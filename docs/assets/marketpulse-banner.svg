@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 430" role="img" aria-labelledby="title desc">
+  <title id="title">MarketPulse VN</title>
+  <desc id="desc">Event-driven market intelligence for Vietnam, illustrated by a rising market line and an event marker.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071a2a"/>
+      <stop offset=".56" stop-color="#102c3a"/>
+      <stop offset="1" stop-color="#123d48"/>
+    </linearGradient>
+    <linearGradient id="line" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#33d6c4"/>
+      <stop offset="1" stop-color="#b7f36b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="77%" cy="49%" r="44%">
+      <stop offset="0" stop-color="#35d6c4" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#35d6c4" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1440" height="430" rx="28" fill="url(#bg)"/>
+  <rect width="1440" height="430" rx="28" fill="url(#glow)"/>
+  <g fill="none" stroke="#c7e5e9" stroke-opacity=".1" stroke-width="1">
+    <path d="M640 86H1380M640 156H1380M640 226H1380M640 296H1380M640 366H1380"/>
+    <path d="M730 56V386M860 56V386M990 56V386M1120 56V386M1250 56V386M1380 56V386"/>
+  </g>
+  <path d="M650 312 L730 284 L790 302 L858 238 L924 256 L1000 188 L1060 208 L1130 148 L1200 164 L1270 105 L1358 84"
+        fill="none" stroke="url(#line)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M650 312 L730 284 L790 302 L858 238 L924 256 L1000 188 L1060 208 L1130 148 L1200 164 L1270 105 L1358 84 L1358 382 L650 382Z"
+        fill="url(#line)" opacity=".08"/>
+  <g stroke="#b7f36b" stroke-width="2" stroke-dasharray="6 8" opacity=".76">
+    <path d="M1000 70V365"/>
+  </g>
+  <circle cx="1000" cy="188" r="12" fill="#b7f36b"/>
+  <circle cx="1000" cy="188" r="24" fill="none" stroke="#b7f36b" stroke-opacity=".35" stroke-width="2"/>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <text x="92" y="102" fill="#8ce6da" font-size="18" font-weight="700" letter-spacing="4">VIETNAM MARKET INTELLIGENCE</text>
+    <text x="88" y="204" fill="#f4f8f8" font-size="72" font-weight="750" letter-spacing="-2">MarketPulse</text>
+    <text x="92" y="266" fill="#b7f36b" font-size="30" font-weight="700" letter-spacing="8">VIETNAM</text>
+    <text x="92" y="326" fill="#bfd1d7" font-size="21">Market movement, data sources and real-world events — connected.</text>
+  </g>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700" letter-spacing="1">
+    <rect x="92" y="356" width="112" height="36" rx="18" fill="#ffffff" fill-opacity=".08" stroke="#ffffff" stroke-opacity=".16"/>
+    <text x="119" y="379" fill="#d8e6e9">EQUITIES</text>
+    <rect x="216" y="356" width="91" height="36" rx="18" fill="#ffffff" fill-opacity=".08" stroke="#ffffff" stroke-opacity=".16"/>
+    <text x="237" y="379" fill="#d8e6e9">EVENTS</text>
+    <rect x="319" y="356" width="111" height="36" rx="18" fill="#ffffff" fill-opacity=".08" stroke="#ffffff" stroke-opacity=".16"/>
+    <text x="340" y="379" fill="#d8e6e9">INSIGHTS</text>
+  </g>
+</svg>
