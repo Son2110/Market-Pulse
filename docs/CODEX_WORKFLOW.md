@@ -14,9 +14,9 @@ Quy trình này tách riêng bước lập kế hoạch, triển khai và đánh
 
 - Bắt đầu mỗi FR từ `main` hiện tại trên nhánh `feat/fr-XX-ten-ngan`, ví dụ `feat/fr-03-stock-search`. Mỗi nhánh và pull request chỉ chứa một FR; mỗi lần chỉ xử lý một task. Nếu FR lớn, chia thành các pull request nhỏ theo thứ tự, giữ cùng mã FR và thêm hậu tố số như `feat/fr-06-01-watchlist-api`, `feat/fr-06-02-watchlist-ui`.
 - Việc hạ tầng hoặc tài liệu dùng nhánh `ci/...` hoặc `docs/...`, không gán mã FR giả.
-- Thứ tự thực hiện: triển khai và chạy các kiểm tra sẵn có phù hợp; GPT-6 Astra đánh giá độc lập; sau đó mới push và mở pull request. Không tự đặt lệnh kiểm tra runtime khi repository chưa có chúng.
-- Phản hồi hiện tại của CodeRabbit cho biết repository dưới 10 stars không nhận review tự động. Với mỗi pull request mới, chủ động gọi `@coderabbitai full review`; sau commit mới, gọi `@coderabbitai review` nếu review tăng dần tự động bị bỏ qua. Không giả định `.coderabbit.yaml` đảm bảo bot sẽ chạy. Xác nhận có review thực chất trên commit mới nhất trước khi merge; xử lý phát hiện có căn cứ kèm bằng chứng, chạy lại CI và yêu cầu review lại sau khi sửa.
-- Chỉ squash-merge khi các check bắt buộc đã pass, review đã đạt yêu cầu và mọi hội thoại review đã được xử lý. Không push thẳng lên `main` hoặc bỏ qua review. Đồng bộ nhánh với `main` mới nhất trước FR kế tiếp.
+- Thứ tự thực hiện: triển khai và chạy các kiểm tra sẵn có phù hợp; GPT-6 Astra review độc lập phần triển khai; sau đó push nhánh và bàn giao tên nhánh cùng bằng chứng. Không tự đặt lệnh kiểm tra runtime khi repository chưa có chúng. User tự tạo pull request và quyết định merge; Codex không tự tạo pull request hoặc merge.
+- Với pull request do user quản lý, trước khi user merge cần có CodeRabbit review thực chất trên commit mới nhất. Phản hồi hiện tại của bot cho biết repository dưới 10 stars không nhận review tự động, nên không giả định `.coderabbit.yaml` đảm bảo bot chạy. Chỉ khi user yêu cầu mới gọi `@coderabbitai full review` cho pull request mới hoặc `@coderabbitai review` sau commit mới nếu review tăng dần bị bỏ qua. Coordinator đánh giá phần triển khai; user quyết định merge.
+- User chỉ squash-merge sau khi các check bắt buộc đã pass, review đã đạt yêu cầu và mọi hội thoại review đã được xử lý. Không push thẳng lên `main` hoặc bỏ qua review. Đồng bộ nhánh với `main` mới nhất trước FR kế tiếp.
 
 ## Quy trình thiết kế frontend theo từng trang
 

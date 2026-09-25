@@ -18,9 +18,9 @@ MarketPulse VN is a planning-stage market intelligence project for Vietnam. Read
 
 - Start each FR from the current `main` on `feat/fr-XX-short-name` (for example, `feat/fr-03-stock-search`). Keep one FR per branch and pull request, and work on one task at a time. Split a large FR into serial smaller pull requests using the same FR ID with numbered suffixes.
 - Use `ci/...` or `docs/...` branches for infrastructure or documentation work; do not assign it a fictitious FR.
-- Implement and run the applicable existing checks, then get an independent GPT-6 Astra review before pushing the pull request. Do not invent runtime checks that the repository does not provide.
-- Current CodeRabbit feedback says automatic reviews are not provided for repositories with fewer than 10 stars. For every new pull request, explicitly request `@coderabbitai full review`; after new commits, request `@coderabbitai review` if an automatic incremental review was skipped. Do not assume `.coderabbit.yaml` guarantees a review. Address justified findings with evidence, rerun CI, and confirm a substantive review of the latest commit before merge.
-- Squash-merge only after required checks pass, review is satisfied, and all review conversations are resolved. Do not push directly to `main` or bypass reviews. Sync with current `main` before starting the next FR.
+- Implement and run applicable existing checks, then get an independent GPT-6 Astra review of the implementation before pushing the branch. Do not invent runtime checks that the repository does not provide. After push, report the branch and evidence; the user owns pull request creation and merge. Do not create a pull request or trigger CodeRabbit unless the user explicitly requests it.
+- For a user-managed pull request, require substantive CodeRabbit review on the latest commit before merge. Current bot feedback says automatic reviews are not provided for repositories with fewer than 10 stars, so `.coderabbit.yaml` does not guarantee a review. Only when explicitly asked, request `@coderabbitai full review` on a new pull request and `@coderabbitai review` after new commits if incremental review was skipped. The coordinator reviews implementation evidence; the user decides whether and when to merge.
+- The user squash-merges only after required checks pass, review is satisfied, and all review conversations are resolved. Do not push directly to `main` or bypass reviews. Sync with current `main` before starting the next FR.
 
 ## Frontend page workflow
 
