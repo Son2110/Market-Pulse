@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: vi-VN
+tone_instructions: >-
+  Chỉ nêu phát hiện có bằng chứng về tính đúng đắn, bảo mật, toàn vẹn dữ liệu hoặc hiệu năng; tránh nit về style và tối ưu hóa sớm.
+reviews:
+  profile: assertive
+  poem: false
+  high_level_summary: true
+  review_status: true
+  request_changes_workflow: true
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+  path_filters:
+    - "!_site/**"
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+  path_instructions:
+    - path: "apps/web/**"
+      instructions: "Review accessibility, responsive behavior, and Stitch-defined loading, empty, and error states."
+    - path: "apps/api/**"
+      instructions: "Review authentication, ownership checks, input validation, MongoDB indexes, errors, and pagination."
+    - path: "apps/worker/**"
+      instructions: "Review BullMQ retry behavior and idempotency across retries and replay."
+    - path: "services/collector/**"
+      instructions: "Review provider rights, units, timezone, source/as-of/freshness labels, retries, and deduplication."
+    - path: "**/*.py"
+      instructions: "For current scripts, check standard-library assumptions, paths, and error handling. Do not invent runtime checks."
+    - path: ".github/workflows/**"
+      instructions: "Review least-privilege permissions, action pins, untrusted pull request handling, and secret exposure."
+    - path: "docs/**"
+      instructions: "Check factual project status and consistency with FR scope and acceptance criteria."
