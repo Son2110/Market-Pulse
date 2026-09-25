@@ -10,6 +10,14 @@ Quy trình này tách riêng bước lập kế hoạch, triển khai và đánh
 4. Chỉ làm một task tại một thời điểm với một worker. Hoàn tất triển khai, kiểm tra bắt buộc và review độc lập rồi mới bắt đầu task kế tiếp. Không triển khai nhiều task song song và không giao việc tiếp cho agent khác.
 5. Ghi rõ phạm vi file, tiêu chí nghiệm thu và lệnh kiểm tra trước khi giao việc. Không giao câu hỏi chỉ cần giải thích hoặc nghiên cứu thành việc viết code.
 
+## Nhánh FR và review
+
+- Bắt đầu mỗi FR từ `main` hiện tại trên nhánh `feat/fr-XX-ten-ngan`, ví dụ `feat/fr-03-stock-search`. Mỗi nhánh và pull request chỉ chứa một FR; mỗi lần chỉ xử lý một task. Nếu FR lớn, chia thành các pull request nhỏ theo thứ tự, giữ cùng mã FR và thêm hậu tố số như `feat/fr-06-01-watchlist-api`, `feat/fr-06-02-watchlist-ui`.
+- Việc hạ tầng hoặc tài liệu dùng nhánh `ci/...` hoặc `docs/...`, không gán mã FR giả.
+- Thứ tự thực hiện: triển khai và chạy các kiểm tra sẵn có phù hợp; GPT-6 Astra đánh giá độc lập; sau đó mới push và mở pull request. Không tự đặt lệnh kiểm tra runtime khi repository chưa có chúng.
+- Trước khi merge, cần có CodeRabbit review thực chất trên pull request. Xem từng phát hiện, sửa các vấn đề có căn cứ và nêu bằng chứng; không áp dụng gợi ý máy móc. Sau thay đổi, chạy lại CI và yêu cầu CodeRabbit review tăng dần trên commit mới nhất.
+- Chỉ squash-merge khi các check bắt buộc đã pass, review đã đạt yêu cầu và mọi hội thoại review đã được xử lý. Không push thẳng lên `main` hoặc bỏ qua review. Đồng bộ nhánh với `main` mới nhất trước FR kế tiếp.
+
 ## Quy trình thiết kế frontend theo từng trang
 
 - Khi vào giai đoạn frontend, dùng Stitch để thiết kế từng trang trước khi triển khai trang đó; giữ các trang nhất quán với design system dùng chung.

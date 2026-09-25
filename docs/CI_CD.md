@@ -25,6 +25,14 @@ Trước khi triển khai, lưu secrets trong Vercel, Render, Atlas hoặc GitHu
 
 Giá trị thị trường cần giữ source, đơn vị/tiền tệ, timezone, as-of và freshness. Thời điểm sự kiện gần biến động giá không chứng minh quan hệ nhân quả và nội dung không phải tư vấn đầu tư.
 
+## CodeRabbit và pull request
+
+`.coderabbit.yaml` mô tả cách review, nhưng riêng file này không cài ứng dụng GitHub hay cấp quyền vào repository. CodeRabbit GitHub App đã được cài ở cấp tài khoản; cần xác nhận quyền truy cập cho riêng `Son2110/Market-Pulse` và kiểm tra một review trên pull request trước khi xem tích hợp là hoạt động. Không tạo subscription hoặc thay đổi billing.
+
+Yêu cầu CodeRabbit review trước khi merge, trên pull request và commit mới nhất. `@coderabbitai review` yêu cầu review thường/tăng dần; dùng `@coderabbitai full review` khi cần đánh giá toàn bộ pull request. Trạng thái skipped, rate-limited hoặc chỉ có summary không chứng minh đã có full review. Không tự động chấp thuận, giải quyết hội thoại hay commit mã sửa lỗi. Người review đánh giá phát hiện, sửa các vấn đề có căn cứ, chạy lại CI và để CodeRabbit xem commit mới nhất trước khi merge.
+
+Xem thêm [quy trình nhánh FR và review](CODEX_WORKFLOW.md) và [thiết lập GitHub](GITHUB_SETUP.md). Cấu hình tham chiếu theo [schema CodeRabbit](https://coderabbit.ai/integrations/schema.v2.json), [tài liệu cấu hình](https://docs.coderabbit.ai/reference/configuration), [Quickstart](https://docs.coderabbit.ai/getting-started/quickstart) và [lệnh review](https://docs.coderabbit.ai/guides/commands).
+
 ## Tài liệu chính thức
 
 - [GitHub Actions: dùng an toàn](https://docs.github.com/en/actions/reference/security/secure-use)
