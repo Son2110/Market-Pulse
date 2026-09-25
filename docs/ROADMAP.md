@@ -27,6 +27,10 @@ Với mỗi task frontend, thiết kế một trang trong Stitch trước khi tr
 
 MP-01 đã hoàn tất báo cáo tài liệu và probe HTTP không xác thực; chưa xác minh được credential, quyền dữ liệu hoặc coverage của nguồn live. Cổng LIVE còn mở. Dùng fixture tổng hợp cho MP-02 cho tới khi các điều kiện này được kiểm chứng. Xem [báo cáo khảo sát provider](PROVIDER_RESEARCH.md); lịch, phạm vi và tiêu chí MP-02 không đổi.
 
+### Tiến độ ghi nhận · 26/09/2026
+
+MP-02 đã hoàn tất schema JSON v1, fixture tổng hợp xác định trước và validator offline có kiểm tra ràng buộc chéo; 24 unit tests và các bước docs/link/build hiện có đều đạt. Documentation CI chạy validation/test này trên pull request và push vào `main`, `ci/**`, `feat/**`, `docs/**`. Các ngày fixture chưa xác minh theo lịch giao dịch; cổng LIVE về credential, quyền dữ liệu và coverage vẫn mở.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |

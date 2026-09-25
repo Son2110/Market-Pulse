@@ -2,16 +2,19 @@
 
 ## Đang hoạt động
 
-`Documentation CI` chạy khi mở/cập nhật pull request và khi push vào `main`. Workflow kiểm tra đích liên kết cục bộ trong Markdown và thuộc tính HTML `src`/`href`, rồi build portal từ danh sách tài liệu cho phép và lưu `_site/` thành artifact trong 7 ngày. Link ngoài không được truy cập; fragment anchor không được kiểm tra. Thiếu file cục bộ sẽ làm job thất bại.
+`Documentation CI` chạy khi mở/cập nhật pull request và khi push vào `main`, `ci/**`, `feat/**` hoặc `docs/**`. Workflow cài dependency validation đã pin, kiểm tra link cục bộ, xác thực schema/fixture thị trường offline, chạy unit tests hợp đồng, build portal từ danh sách tài liệu cho phép và lưu `_site/` thành artifact trong 7 ngày. Link ngoài không được truy cập; fragment anchor không được kiểm tra. Thiếu file cục bộ hoặc lỗi validation/test sẽ làm job thất bại.
 
-Chạy hai bước hiện có tại máy:
+Chạy cùng các bước tại máy:
 
 ~~~powershell
+python -m pip install -r requirements-dev.txt
 python scripts/check_docs.py
+python scripts/validate_market_data.py
+python -m unittest discover -s tests -v
 python scripts/build_docs.py
 ~~~
 
-Build chỉ dùng thư viện chuẩn của Python 3.12, không render Markdown và không build ứng dụng. `_site/` là đầu ra sinh tự động.
+Portal build chỉ dùng thư viện chuẩn của Python 3.12; workflow không render Markdown và không build ứng dụng. `_site/` là đầu ra sinh tự động.
 
 `Documentation Pages` chỉ chạy thủ công từ `main`: workflow kiểm tra, build và upload Pages artifact rồi deploy qua environment `github-pages`. Bật **Settings → Pages → Build and deployment → GitHub Actions** trước khi chạy. Đây là portal tài liệu, không phải website ứng dụng hay môi trường production.
 

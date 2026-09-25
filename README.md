@@ -51,6 +51,7 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 | Document | What it covers |
 |---|---|
 | [Product requirements](docs/PRD.md) | Vietnamese scope, all FR-01–FR-18 statuses, acceptance boundaries and explicit omissions. |
+| [Market-data contract](docs/DATA_CONTRACT.md) | Versioned canonical schema, synthetic fixture semantics, units, provenance and offline checks. |
 | [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
 | [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison, limited access probe, unresolved live-source gate and MP-02 fixture decision. |
 | [Codex workflow](docs/CODEX_WORKFLOW.md) | Sequential planning, bounded implementation handoffs and independent review. |
@@ -66,6 +67,14 @@ The brief is the product context; the PRD and roadmap define the smaller demo bo
 - [SSI FastConnect](https://developers.ssi.com.vn/docs/getting-started/overview) documents market APIs and streaming. Project credentials and coverage have not been tested.
 - [GDELT DOC API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) is a candidate for later news research; the project does not promise a particular archive or Vietnam coverage.
 - MongoDB’s [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) inform the replay and uniqueness design.
+
+The canonical market-data schema and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). Run its offline checks with the pinned development dependency:
+
+```sh
+python -m pip install -r requirements-dev.txt
+python scripts/validate_market_data.py
+python -m unittest discover -s tests -v
+```
 
 ## Hosting direction
 

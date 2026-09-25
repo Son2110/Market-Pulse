@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marketpulse.invalid/schemas/market-data-v1.schema.json",
+  "title": "MarketPulse canonical market data v1",
+  "description": "Canonical daily market-data envelope. The fixture validator applies additional cross-record rules.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "dataset", "assets", "candles", "quotes", "indexObservations"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "dataset": { "$ref": "#/$defs/dataset" },
+    "assets": { "type": "array", "items": { "$ref": "#/$defs/asset" }, "minItems": 1 },
+    "candles": { "type": "array", "items": { "$ref": "#/$defs/candle" } },
+    "quotes": { "type": "array", "items": { "$ref": "#/$defs/quote" } },
+    "indexObservations": { "type": "array", "items": { "$ref": "#/$defs/indexObservation" } }
+  },
+  "$defs": {
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "label", "freshness", "sessionCalendar"],
+      "properties": {
+        "mode": { "enum": ["fixture", "observed"] },
+        "label": { "type": "string", "minLength": 1 },
+        "freshness": { "enum": ["fixture / unknown", "unknown", "delayed", "current"] },
+        "sessionCalendar": { "enum": ["unverified", "verified"] }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "symbol", "assetType", "exchange", "currency", "unit", "timezone"],
+      "properties": {
+        "assetId": { "type": "string", "pattern": "^VN:(HOSE|HNX|UPCOM|INDEX):[A-Z0-9._-]+$" },
+        "symbol": { "type": "string", "pattern": "^[A-Z0-9._-]+$" },
+        "assetType": { "enum": ["equity", "index"] },
+        "exchange": { "enum": ["HOSE", "HNX", "UPCOM", "INDEX"] },
+        "currency": { "enum": ["VND", null] },
+        "unit": { "enum": ["VND", "index_point"] },
+        "timezone": { "const": "Asia/Ho_Chi_Minh" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "mode", "recordId"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1 },
+        "mode": { "enum": ["fixture", "observed"] },
+        "recordId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "candle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "interval", "tradingDate", "open", "high", "low", "close", "volume", "volumeUnit", "currency", "unit", "adjustmentBasis", "timezone", "asOf", "ingestedAt", "source"],
+      "properties": {
+        "assetId": { "type": "string", "minLength": 1 },
+        "interval": { "const": "1d" },
+        "tradingDate": { "type": "string", "format": "date" },
+        "open": { "type": "number", "exclusiveMinimum": 0 },
+        "high": { "type": "number", "exclusiveMinimum": 0 },
+        "low": { "type": "number", "exclusiveMinimum": 0 },
+        "close": { "type": "number", "exclusiveMinimum": 0 },
+        "volume": { "type": ["integer", "null"], "minimum": 0 },
+        "volumeUnit": { "enum": ["shares", "not_available"] },
+        "currency": { "enum": ["VND", null] },
+        "unit": { "enum": ["VND", "index_point"] },
+        "adjustmentBasis": { "enum": ["unadjusted", "split_adjusted", "total_return_adjusted", "not_applicable"] },
+        "timezone": { "const": "Asia/Ho_Chi_Minh" },
+        "asOf": { "type": "string", "format": "date-time" },
+        "ingestedAt": { "type": "string", "format": "date-time" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "quote": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "tradingDate", "previousTradingDate", "lastPrice", "previousClose", "change", "changePercent", "volume", "volumeUnit", "currency", "unit", "adjustmentBasis", "timezone", "asOf", "ingestedAt", "source"],
+      "properties": {
+        "assetId": { "type": "string", "minLength": 1 },
+        "tradingDate": { "type": "string", "format": "date" },
+        "previousTradingDate": { "type": ["string", "null"], "format": "date" },
+        "lastPrice": { "type": "number", "exclusiveMinimum": 0 },
+        "previousClose": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "change": { "type": ["number", "null"] },
+        "changePercent": { "type": ["number", "null"] },
+        "volume": { "type": ["integer", "null"], "minimum": 0 },
+        "volumeUnit": { "enum": ["shares", "not_available"] },
+        "currency": { "enum": ["VND", null] },
+        "unit": { "enum": ["VND", "index_point"] },
+        "adjustmentBasis": { "enum": ["unadjusted", "split_adjusted", "total_return_adjusted", "not_applicable"] },
+        "timezone": { "const": "Asia/Ho_Chi_Minh" },
+        "asOf": { "type": "string", "format": "date-time" },
+        "ingestedAt": { "type": "string", "format": "date-time" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "indexObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "tradingDate", "previousTradingDate", "indexValue", "previousClose", "change", "changePercent", "currency", "unit", "adjustmentBasis", "timezone", "asOf", "ingestedAt", "source"],
+      "properties": {
+        "assetId": { "type": "string", "minLength": 1 },
+        "tradingDate": { "type": "string", "format": "date" },
+        "previousTradingDate": { "type": ["string", "null"], "format": "date" },
+        "indexValue": { "type": "number", "exclusiveMinimum": 0 },
+        "previousClose": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "change": { "type": ["number", "null"] },
+        "changePercent": { "type": ["number", "null"] },
+        "currency": { "enum": ["VND", null] },
+        "unit": { "enum": ["VND", "index_point"] },
+        "adjustmentBasis": { "enum": ["unadjusted", "split_adjusted", "total_return_adjusted", "not_applicable"] },
+        "timezone": { "const": "Asia/Ho_Chi_Minh" },
+        "asOf": { "type": "string", "format": "date-time" },
+        "ingestedAt": { "type": "string", "format": "date-time" },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    }
+  }
+}

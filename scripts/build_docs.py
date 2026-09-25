@@ -16,13 +16,18 @@ DOCUMENTS = (
     "README.md",
     "MarketPulse_VN_Project_Documentation.md",
     "docs/PRD.md",
+    "docs/DATA_CONTRACT.md",
     "docs/ROADMAP.md",
     "docs/PROVIDER_RESEARCH.md",
     "docs/CODEX_WORKFLOW.md",
     "docs/CI_CD.md",
     "docs/GITHUB_SETUP.md",
 )
-ASSETS = ("docs/assets/marketpulse-banner.svg",)
+ASSETS = (
+    "docs/assets/marketpulse-banner.svg",
+    "packages/schemas/market-data-v1.schema.json",
+    "fixtures/market/mp-02-synthetic.json",
+)
 PORTAL = ROOT / "docs/assets/portal.html"
 
 
