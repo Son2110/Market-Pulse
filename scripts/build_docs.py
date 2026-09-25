@@ -17,6 +17,7 @@ DOCUMENTS = (
     "MarketPulse_VN_Project_Documentation.md",
     "docs/PRD.md",
     "docs/ROADMAP.md",
+    "docs/PROVIDER_RESEARCH.md",
     "docs/CODEX_WORKFLOW.md",
     "docs/CI_CD.md",
     "docs/GITHUB_SETUP.md",

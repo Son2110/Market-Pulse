@@ -23,6 +23,10 @@ Với mỗi task frontend, thiết kế một trang trong Stitch trước khi tr
 | D6 · Thứ Ba 29/09 | Build · 2,4 giờ | MP-05 đường đọc candle ngày đã chuẩn hóa | Nạp fixture qua provider adapter vào response candle ngày canonical; hiển thị trạng thái thiếu dữ liệu/as-of/freshness trung thực. |
 | D7 · Thứ Tư 30/09 | Review / buffer · 1 giờ | GATE-2 tích hợp tuần 1 | Compose khởi động được, seed lặp lại được, một response API đúng contract và CI không skip. Nếu chưa đạt, dùng buffer để sửa thay vì thêm tính năng. |
 
+### Tiến độ ghi nhận · 25/09/2026
+
+MP-01 đã hoàn tất báo cáo tài liệu và probe HTTP không xác thực; chưa xác minh được credential, quyền dữ liệu hoặc coverage của nguồn live. Cổng LIVE còn mở. Dùng fixture tổng hợp cho MP-02 cho tới khi các điều kiện này được kiểm chứng. Xem [báo cáo khảo sát provider](PROVIDER_RESEARCH.md); lịch, phạm vi và tiêu chí MP-02 không đổi.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |

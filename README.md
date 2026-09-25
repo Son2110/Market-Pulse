@@ -52,6 +52,7 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 |---|---|
 | [Product requirements](docs/PRD.md) | Vietnamese scope, all FR-01–FR-18 statuses, acceptance boundaries and explicit omissions. |
 | [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
+| [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison, limited access probe, unresolved live-source gate and MP-02 fixture decision. |
 | [Codex workflow](docs/CODEX_WORKFLOW.md) | Sequential planning, bounded implementation handoffs and independent review. |
 | [CI/CD and documentation portal](docs/CI_CD.md) | Documentation checks, artifact build, Pages deployment and future application CI. |
 | [GitHub setup](docs/GITHUB_SETUP.md) | Repository checks, Pages setup and branch-protection guidance. |
