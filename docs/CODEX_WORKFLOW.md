@@ -10,6 +10,14 @@ Quy trình này tách riêng bước lập kế hoạch, triển khai và đánh
 4. Chỉ làm một task tại một thời điểm với một worker. Hoàn tất triển khai, kiểm tra bắt buộc và review độc lập rồi mới bắt đầu task kế tiếp. Không triển khai nhiều task song song và không giao việc tiếp cho agent khác.
 5. Ghi rõ phạm vi file, tiêu chí nghiệm thu và lệnh kiểm tra trước khi giao việc. Không giao câu hỏi chỉ cần giải thích hoặc nghiên cứu thành việc viết code.
 
+## Nhánh FR và review
+
+- Bắt đầu mỗi FR từ `main` hiện tại trên nhánh `feat/fr-XX-ten-ngan`, ví dụ `feat/fr-03-stock-search`. Mỗi nhánh và pull request chỉ chứa một FR; mỗi lần chỉ xử lý một task. Nếu FR lớn, chia thành các pull request nhỏ theo thứ tự, giữ cùng mã FR và thêm hậu tố số như `feat/fr-06-01-watchlist-api`, `feat/fr-06-02-watchlist-ui`.
+- Việc hạ tầng hoặc tài liệu dùng nhánh `ci/...` hoặc `docs/...`, không gán mã FR giả.
+- Thứ tự thực hiện: triển khai và chạy các kiểm tra sẵn có phù hợp; GPT-6 Astra review độc lập phần triển khai; sau đó push nhánh và bàn giao tên nhánh cùng bằng chứng. Không tự đặt lệnh kiểm tra runtime khi repository chưa có chúng. User tự tạo pull request và quyết định merge; Codex không tự tạo pull request hoặc merge.
+- Với pull request do user quản lý, trước khi user merge cần có CodeRabbit review thực chất trên commit mới nhất. Phản hồi hiện tại của bot cho biết repository dưới 10 stars không nhận review tự động, nên không giả định `.coderabbit.yaml` đảm bảo bot chạy. Chỉ khi user yêu cầu mới gọi `@coderabbitai full review` cho pull request mới hoặc `@coderabbitai review` sau commit mới nếu review tăng dần bị bỏ qua. Coordinator đánh giá phần triển khai; user quyết định merge.
+- User chỉ squash-merge sau khi các check bắt buộc đã pass, review đã đạt yêu cầu và mọi hội thoại review đã được xử lý. Không push thẳng lên `main` hoặc bỏ qua review. Đồng bộ nhánh với `main` mới nhất trước FR kế tiếp.
+
 ## Quy trình thiết kế frontend theo từng trang
 
 - Khi vào giai đoạn frontend, dùng Stitch để thiết kế từng trang trước khi triển khai trang đó; giữ các trang nhất quán với design system dùng chung.
