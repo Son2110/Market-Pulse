@@ -19,7 +19,7 @@ MarketPulse VN is a planning-stage market intelligence project for Vietnam. Read
 - Start each FR from the current `main` on `feat/fr-XX-short-name` (for example, `feat/fr-03-stock-search`). Keep one FR per branch and pull request, and work on one task at a time. Split a large FR into serial smaller pull requests using the same FR ID with numbered suffixes.
 - Use `ci/...` or `docs/...` branches for infrastructure or documentation work; do not assign it a fictitious FR.
 - Implement and run the applicable existing checks, then get an independent GPT-6 Astra review before pushing the pull request. Do not invent runtime checks that the repository does not provide.
-- Before merge, obtain a substantive CodeRabbit review on the pull request. Address justified findings with evidence; do not apply suggestions blindly. Rerun CI and have CodeRabbit incrementally review the latest commit.
+- Current CodeRabbit feedback says automatic reviews are not provided for repositories with fewer than 10 stars. For every new pull request, explicitly request `@coderabbitai full review`; after new commits, request `@coderabbitai review` if an automatic incremental review was skipped. Do not assume `.coderabbit.yaml` guarantees a review. Address justified findings with evidence, rerun CI, and confirm a substantive review of the latest commit before merge.
 - Squash-merge only after required checks pass, review is satisfied, and all review conversations are resolved. Do not push directly to `main` or bypass reviews. Sync with current `main` before starting the next FR.
 
 ## Frontend page workflow

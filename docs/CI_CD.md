@@ -27,9 +27,9 @@ Giá trị thị trường cần giữ source, đơn vị/tiền tệ, timezone,
 
 ## CodeRabbit và pull request
 
-`.coderabbit.yaml` mô tả cách review, nhưng riêng file này không cài ứng dụng GitHub hay cấp quyền vào repository. CodeRabbit GitHub App đã được cài ở cấp tài khoản; cần xác nhận quyền truy cập cho riêng `Son2110/Market-Pulse` và kiểm tra một review trên pull request trước khi xem tích hợp là hoạt động. Không tạo subscription hoặc thay đổi billing.
+Một pull request thật đã xác nhận CodeRabbit truy cập được `Son2110/Market-Pulse` và đọc cấu hình với profile `assertive`. Phản hồi của bot trong [PR #1](https://github.com/Son2110/Market-Pulse/pull/1#issuecomment-5829748407) và [follow-up](https://github.com/Son2110/Market-Pulse/pull/1#issuecomment-5829751224) cho biết repository dưới 10 stars không nhận review tự động; vì vậy `.coderabbit.yaml` không đảm bảo bot tự review. Không cần thay đổi subscription hoặc billing.
 
-Yêu cầu CodeRabbit review trước khi merge, trên pull request và commit mới nhất. `@coderabbitai review` yêu cầu review thường/tăng dần; dùng `@coderabbitai full review` khi cần đánh giá toàn bộ pull request. Trạng thái skipped, rate-limited hoặc chỉ có summary không chứng minh đã có full review. Không tự động chấp thuận, giải quyết hội thoại hay commit mã sửa lỗi. Người review đánh giá phát hiện, sửa các vấn đề có căn cứ, chạy lại CI và để CodeRabbit xem commit mới nhất trước khi merge.
+Với mỗi pull request mới, chủ động gọi `@coderabbitai full review`. Sau commit mới, gọi `@coderabbitai review` nếu review tăng dần tự động bị bỏ qua. Trạng thái skipped, rate-limited hoặc chỉ có summary không chứng minh đã có full review. Không tự động chấp thuận, giải quyết hội thoại hay commit mã sửa lỗi. Người review đánh giá phát hiện, sửa các vấn đề có căn cứ, chạy lại CI và xác nhận CodeRabbit review commit mới nhất trước khi merge.
 
 Xem thêm [quy trình nhánh FR và review](CODEX_WORKFLOW.md) và [thiết lập GitHub](GITHUB_SETUP.md). Cấu hình tham chiếu theo [schema CodeRabbit](https://coderabbit.ai/integrations/schema.v2.json), [tài liệu cấu hình](https://docs.coderabbit.ai/reference/configuration), [Quickstart](https://docs.coderabbit.ai/getting-started/quickstart) và [lệnh review](https://docs.coderabbit.ai/guides/commands).
 
