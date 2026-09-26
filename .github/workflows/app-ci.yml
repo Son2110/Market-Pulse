@@ -1,0 +1,74 @@
+name: Application CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, "ci/**", "feat/**", "docs/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    name: app
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - name: Install Node workspaces
+        run: npm ci
+      - name: Lint, typecheck, unit test and build
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:unit
+          npm run build
+      - name: Install fixture validation dependency
+        run: python -m pip install -r requirements-dev.txt
+      - name: Validate fixture and run Python tests
+        run: |
+          python scripts/validate_market_data.py
+          python -m unittest discover -s tests -v
+          python -m unittest discover -s services/collector/tests -v
+      - name: Validate Compose configuration and build services
+        run: |
+          docker compose config --quiet
+          docker compose --profile collector build
+      - name: Start local stack and wait for healthy services
+        run: docker compose up --build --detach --wait
+      - name: Smoke test loopback application ports
+        run: |
+          node --input-type=module <<'NODE'
+          const checks = [
+            ["http://127.0.0.1:3001/health/live", '"status":"alive"'],
+            ["http://127.0.0.1:3001/health/ready", '"status":"ready"'],
+            ["http://127.0.0.1:5173/", '<div id="root"></div>'],
+          ];
+          for (const [url, expected] of checks) {
+            const response = await fetch(url);
+            const body = await response.text();
+            if (!response.ok || !body.includes(expected)) throw new Error(`Smoke test failed for ${url}`);
+            console.log(`OK ${url}`);
+          }
+          NODE
+      - name: Run fixture collector container
+        run: docker compose --profile collector run --rm collector
+      - name: Run real MongoDB and Redis integration test
+        run: npm run test:integration
+      - name: Show service logs after failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+      - name: Stop local stack
+        if: always()
+        run: docker compose down --remove-orphans

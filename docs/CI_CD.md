@@ -4,6 +4,8 @@
 
 `Documentation CI` chạy khi mở/cập nhật pull request và khi push vào `main`, `ci/**`, `feat/**` hoặc `docs/**`. Workflow cài dependency validation đã pin, kiểm tra link cục bộ, xác thực schema/fixture thị trường offline, chạy unit tests hợp đồng, build portal từ danh sách tài liệu cho phép và lưu `_site/` thành artifact trong 7 ngày. Link ngoài không được truy cập; fragment anchor không được kiểm tra. Thiếu file cục bộ hoặc lỗi validation/test sẽ làm job thất bại.
 
+`Application CI` là workflow riêng trên cùng pull request và các nhánh push đó. Nó chạy `npm ci`, lint, typecheck source và test, unit tests, build API/web, validator và Python tests; sau đó kiểm tra/build Compose, khởi động stack và đợi health checks, chạy collector fixture cùng integration thật với MongoDB/Redis. Integration không skip khi thiếu dependency. Workflow chỉ có quyền `contents: read`, không cần provider secret.
+
 Chạy cùng các bước tại máy:
 
 ~~~powershell
@@ -14,13 +16,17 @@ python -m unittest discover -s tests -v
 python scripts/build_docs.py
 ~~~
 
-Portal build chỉ dùng thư viện chuẩn của Python 3.12; workflow không render Markdown và không build ứng dụng. `_site/` là đầu ra sinh tự động.
+Portal build chỉ dùng thư viện chuẩn của Python 3.12; workflow không render Markdown. `_site/` là đầu ra sinh tự động.
 
 `Documentation Pages` chỉ chạy thủ công từ `main`: workflow kiểm tra, build và upload Pages artifact rồi deploy qua environment `github-pages`. Bật **Settings → Pages → Build and deployment → GitHub Actions** trước khi chạy. Đây là portal tài liệu, không phải website ứng dụng hay môi trường production.
 
+## Luồng ứng dụng local hiện tại
+
+`Application CI` kiểm tra đúng scaffold MP-03. API chỉ có `/health/live` và `/health/ready`, web root cố ý trống tới khi có page được thiết kế trong Stitch, còn collector chỉ xác thực fixture. Những check này không chứng minh đã có luồng user, live data, E2E sản phẩm hay deploy.
+
 ## Luồng ứng dụng sau này
 
-Chưa có mã ứng dụng hoặc pipeline app để chạy. Khi các lệnh thật đã tồn tại, pull request cần có một app gate bắt buộc gồm lint, typecheck, unit test normalization/analytics, API integration với MongoDB/Redis local, build frontend/backend và E2E dùng fixture. E2E nên đi qua search → chart → watchlist, kiểm tra quyền sở hữu phủ định và replay/retry idempotency. Vercel có thể tạo Preview cho pull request; chỉ dùng fixture và không đưa khóa provider vào preview.
+Khi có luồng sản phẩm, pull request cần bổ sung unit test normalization/analytics và E2E dùng fixture. E2E nên đi qua search → chart → watchlist, kiểm tra quyền sở hữu phủ định và replay/retry idempotency. Vercel có thể tạo Preview cho pull request; chỉ dùng fixture và không đưa khóa provider vào preview.
 
 Sau review và khi app gate đạt, user merge vào `main`. Đưa API và worker lên Render staging sau CI hoặc deploy thủ công đúng commit đã kiểm tra; chạy smoke test health, search/chart/watchlist và nhãn source/as-of/freshness. Chỉ promote production ở một bước riêng có người duyệt sau này. Một trạng thái Render bị skip/neutral không chứng minh app gate thành công: bảo vệ `main` bằng check cuối cùng yêu cầu job gate thực sự pass.
 

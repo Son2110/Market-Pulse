@@ -1,0 +1,14 @@
+.git
+.github
+**/node_modules
+**/dist
+**/coverage
+**/__pycache__
+**/*.py[cod]
+.env
+.env.*
+!.env.example
+.npm-cache
+_site
+.venv
+*.log

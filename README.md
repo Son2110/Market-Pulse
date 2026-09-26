@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Event-driven market intelligence for Vietnam</strong></p>
 
-**Project status: planning and repository foundation.** The application, live data integration and production deployment are not yet demonstrated in this repository. The roadmap describes a three-week, local-first portfolio demo; the broader product remains a longer-term plan.
+**Project status: MP-03 local scaffold.** The repository now contains a runnable API health shell, blank React/Vite app wiring, local MongoDB/Redis Compose services and a fixture-only Python collector. Market/account routes, designed product screens, verified live data and production deployment are not present. The roadmap describes a three-week, local-first portfolio demo; the broader product remains a longer-term plan.
 
 MarketPulse VN is designed to bring Vietnamese equities, market indices, gold, foreign exchange, macro data, financial news and public events into one research experience. The central idea is to show market movement alongside relevant events while making data source and freshness visible. A nearby event is context, not proof of cause.
 
@@ -55,7 +55,8 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 | [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
 | [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison and limited probe, owner’s Vnstock direction, unresolved live-source gate and MP-02 fixture decision. |
 | [Codex workflow](docs/CODEX_WORKFLOW.md) | Sequential planning, bounded implementation handoffs and independent review. |
-| [CI/CD and documentation portal](docs/CI_CD.md) | Documentation checks, artifact build, Pages deployment and future application CI. |
+| [CI/CD and documentation portal](docs/CI_CD.md) | Documentation checks, Pages deployment, and application lint, build, Compose and integration CI. |
+| [Local development](docs/LOCAL_DEVELOPMENT.md) | Compose startup, host mode, fixture collector and local check commands. |
 | [GitHub setup](docs/GITHUB_SETUP.md) | Repository checks, Pages setup and branch-protection guidance. |
 | [Original project brief](MarketPulse_VN_Project_Documentation.md) | Full Vietnamese source requirements, preserved as supplied. |
 
@@ -68,12 +69,18 @@ The brief is the product context; the PRD and roadmap define the smaller demo bo
 - [GDELT DOC API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) is a candidate for later news research; the project does not promise a particular archive or Vietnam coverage.
 - MongoDB’s [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) inform the replay and uniqueness design.
 
-The canonical market-data schema and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). Run its offline checks with the pinned development dependency:
+The canonical market-data schema and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). The API currently offers only `/health/live` and `/health/ready`; the web root intentionally renders nothing until its first Stitch-designed page. Run the scaffold checks with:
 
 ```sh
 python -m pip install -r requirements-dev.txt
 python scripts/validate_market_data.py
 python -m unittest discover -s tests -v
+python -m unittest discover -s services/collector/tests -v
+npm ci
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run build
 ```
 
 ## Hosting direction

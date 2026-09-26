@@ -31,6 +31,12 @@ MP-01 đã hoàn tất báo cáo tài liệu và probe HTTP không xác thực; 
 
 MP-02 đã hoàn tất schema JSON v1, fixture tổng hợp xác định trước và validator offline có kiểm tra ràng buộc chéo; 24 unit tests và các bước docs/link/build hiện có đều đạt. Documentation CI chạy validation/test này trên pull request và push vào `main`, `ci/**`, `feat/**`, `docs/**`. Các ngày fixture chưa xác minh theo lịch giao dịch; cổng LIVE vẫn mở. Ngày 26/09, chủ dự án chọn Vnstock làm hướng connector/tích hợp để xác minh tiếp; SSI bị loại vì đăng ký không thực tế cho dự án theo đánh giá của chủ dự án, không phải kết luận chung về kỹ thuật hay pháp lý. Lựa chọn này chưa xác minh upstream, truy cập thực tế, coverage, đơn vị/ngữ nghĩa thời gian hoặc quyền dữ liệu. Không còn yêu cầu tài khoản/credential SSI; credential chỉ cần nếu upstream Vnstock được chọn thực sự yêu cầu. Fixture giữ provider `marketpulse-fixture`.
 
+### Tiến độ ghi nhận · MP-03 · 26/09/2026
+
+Scaffold local có workspace npm với lockfile, API chỉ có liveness/readiness, React/Vite root trống chờ thiết kế Stitch, Compose MongoDB/Redis, và Python CLI chỉ xác thực cùng báo cáo metadata fixture. Collector chưa kết nối Vnstock. Compose chỉ publish cổng loopback; startup retry có giới hạn. Sau khi Redis ngắt kết nối, API thoát lỗi để Compose thử khởi động lại tối đa năm lần; MongoDB readiness failure trả 503 trong khi liveness còn 200. Workflow `Application CI` chạy checks app, collector, Compose và integration MongoDB/Redis; xem [hướng dẫn local](LOCAL_DEVELOPMENT.md) và [CI/CD](CI_CD.md) để biết lệnh chi tiết.
+
+Kiểm tra local đã đạt: `npm ci`, lint, typecheck source/test, 8 API unit tests, build, fixture validator, 24 test contract và 2 test collector. Cả ba images build; `docker compose up --build --wait` đưa bốn service tới healthy; container collector báo 11 assets, 33 candles, 10 quotes và 1 index observation; API liveness/readiness cùng web root trả 200; integration MongoDB/Redis đạt 1 test, 0 skip. Khi dừng MongoDB, liveness vẫn 200 và readiness 503; khi Redis bị dừng, API thoát với log đã khử lỗi, rồi tự chạy lại và readiness 200 sau khi Redis hoạt động. Bài kiểm tra startup SIGTERM thoát mã 0 trong 1,327 ms. GitHub Actions ở remote chưa chạy trên branch này. Cổng truy cập/điều khoản/provider Vnstock vẫn mở; fixture vẫn là synthetic.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |

@@ -1,7 +1,7 @@
 # Yêu cầu sản phẩm và giới hạn ba tuần
 
 **Sản phẩm:** MarketPulse VN — nền tảng thông tin thị trường Việt Nam theo sự kiện  
-**Trạng thái kế hoạch:** repo hiện là nền tảng tài liệu, chưa chứng minh ứng dụng đã chạy. Yêu cầu gốc nằm trong [MarketPulse_VN_Project_Documentation.md](../MarketPulse_VN_Project_Documentation.md).
+**Trạng thái:** MP-03 đã thêm scaffold local gồm API chỉ có health check, web shell trống có chủ đích, MongoDB/Redis Compose và collector chỉ đọc fixture. Chưa có luồng sản phẩm, trang được thiết kế, live adapter hay deployment; yêu cầu gốc nằm trong [MarketPulse_VN_Project_Documentation.md](../MarketPulse_VN_Project_Documentation.md).
 
 ## Mục tiêu sản phẩm
 
@@ -19,7 +19,7 @@ Nếu thiếu credential, quyền sử dụng hoặc độ phủ phù hợp, dù
 - **Hoãn:** không nằm trong mục tiêu ba tuần.
 - **Mở rộng / một phần:** chỉ bắt đầu sau khi qua các cổng đã nêu và không làm lùi luồng chính.
 
-Không FR nào được xem là hoàn tất theo toàn bộ mô tả gốc. Trạng thái dưới đây là kế hoạch, chưa phải bằng chứng triển khai trong repo.
+Không FR nào được xem là hoàn tất theo toàn bộ mô tả gốc. Trạng thái FR dưới đây vẫn là mục tiêu ba tuần; tiến độ scaffold và bằng chứng kiểm tra được ghi riêng trong [roadmap](ROADMAP.md).
 
 ## Đối chiếu yêu cầu chức năng
 
