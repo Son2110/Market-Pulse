@@ -16,3 +16,10 @@ __pycache__/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Node workspaces
+node_modules/
+**/node_modules/
+apps/*/dist/
+apps/*/coverage/
+.npm-cache/

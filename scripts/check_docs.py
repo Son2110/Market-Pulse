@@ -13,7 +13,7 @@ from urllib.parse import unquote, urlsplit
 FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 INLINE_LINK = re.compile(r"!?\[[^\]]*\]\(\s*(?:<([^>]+)>|([^\s)]+))")
 REFERENCE_LINK = re.compile(r"^\s{0,3}\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))")
-SKIP_DIRS = {".git", ".github", "_site", "node_modules", ".venv"}
+SKIP_DIRS = {".git", ".github", "_site", "node_modules", ".venv", "dist", "coverage"}
 HTML_FILES = {".html", ".htm"}
 
 

@@ -1,0 +1,29 @@
+{
+  "name": "marketpulse-vn",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.15.0 <23"
+  },
+  "scripts": {
+    "lint": "eslint apps/api/src apps/api/tests apps/web/src apps/web/vite.config.ts --max-warnings=0",
+    "typecheck": "npm run typecheck --workspace=@marketpulse/api && npm run typecheck --workspace=@marketpulse/web",
+    "test:unit": "node --import tsx --test apps/api/tests/health.test.ts apps/api/tests/config.test.ts",
+    "test:integration": "node --import tsx --test apps/api/tests/health.integration.test.ts",
+    "build": "npm run build --workspace=@marketpulse/api && npm run build --workspace=@marketpulse/web",
+    "dev:api": "npm run dev --workspace=@marketpulse/api",
+    "dev:web": "npm run dev --workspace=@marketpulse/web"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.21",
+    "eslint": "9.39.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.1"
+  }
+}

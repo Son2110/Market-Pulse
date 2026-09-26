@@ -22,6 +22,7 @@ DOCUMENTS = (
     "docs/CODEX_WORKFLOW.md",
     "docs/CI_CD.md",
     "docs/GITHUB_SETUP.md",
+    "docs/LOCAL_DEVELOPMENT.md",
 )
 ASSETS = (
     "docs/assets/marketpulse-banner.svg",
