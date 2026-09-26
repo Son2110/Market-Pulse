@@ -23,13 +23,13 @@ Với mỗi task frontend, thiết kế một trang trong Stitch trước khi tr
 | D6 · Thứ Ba 29/09 | Build · 2,4 giờ | MP-05 đường đọc candle ngày đã chuẩn hóa | Nạp fixture qua provider adapter vào response candle ngày canonical; hiển thị trạng thái thiếu dữ liệu/as-of/freshness trung thực. |
 | D7 · Thứ Tư 30/09 | Review / buffer · 1 giờ | GATE-2 tích hợp tuần 1 | Compose khởi động được, seed lặp lại được, một response API đúng contract và CI không skip. Nếu chưa đạt, dùng buffer để sửa thay vì thêm tính năng. |
 
-### Tiến độ ghi nhận · 25/09/2026
+### Tiến độ ghi nhận · 25/09/2026 (trước khi hoàn tất MP-02)
 
-MP-01 đã hoàn tất báo cáo tài liệu và probe HTTP không xác thực; chưa xác minh được credential, quyền dữ liệu hoặc coverage của nguồn live. Cổng LIVE còn mở. Dùng fixture tổng hợp cho MP-02 cho tới khi các điều kiện này được kiểm chứng. Xem [báo cáo khảo sát provider](PROVIDER_RESEARCH.md); lịch, phạm vi và tiêu chí MP-02 không đổi.
+MP-01 đã hoàn tất báo cáo tài liệu và probe HTTP không xác thực; chưa xác minh quyền truy cập, quyền dữ liệu hoặc coverage của nguồn live. Cổng LIVE còn mở. Tại thời điểm này, dùng fixture tổng hợp cho MP-02. Xem [báo cáo khảo sát provider](PROVIDER_RESEARCH.md); lịch, phạm vi và tiêu chí MP-02 không đổi.
 
 ### Tiến độ ghi nhận · 26/09/2026
 
-MP-02 đã hoàn tất schema JSON v1, fixture tổng hợp xác định trước và validator offline có kiểm tra ràng buộc chéo; 24 unit tests và các bước docs/link/build hiện có đều đạt. Documentation CI chạy validation/test này trên pull request và push vào `main`, `ci/**`, `feat/**`, `docs/**`. Các ngày fixture chưa xác minh theo lịch giao dịch; cổng LIVE về credential, quyền dữ liệu và coverage vẫn mở.
+MP-02 đã hoàn tất schema JSON v1, fixture tổng hợp xác định trước và validator offline có kiểm tra ràng buộc chéo; 24 unit tests và các bước docs/link/build hiện có đều đạt. Documentation CI chạy validation/test này trên pull request và push vào `main`, `ci/**`, `feat/**`, `docs/**`. Các ngày fixture chưa xác minh theo lịch giao dịch; cổng LIVE vẫn mở. Ngày 26/09, chủ dự án chọn Vnstock làm hướng connector/tích hợp để xác minh tiếp; SSI bị loại vì đăng ký không thực tế cho dự án theo đánh giá của chủ dự án, không phải kết luận chung về kỹ thuật hay pháp lý. Lựa chọn này chưa xác minh upstream, truy cập thực tế, coverage, đơn vị/ngữ nghĩa thời gian hoặc quyền dữ liệu. Không còn yêu cầu tài khoản/credential SSI; credential chỉ cần nếu upstream Vnstock được chọn thực sự yêu cầu. Fixture giữ provider `marketpulse-fixture`.
 
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
@@ -47,7 +47,7 @@ MP-02 đã hoàn tất schema JSON v1, fixture tổng hợp xác định trướ
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
-| D15 · Thứ Năm 08/10 | Build · 2,4 giờ | MP-11 tích hợp nguồn đã xác minh hoặc demo suy giảm | Nếu credential, điều khoản và coverage đã xác minh, tích hợp lát cắt EOD/delay giới hạn. Nếu không, giữ fixture và gắn nhãn demo suy giảm; không gọi là MVP có nguồn thật. |
+| D15 · Thứ Năm 08/10 | Build · 2,4 giờ | MP-11 tích hợp nguồn đã xác minh hoặc demo suy giảm | Thử hướng Vnstock cho lát cắt EOD/delay chỉ sau khi xác minh upstream, truy cập (và credential nếu đường đó yêu cầu), điều khoản/quyền sử dụng, coverage, đơn vị và ngữ nghĩa thời gian. Nếu chưa đạt, giữ fixture `marketpulse-fixture` và gắn nhãn demo suy giảm; không gọi là MVP có nguồn thật. |
 | D16 · Thứ Sáu 09/10 | Build · 2,4 giờ | MP-12 freshness, retry và cache | Ghi provider/as-of/freshness/trạng thái ingestion. Chỉ thêm Redis cache nếu kiểm thử được invalidation và expiry; retry/replay không tạo bản ghi canonical trùng. |
 | D17 · Thứ Bảy 10/10 | Build · 2,4 giờ | MP-13 chọn tối đa một hạng mục mở rộng khi qua cổng | Ưu tiên một chuỗi vàng hoặc USD/VND đã xác minh nguồn, đơn vị và quyền. Nếu chưa đạt, thêm timeline thủ công ít sự kiện, có nguồn. Phân tích tác động cần đủ lịch sử ngày; không tuyên bố nhân quả. |
 | D18 · Chủ Nhật 11/10 | Review / buffer · 1 giờ | GATE-4 review bằng chứng và phạm vi | Kiểm tra bằng chứng nguồn, hạn chế, nhãn thời gian, replay và câu chữ sự kiện. Bỏ mọi khẳng định chưa có căn cứ. |
@@ -92,7 +92,7 @@ Workflow GitHub Pages trong repo này chỉ publish documentation portal, tách 
 ## Nguồn tham khảo
 
 - [Tài liệu Vnstock](https://vnstocks.com/docs/vnstock) mô tả thư viện dữ liệu cổ phiếu Python và phân biệt phần mềm với quyền dữ liệu nguồn; [macro layer của vnstock_data](https://vnstocks.com/docs/vnstock-data/macro-layer-v3) liệt kê khả năng tỷ giá và vàng/hàng hóa. Các tài liệu này không chứng minh runtime access, coverage hoặc quyền dữ liệu của project.
-- [Tổng quan SSI FastConnect API](https://developers.ssi.com.vn/docs/getting-started/overview) mô tả market API và streaming; project chưa thử truy cập.
+- [Tổng quan SSI FastConnect API](https://developers.ssi.com.vn/docs/getting-started/overview) là tài liệu tham khảo lịch sử cho phương án đã loại theo quyết định chủ dự án ngày 26/09; đăng ký được đánh giá là không thực tế cho dự án, không phải kết luận chung hay điều kiện hiện tại.
 - [Render background worker](https://render.com/docs/background-workers) mô tả worker và cách dùng BullMQ/Key Value. Cần xác minh topology và plan trước production.
 - [Giới hạn MongoDB time-series](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) không cho phép unique index trên time-series collection.
 - [GitHub Actions secure use](https://docs.github.com/en/actions/reference/security/secure-use) khuyến nghị quyền tối thiểu và pin action reference.
