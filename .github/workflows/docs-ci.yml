@@ -3,7 +3,7 @@ name: Documentation CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "ci/**", "feat/**", "docs/**"]
 
 permissions:
   contents: read
@@ -20,8 +20,14 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
+      - name: Install contract validation dependency
+        run: python -m pip install -r requirements-dev.txt
       - name: Check local documentation links
         run: python scripts/check_docs.py
+      - name: Validate market-data fixture
+        run: python scripts/validate_market_data.py
+      - name: Run market-data contract tests
+        run: python -m unittest discover -s tests -v
       - name: Build documentation portal
         run: python scripts/build_docs.py
       - name: Upload documentation artifact

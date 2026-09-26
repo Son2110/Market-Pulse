@@ -46,7 +46,7 @@ Không FR nào được xem là hoàn tất theo toàn bộ mô tả gốc. Tr�
 
 ## Ràng buộc dữ liệu và kiến trúc
 
-- Bắt đầu với một provider thị trường sau adapter và fixture xác định trước; xác minh độ phủ, credential, điều khoản và quyền phân phối trước khi tích hợp.
+- Hướng tích hợp được chọn ngày 26/09/2026 là Vnstock qua provider adapter; giữ fixture xác định trước cho tới khi xác minh upstream, khả năng truy cập, coverage, đơn vị/ngữ nghĩa thời gian, điều khoản và quyền sử dụng. Credential chỉ cần nếu đường Vnstock/upstream được chọn thực sự yêu cầu; lựa chọn connector không xác minh nguồn live.
 - Lưu tách payload thô và bản ghi canonical đã chuẩn hóa; giữ provider và thời điểm ingest.
 - Luồng dự kiến: Python collector → ingestion API nội bộ có xác thực → Node/BullMQ worker → collection thường cho dữ liệu raw/normalized → projection MongoDB time-series cho truy vấn. Retry hoặc crash không được tạo bản ghi canonical trùng. Dùng khóa idempotency/unique index ở collection thường; MongoDB time-series không hỗ trợ unique index nên không được dựa vào đó.
 - Chuẩn hóa đơn vị giá, tiền tệ, sàn, interval và timestamp. Ghi rõ múi giờ và dùng lịch phiên giao dịch Việt Nam khi có. Không tự bù hoặc nội suy điểm dữ liệu thị trường/sự kiện bị thiếu.

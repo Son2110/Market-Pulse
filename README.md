@@ -51,8 +51,9 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 | Document | What it covers |
 |---|---|
 | [Product requirements](docs/PRD.md) | Vietnamese scope, all FR-01–FR-18 statuses, acceptance boundaries and explicit omissions. |
+| [Market-data contract](docs/DATA_CONTRACT.md) | Versioned canonical schema, synthetic fixture semantics, units, provenance and offline checks. |
 | [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
-| [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison, limited access probe, unresolved live-source gate and MP-02 fixture decision. |
+| [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison and limited probe, owner’s Vnstock direction, unresolved live-source gate and MP-02 fixture decision. |
 | [Codex workflow](docs/CODEX_WORKFLOW.md) | Sequential planning, bounded implementation handoffs and independent review. |
 | [CI/CD and documentation portal](docs/CI_CD.md) | Documentation checks, artifact build, Pages deployment and future application CI. |
 | [GitHub setup](docs/GITHUB_SETUP.md) | Repository checks, Pages setup and branch-protection guidance. |
@@ -62,10 +63,18 @@ The brief is the product context; the PRD and roadmap define the smaller demo bo
 
 ## Data research
 
-- [Vnstock](https://vnstocks.com/docs/vnstock) provides a Python equity-data library. The library and underlying data rights are separate questions; availability and redistribution rights have not been tested for this project.
-- [SSI FastConnect](https://developers.ssi.com.vn/docs/getting-started/overview) documents market APIs and streaming. Project credentials and coverage have not been tested.
+- [Vnstock](https://vnstocks.com/docs/vnstock) is the connector/integration direction selected on 2026-09-26. The upstream source, actual access, coverage, units/time semantics and data-use rights remain unverified; selecting the library does not verify a data source.
+- [SSI FastConnect](https://developers.ssi.com.vn/docs/getting-started/overview) is historical MP-01 comparison evidence and a rejected project alternative: the owner considers its registration impractical for this project. It is not a current integration option or a universal technical/legal conclusion.
 - [GDELT DOC API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) is a candidate for later news research; the project does not promise a particular archive or Vietnam coverage.
 - MongoDB’s [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) inform the replay and uniqueness design.
+
+The canonical market-data schema and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). Run its offline checks with the pinned development dependency:
+
+```sh
+python -m pip install -r requirements-dev.txt
+python scripts/validate_market_data.py
+python -m unittest discover -s tests -v
+```
 
 ## Hosting direction
 

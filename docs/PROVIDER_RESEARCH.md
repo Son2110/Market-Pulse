@@ -1,18 +1,18 @@
-# Báo cáo khảo sát provider — MP-01
+# Báo cáo khảo sát provider — MP-01 (ảnh chụp tại 25/09/2026)
 
 **Ngày ghi nhận:** 25/09/2026 · **Phạm vi:** dữ liệu cổ phiếu Việt Nam và VN-Index, tần suất ngày cuối phiên hoặc trễ.  
-**Kết quả:** hoàn tất khảo sát tài liệu và một probe HTTP không xác thực. Cổng nguồn live vẫn **chưa đạt**: chưa có credential/quyền truy cập dự án, chưa xác nhận quyền dữ liệu, và chưa đo coverage. Vì vậy, chưa xác minh provider nào phù hợp để hiển thị dữ liệu thị trường trong sản phẩm.
+**Kết quả tại ngày khảo sát 25/09/2026:** hoàn tất khảo sát tài liệu và một probe HTTP không xác thực. Cổng nguồn live vẫn **chưa đạt**: chưa xác minh quyền truy cập của dự án, quyền dữ liệu hoặc coverage cho nguồn/upstream dự kiến.
 
 ## So sánh sơ bộ
 
-| Tiêu chí | Vnstock | SSI FastConnect |
+| Tiêu chí | Vnstock | SSI FastConnect (phương án lịch sử, nay bị loại) |
 |---|---|---|
 | Khả năng được tài liệu mô tả | Thư viện Python có ví dụ truy vấn OHLCV ngày cho `FPT` và index `VNINDEX`. | Market REST mô tả OHLCV ngày cho chứng khoán và chỉ số, gồm VNINDEX; FAQ phân biệt REST định kỳ và WebSocket độ trễ thấp. |
-| Điều kiện truy cập | Connector chạy từ runtime cục bộ tới nguồn upstream. Hướng dẫn cài đặt hiện nêu vendor extra-index cho `vnstock`/`vnai`. Chưa cài hay chạy package trong task này. | Cần tài khoản SSI, đăng ký FastConnect được duyệt và chấp thuận điều khoản; xác thực bearer bằng key/secret. Endpoint production được tài liệu nêu; chưa có credential hay entitlement của dự án. |
+| Điều kiện truy cập | Connector chạy từ runtime cục bộ tới nguồn upstream. Hướng dẫn cài đặt hiện nêu vendor extra-index cho `vnstock`/`vnai`. Chưa cài hay chạy package trong MP-01; yêu cầu truy cập của upstream chưa được xác minh. | Tài liệu nêu tài khoản SSI, đăng ký FastConnect được duyệt, chấp thuận điều khoản và bearer key/secret. Đây là bằng chứng của phương án đã so sánh, không phải điều kiện còn lại của hướng tích hợp hiện tại. |
 | Coverage và freshness đã đo | Chưa đo. Ví dụ trong tài liệu không chứng minh dữ liệu có sẵn cho basket dự án hoặc freshness thực tế. | Chưa đo. Tài liệu nêu lịch sử ngày từ ngày giao dịch đầu tiên, nhưng không đưa ra phép đo freshness hay coverage của tài khoản dự án. |
 | Quyền dữ liệu | Giấy phép phần mềm tách biệt với quyền truy cập, lưu, hiển thị hoặc phân phối dữ liệu upstream. Cần xác minh riêng. | Các trang đã xem mô tả API và điều khoản truy cập, nhưng chưa chứng minh quyền redisplay/phân phối của dự án. Cần xác minh bằng văn bản. |
 
-**Diễn giải:** tài liệu cho thấy hai hướng đáng kiểm tra, không phải kết quả cấp quyền hoặc bảo đảm sản phẩm. Vnstock là connector/phần mềm; quyền phần mềm không thay cho quyền dữ liệu do upstream cung cấp. SSI nêu rõ quy trình account và đăng ký, nhưng chưa có bằng chứng dự án đã được cấp quyền hay nhận dữ liệu. Không đưa ra kết luận pháp lý về việc lưu trữ hoặc hiển thị; cần xác nhận điều khoản với provider và người có thẩm quyền trước khi dùng dữ liệu thật.
+**Diễn giải tại thời điểm khảo sát:** đây là so sánh tài liệu, không phải kết quả cấp quyền hay bảo đảm sản phẩm. Vnstock là connector/phần mềm; quyền phần mềm không thay cho quyền dữ liệu do upstream cung cấp. Không đưa ra kết luận pháp lý về việc lưu trữ hoặc hiển thị; cần xác nhận điều khoản cho nguồn được chọn trước khi dùng dữ liệu thật.
 
 ## Bằng chứng đã có
 
@@ -26,21 +26,25 @@ Tài liệu SSI mô tả REST cho market data, trường OHLCV ngày, mã chứn
 
 ## Basket ứng viên và cổng xác minh live
 
-Basket sơ bộ cho lần kiểm tra có credential gồm `FPT`, `VCB`, `HPG`, `VNM`, `SSI`, `VIC`, `VHM`, `MSN`, `MWG`, `BID` và `VNINDEX`. Tất cả đều là **mã ứng viên chưa xác minh**. Scope thử nghiệm tiếp theo chỉ là dữ liệu ngày EOD/delayed; không suy rộng sang intraday hoặc coverage toàn sàn.
+Basket sơ bộ cho lần xác minh Vnstock/upstream gồm `FPT`, `VCB`, `HPG`, `VNM`, `SSI`, `VIC`, `VHM`, `MSN`, `MWG`, `BID` và `VNINDEX`. Tất cả đều là **mã ứng viên chưa xác minh**. Scope thử nghiệm tiếp theo chỉ là dữ liệu ngày EOD/delayed; không suy rộng sang intraday hoặc coverage toàn sàn.
 
-Trước khi chọn provider live, cần hoàn tất các bước sau:
+Trước khi dùng dữ liệu live qua hướng Vnstock đã chọn, cần hoàn tất các bước sau:
 
-1. Dùng credential được phê duyệt trong secret local; không đưa key vào chat, PR, fixture hoặc Git. Xin provider xác nhận quyền truy cập, gọi API, lưu trữ/cache, hiển thị công khai và phân phối lại cho đúng sản phẩm, gồm chỉ số nếu khác quyền cổ phiếu.
+1. Xác định upstream cụ thể và xác minh quyền truy cập, gọi API, lưu trữ/cache, hiển thị công khai và phân phối lại cho đúng sản phẩm, gồm chỉ số nếu quyền khác cổ phiếu. Chỉ dùng credential trong secret local nếu upstream được chọn thực sự yêu cầu; không đưa key vào chat, PR, fixture hoặc Git.
 2. Gọi có giới hạn cho đủ 11 mã, ghi số hàng trả về, dải ngày, thời điểm phản hồi, lỗi/auth/rate limit và mã nào thiếu. Không coi ví dụ tài liệu là coverage; không tự điền các ngày thiếu hay tuyên bố completeness.
 3. Đối chiếu schema trước khi chuẩn hóa: giá là VND hay nghìn VND, đơn vị index points (không phải tiền tệ), timestamp và timezone/phiên Việt Nam, cơ sở điều chỉnh giá, ý nghĩa volume, ngày không giao dịch, source/as-of/freshness. Trường hợp chưa rõ phải fail closed và hiện thiếu/không xác minh, không đoán.
 
-## Quyết định cho MP-02
+## Quyết định của chủ dự án · 26/09/2026
 
-MP-01 hoàn tất dưới dạng báo cáo nghiên cứu; cổng LIVE vẫn chưa đạt. MP-02 nên dùng fixture nhỏ có giá trị tổng hợp do dự án tự tạo, gắn nhãn `fixture` rõ ràng và metadata thời điểm nguồn phù hợp với contract. Không chép ví dụ trong tài liệu vendor thành quan sát thị trường, không ghi fixture như dữ liệu provider và không bật đường ingest live. Contract/fixture cụ thể chưa được triển khai trong báo cáo này. Chỉ đánh giá lại nguồn sau khi credential, quyền, coverage, đơn vị và thời gian được kiểm chứng bằng phép gọi có kiểm soát.
+Chủ dự án chọn Vnstock làm hướng connector/tích hợp để tiếp tục xác minh. SSI FastConnect không được theo đuổi vì đăng ký không thực tế cho dự án theo đánh giá của chủ dự án; đây là quyết định theo bối cảnh dự án, không phải kết luận chung về kỹ thuật hay pháp lý. Không còn yêu cầu đăng ký tài khoản hoặc credential SSI. Lựa chọn Vnstock chưa xác minh nguồn/upstream cụ thể, khả năng truy cập thực tế, coverage, đơn vị/ngữ nghĩa thời gian hay quyền sử dụng dữ liệu. Credential chỉ cần nếu đường Vnstock/upstream được chọn thực sự yêu cầu.
+
+## Quyết định cho MP-02 tại thời điểm khảo sát · 25/09/2026
+
+Tại ngày khảo sát, MP-01 hoàn tất dưới dạng báo cáo; cổng LIVE chưa đạt nên MP-02 được định hướng dùng fixture tổng hợp do dự án tự tạo. MP-02 sau đó đã hoàn tất: schema và fixture được mô tả trong [hợp đồng dữ liệu](DATA_CONTRACT.md). Fixture mang provider `marketpulse-fixture`; không chép ví dụ vendor thành quan sát thị trường, không ghi fixture như dữ liệu Vnstock và không bật ingest live trước khi hoàn tất cổng xác minh.
 
 ## Nguồn chính
 
 - [Vnstock docs](https://vnstocks.com/docs/vnstock), [giới thiệu](https://vnstocks.com/docs/vnstock/gioi-thieu-vnstock), [market data](https://vnstocks.com/docs/vnstock/du-lieu-thi-truong-market-data) và [giấy phép 2026.09](https://vnstocks.com/onboard/giay-phep-su-dung).
-- SSI FastConnect: [overview](https://developers.ssi.com.vn/docs/getting-started/overview), [FAQ market data](https://developers.ssi.com.vn/docs/faq/market-data), [terms and environments](https://developers.ssi.com.vn/docs/getting-started/terms-and-environments), [first API call](https://developers.ssi.com.vn/docs/getting-started/first-api-call).
+- SSI FastConnect (tài liệu tham khảo lịch sử cho phương án đã loại): [overview](https://developers.ssi.com.vn/docs/getting-started/overview), [FAQ market data](https://developers.ssi.com.vn/docs/faq/market-data), [terms and environments](https://developers.ssi.com.vn/docs/getting-started/terms-and-environments), [first API call](https://developers.ssi.com.vn/docs/getting-started/first-api-call).
 
-Đây là tóm tắt tài liệu và kết quả probe có giới hạn đến ngày ghi nhận, không phải ý kiến pháp lý, bảo đảm vận hành hoặc xác nhận provider đã được tích hợp.
+Phần so sánh và probe là bằng chứng lịch sử đến ngày ghi nhận, không phải ý kiến pháp lý, bảo đảm vận hành hoặc xác nhận provider đã được tích hợp. Quyết định ngày 26/09/2026 chỉ chọn hướng xác minh tiếp theo.
