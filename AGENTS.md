@@ -13,6 +13,7 @@ MarketPulse VN is a planning-stage market intelligence project for Vietnam. Read
 - Work on one task at a time with one worker. Finish implementation, required checks and independent review before starting another task. Do not run parallel task implementations or delegate recursively.
 - Preserve existing user changes. Keep implementation scope aligned with an approved task and avoid modifying unrelated files.
 - Keep authored code comments concise, usually one or two lines, and explain intent or a non-obvious constraint.
+- Use [docs/SKILLS_BY_FR.md](docs/SKILLS_BY_FR.md) for the installed skill inventory and FR-specific usage limits; installation does not configure providers, APIs or MCP.
 
 ## FR branches and review
 
