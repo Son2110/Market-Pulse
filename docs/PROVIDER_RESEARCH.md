@@ -1,7 +1,9 @@
-# Báo cáo khảo sát provider — MP-01 (ảnh chụp tại 25/09/2026)
+# Báo cáo khảo sát provider — MP-01 (ảnh chụp lịch sử tại 25/09/2026)
+
+> **Trạng thái mới nhất · 27/09/2026:** Probe cục bộ xác nhận khả năng đọc kỹ thuật qua Vnstock/KBS và nhận được dữ liệu cho cả 11/11 mã trong basket ở phạm vi truy vấn mẫu. Đây chưa phải cổng production/live đã đạt: freshness, cơ sở điều chỉnh giá, ngữ nghĩa timestamp/as-of và quyền sử dụng dữ liệu upstream vẫn chưa được xác minh. Fixture `marketpulse-fixture` tiếp tục là dữ liệu của ứng dụng. Chi tiết và giới hạn nằm trong [xác minh kỹ thuật ngày 27/09](#xác-minh-kỹ-thuật-ngày-27092026).
 
 **Ngày ghi nhận:** 25/09/2026 · **Phạm vi:** dữ liệu cổ phiếu Việt Nam và VN-Index, tần suất ngày cuối phiên hoặc trễ.  
-**Kết quả tại ngày khảo sát 25/09/2026:** hoàn tất khảo sát tài liệu và một probe HTTP không xác thực. Cổng nguồn live vẫn **chưa đạt**: chưa xác minh quyền truy cập của dự án, quyền dữ liệu hoặc coverage cho nguồn/upstream dự kiến.
+**Kết quả lịch sử tại ngày khảo sát 25/09/2026:** hoàn tất khảo sát tài liệu và một probe HTTP không xác thực. Tại thời điểm đó, cổng nguồn live **chưa đạt** vì chưa xác minh quyền truy cập của dự án, quyền dữ liệu hoặc coverage cho nguồn/upstream dự kiến. Kết quả mới hơn được ghi riêng bên dưới; không sửa hồi tố bằng chứng MP-01.
 
 ## So sánh sơ bộ
 
@@ -9,7 +11,7 @@
 |---|---|---|
 | Khả năng được tài liệu mô tả | Thư viện Python có ví dụ truy vấn OHLCV ngày cho `FPT` và index `VNINDEX`. | Market REST mô tả OHLCV ngày cho chứng khoán và chỉ số, gồm VNINDEX; FAQ phân biệt REST định kỳ và WebSocket độ trễ thấp. |
 | Điều kiện truy cập | Connector chạy từ runtime cục bộ tới nguồn upstream. Hướng dẫn cài đặt hiện nêu vendor extra-index cho `vnstock`/`vnai`. Chưa cài hay chạy package trong MP-01; yêu cầu truy cập của upstream chưa được xác minh. | Tài liệu nêu tài khoản SSI, đăng ký FastConnect được duyệt, chấp thuận điều khoản và bearer key/secret. Đây là bằng chứng của phương án đã so sánh, không phải điều kiện còn lại của hướng tích hợp hiện tại. |
-| Coverage và freshness đã đo | Chưa đo. Ví dụ trong tài liệu không chứng minh dữ liệu có sẵn cho basket dự án hoặc freshness thực tế. | Chưa đo. Tài liệu nêu lịch sử ngày từ ngày giao dịch đầu tiên, nhưng không đưa ra phép đo freshness hay coverage của tài khoản dự án. |
+| Coverage và freshness trong MP-01 | Chưa đo. Ví dụ trong tài liệu không chứng minh dữ liệu có sẵn cho basket dự án hoặc freshness thực tế. | Chưa đo. Tài liệu nêu lịch sử ngày từ ngày giao dịch đầu tiên, nhưng không đưa ra phép đo freshness hay coverage của tài khoản dự án. |
 | Quyền dữ liệu | Giấy phép phần mềm tách biệt với quyền truy cập, lưu, hiển thị hoặc phân phối dữ liệu upstream. Cần xác minh riêng. | Các trang đã xem mô tả API và điều khoản truy cập, nhưng chưa chứng minh quyền redisplay/phân phối của dự án. Cần xác minh bằng văn bản. |
 
 **Diễn giải tại thời điểm khảo sát:** đây là so sánh tài liệu, không phải kết quả cấp quyền hay bảo đảm sản phẩm. Vnstock là connector/phần mềm; quyền phần mềm không thay cho quyền dữ liệu do upstream cung cấp. Không đưa ra kết luận pháp lý về việc lưu trữ hoặc hiển thị; cần xác nhận điều khoản cho nguồn được chọn trước khi dùng dữ liệu thật.
@@ -42,9 +44,38 @@ Chủ dự án chọn Vnstock làm hướng connector/tích hợp để tiếp t
 
 Tại ngày khảo sát, MP-01 hoàn tất dưới dạng báo cáo; cổng LIVE chưa đạt nên MP-02 được định hướng dùng fixture tổng hợp do dự án tự tạo. MP-02 sau đó đã hoàn tất: schema và fixture được mô tả trong [hợp đồng dữ liệu](DATA_CONTRACT.md). Fixture mang provider `marketpulse-fixture`; không chép ví dụ vendor thành quan sát thị trường, không ghi fixture như dữ liệu Vnstock và không bật ingest live trước khi hoàn tất cổng xác minh.
 
+## Xác minh kỹ thuật ngày 27/09/2026
+
+Trong môi trường cô lập `.venv/vnstock-probe`, đã cài `vnstock` 4.0.8 và `vnai` 2.6.2 từ vendor index `https://vnstocks.com/api/simple`; `vnstock_ezchart` 1.0.2 được cài từ PyPI. Tắt agent setup và telemetry bằng `VNSTOCK_DISABLE_AGENT_SETUP=1` và `VNSTOCK_TELEMETRY=off`. Không cung cấp credential. Mười hai lần gọi chỉ đọc tới provider `KBS` hoàn tất trong khoảng 04:38:48–04:44:29 UTC (11:38–11:44 giờ Việt Nam); lần đầu cho FPT mất 2,797 giây, các lần còn lại 0,48–0,62 giây. Không gặp lỗi auth, chặn truy cập hay rate limit trong các lần này; điều đó không xác nhận quota guest ổn định, khả năng truy cập từ cloud hoặc quyền dữ liệu. Mã package cục bộ ánh xạ KBS tới host `kbbuddywts.kbsec.com.vn`; probe chỉ truy cập qua thư viện Vnstock, không gọi endpoint riêng ngoài thư viện.
+
+Yêu cầu OHLCV `1D` cho khoảng 14–25/09/2026 trả dữ liệu cho cả 11/11 mã, nhưng số hàng và ngày cuối khác nhau. FPT được hỏi thêm đến 26/09 vẫn chỉ có dữ liệu đến ngày 24/09. Đây là kết quả của truy vấn mẫu, không xác nhận tính đầy đủ, ngày cuối cùng đã có dữ liệu hay freshness hiện tại.
+
+Bảng dưới đây chỉ ghi metadata về số hàng và ngày; báo cáo không công bố chuỗi giá thô.
+
+| Mã | Loại | Số hàng | Ngày trong kết quả |
+|---|---|---:|---|
+| FPT | Cổ phiếu | 9 | 14–24/09/2026 |
+| VCB | Cổ phiếu | 9 | 14–24/09/2026 |
+| HPG | Cổ phiếu | 9 | 14–24/09/2026 |
+| VNM | Cổ phiếu | 9 | 14–24/09/2026 |
+| SSI | Cổ phiếu | 9 | 14–24/09/2026 |
+| VIC | Cổ phiếu | 9 | 14–24/09/2026 |
+| VHM | Cổ phiếu | 9 | 14–24/09/2026 |
+| MSN | Cổ phiếu | 9 | 14–24/09/2026 |
+| MWG | Cổ phiếu | 9 | 14–24/09/2026 |
+| BID | Cổ phiếu | 9 | 14–24/09/2026 |
+| VNINDEX | Chỉ số | 10 | 14–25/09/2026 |
+
+Kiểm tra cục bộ trên các hàng mẫu không thấy null hay ngày trùng; OHLC thỏa quan hệ high/low và volume không âm. Schema trả về dùng `datetime64[ns]` không timezone, timestamp đều là 07:00; giá `float64`, volume `int64`. Không gán 07:00 thành giờ đóng cửa hay timezone cụ thể. Kiểm tra tĩnh package cho thấy adapter KBS chia các trường giá cổ phiếu cho 1.000, nhưng không chia giá index/derivative; đây chỉ là phép biến đổi của package, chưa xác minh đơn vị canonical hay cơ sở điều chỉnh. Volume chưa có ngữ nghĩa được xác nhận; adapter tương lai chỉ nên ghi volume index khi contract nguồn hỗ trợ. Kết quả không có timestamp as-of chính xác từ nguồn.
+
+License `2026.09` mô tả giấy phép phần mềm riêng với quyền truy cập và sử dụng dữ liệu upstream. Probe này không xác lập quyền lưu/cache, hiển thị công khai hay phân phối lại; tài liệu đã xem không nêu rõ quyền hiển thị công khai cho dự án. Cần xác nhận điều khoản với upstream; đây không phải kết luận rằng việc hiển thị bị cấm.
+
+**Kết luận:** khả năng đọc kỹ thuật cục bộ và coverage của basket trong truy vấn mẫu **đạt giới hạn kiểm tra (11/11 mã)**. Cổng nguồn live cho sản phẩm vẫn **một phần / chưa đạt** cho tới khi xác minh freshness, adjustment basis, ngữ nghĩa timestamp/as-of và quyền dữ liệu upstream. Không chuyển kết quả này thành fixture, canonical records hoặc nhãn live trong app. Các lần probe thuộc xác minh thủ công; không đưa live calls vào CI.
+
 ## Nguồn chính
 
 - [Vnstock docs](https://vnstocks.com/docs/vnstock), [giới thiệu](https://vnstocks.com/docs/vnstock/gioi-thieu-vnstock), [market data](https://vnstocks.com/docs/vnstock/du-lieu-thi-truong-market-data) và [giấy phép 2026.09](https://vnstocks.com/onboard/giay-phep-su-dung).
+- [Lịch sử phiên bản Vnstock](https://vnstocks.com/docs/tai-lieu/lich-su-phien-ban) ghi phiên bản 4.0.8 ngày 15/09/2026; [vendor index](https://vnstocks.com/api/simple) được dùng cho môi trường xác minh cô lập.
 - SSI FastConnect (tài liệu tham khảo lịch sử cho phương án đã loại): [overview](https://developers.ssi.com.vn/docs/getting-started/overview), [FAQ market data](https://developers.ssi.com.vn/docs/faq/market-data), [terms and environments](https://developers.ssi.com.vn/docs/getting-started/terms-and-environments), [first API call](https://developers.ssi.com.vn/docs/getting-started/first-api-call).
 
-Phần so sánh và probe là bằng chứng lịch sử đến ngày ghi nhận, không phải ý kiến pháp lý, bảo đảm vận hành hoặc xác nhận provider đã được tích hợp. Quyết định ngày 26/09/2026 chỉ chọn hướng xác minh tiếp theo.
+Phần so sánh và probe HTTP SSI là bằng chứng lịch sử đến ngày ghi nhận; probe Vnstock/KBS ngày 27/09 chỉ xác nhận truy vấn mẫu cục bộ. Không nội dung nào là ý kiến pháp lý, bảo đảm vận hành hoặc xác nhận provider đã được tích hợp vào app. Quyết định ngày 26/09/2026 chỉ chọn hướng xác minh tiếp theo.
