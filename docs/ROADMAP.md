@@ -37,6 +37,10 @@ Scaffold local có workspace npm với lockfile, API chỉ có liveness/readines
 
 Kiểm tra local đã đạt: `npm ci`, lint, typecheck source/test, 8 API unit tests, build, fixture validator, 24 test contract và 2 test collector. Cả ba images build; `docker compose up --build --wait` đưa bốn service tới healthy; container collector báo 11 assets, 33 candles, 10 quotes và 1 index observation; API liveness/readiness cùng web root trả 200; integration MongoDB/Redis đạt 1 test, 0 skip. Khi dừng MongoDB, liveness vẫn 200 và readiness 503; khi Redis bị dừng, API thoát với log đã khử lỗi, rồi tự chạy lại và readiness 200 sau khi Redis hoạt động. Bài kiểm tra startup SIGTERM thoát mã 0 trong 1,327 ms. GitHub Actions ở remote chưa chạy trên branch này. Cổng truy cập/điều khoản/provider Vnstock vẫn mở; fixture vẫn là synthetic.
 
+### Trạng thái provider · 27/09/2026 (trước tuần 2)
+
+Probe Vnstock/KBS cục bộ trả dữ liệu cho 11/11 mã mẫu; 10 cổ phiếu có hàng đến 24/09 và VNINDEX đến 25/09. Kết quả chưa xác nhận latest coverage, freshness, adjustment basis, timestamp/as-of hoặc quyền dữ liệu upstream, nên cổng nguồn live cho sản phẩm vẫn chưa đạt. Giữ fixture `marketpulse-fixture` làm nguồn ứng dụng; xem [báo cáo provider](PROVIDER_RESEARCH.md) trước khi xem xét tích hợp.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
