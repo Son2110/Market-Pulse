@@ -55,6 +55,7 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 | [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
 | [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison and limited probe, owner’s Vnstock direction, unresolved live-source gate and MP-02 fixture decision. |
 | [Codex workflow](docs/CODEX_WORKFLOW.md) | Sequential planning, bounded implementation handoffs and independent review. |
+| [Skills by FR](docs/SKILLS_BY_FR.md) | Installed local skills, guarded use, and optional future skills by requirement. |
 | [CI/CD and documentation portal](docs/CI_CD.md) | Documentation checks, Pages deployment, and application lint, build, Compose and integration CI. |
 | [Local development](docs/LOCAL_DEVELOPMENT.md) | Compose startup, host mode, fixture collector and local check commands. |
 | [GitHub setup](docs/GITHUB_SETUP.md) | Repository checks, Pages setup and branch-protection guidance. |

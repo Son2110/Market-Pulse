@@ -20,6 +20,7 @@ DOCUMENTS = (
     "docs/ROADMAP.md",
     "docs/PROVIDER_RESEARCH.md",
     "docs/CODEX_WORKFLOW.md",
+    "docs/SKILLS_BY_FR.md",
     "docs/CI_CD.md",
     "docs/GITHUB_SETUP.md",
     "docs/LOCAL_DEVELOPMENT.md",
