@@ -37,6 +37,14 @@ Scaffold local có workspace npm với lockfile, API chỉ có liveness/readines
 
 Kiểm tra local đã đạt: `npm ci`, lint, typecheck source/test, 8 API unit tests, build, fixture validator, 24 test contract và 2 test collector. Cả ba images build; `docker compose up --build --wait` đưa bốn service tới healthy; container collector báo 11 assets, 33 candles, 10 quotes và 1 index observation; API liveness/readiness cùng web root trả 200; integration MongoDB/Redis đạt 1 test, 0 skip. Khi dừng MongoDB, liveness vẫn 200 và readiness 503; khi Redis bị dừng, API thoát với log đã khử lỗi, rồi tự chạy lại và readiness 200 sau khi Redis hoạt động. Bài kiểm tra startup SIGTERM thoát mã 0 trong 1,327 ms. GitHub Actions ở remote chưa chạy trên branch này. Cổng truy cập/điều khoản/provider Vnstock vẫn mở; fixture vẫn là synthetic.
 
+### GATE-1 review · 27/09/2026
+
+GATE-1 đạt cho việc tiếp tục demo cục bộ bằng fixture: contract, fixture, scaffold và CI không có blocker cho MP-04. Trên [commit `d6648b4`](https://github.com/Son2110/Market-Pulse/commit/d6648b48ce0053b0988bad53a77a767108411d7f), [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/36292869880) và [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/36292869917) đều thành công; Application CI hoàn tất lint, typecheck, 8 API unit tests, build, fixture validation, 24 contract tests, 2 collector tests, Compose build/health/smoke và 1 integration test MongoDB/Redis, không skip bước bắt buộc.
+
+Kiểm tra runtime ngày 27/09: `docker compose up --wait` đưa cả API, web, MongoDB và Redis tới healthy; hai health endpoint cùng web root trả HTTP 200. Collector fixture báo 11 assets, 33 candles, 10 quotes và 1 index observation; integration MongoDB/Redis đạt 1 test, 0 skip với MongoDB tại `127.0.0.1:27018`. Các kịch bản outage và SIGTERM thuộc bằng chứng MP-03 ngày 26/09, không được chạy lại trong lần review này.
+
+Cổng live source vẫn **NOT VERIFIED**: chưa xác minh upstream, quyền truy cập/điều khoản, coverage, đơn vị/ngữ nghĩa thời gian hoặc quyền dữ liệu. Tiếp tục MP-04 trên fixture; không gọi scaffold là live-ready hay xem các tính năng sản phẩm đã hoàn tất.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
