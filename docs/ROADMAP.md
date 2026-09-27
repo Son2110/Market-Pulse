@@ -45,6 +45,12 @@ Kiểm tra runtime ngày 27/09: `docker compose up --wait` đưa cả API, web, 
 
 Cổng live source vẫn **NOT VERIFIED**: chưa xác minh upstream, quyền truy cập/điều khoản, coverage, đơn vị/ngữ nghĩa thời gian hoặc quyền dữ liệu. Tiếp tục MP-04 trên fixture; không gọi scaffold là live-ready hay xem các tính năng sản phẩm đã hoàn tất.
 
+### Tiến độ ghi nhận · MP-04 · 28/09/2026
+
+API auth local có `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout` và `GET /api/auth/me`. Mật khẩu được băm bằng scrypt có salt riêng; bearer token ngẫu nhiên chỉ được lưu dưới dạng SHA-256 digest trong MongoDB, hết hạn sau 8 giờ và bị xóa khi logout. Validation, giới hạn tốc độ/KDF và việc khởi tạo index nằm trong API; readiness chờ MongoDB, Redis và auth index. Đây là lát cắt API cho tài khoản demo, chưa có trang đăng nhập, API thị trường/watchlist hay toàn bộ yêu cầu FR-01. Xem [hướng dẫn local](LOCAL_DEVELOPMENT.md) để biết request, giới hạn và lệnh chạy.
+
+Kiểm tra local đạt: lint, typecheck, build, 17 API unit tests, fixture validation, 24 contract tests, 2 collector tests, docs check/build và 2 integration tests MongoDB/Redis (0 skip). `docker compose up --wait` đưa API, web, MongoDB và Redis tới healthy; smoke test nhận HTTP 200 ở `/health/live`, `/health/ready` và web root, cùng 401 tại `/api/auth/me` khi không có bearer token. Không tạo tài khoản trong smoke test. GitHub Actions trên branch này chưa được xác nhận.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
