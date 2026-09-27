@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
+import type { ErrorRequestHandler } from "express";
 import test from "node:test";
-import type { Db } from "mongodb";
+import { ObjectId, type Db } from "mongodb";
 import { createAuthApi } from "../src/auth.js";
 import { readConfig } from "../src/config.js";
 import { createApp } from "../src/health.js";
@@ -119,6 +120,105 @@ test("database errors are sanitized and do not expose submitted values", async (
     assert.equal(body.includes("private Mongo connection string"), false);
     assert.equal(response.headers.get("cache-control"), "no-store");
   });
+});
+
+test("registration removes only its inserted user when session creation fails, allowing retry", async () => {
+  type StoredUser = { _id: ObjectId; email: string; passwordHash: string; role: "USER"; createdAt: Date };
+  const storedUsers = new Map<string, StoredUser>();
+  const insertedUserIds: ObjectId[] = [];
+  const deletionFilters: Array<{ _id: ObjectId }> = [];
+  let failSessionInsert = true;
+  const users = {
+    insertOne: async (user: Omit<StoredUser, "_id">) => {
+      if ([...storedUsers.values()].some((stored) => stored.email === user.email)) {
+        throw Object.assign(new Error("duplicate key"), { code: 11000 });
+      }
+      const _id = new ObjectId();
+      insertedUserIds.push(_id);
+      storedUsers.set(_id.toHexString(), { ...user, _id });
+      return { acknowledged: true, insertedId: _id };
+    },
+    deleteOne: async (filter: { _id: ObjectId }) => {
+      deletionFilters.push(filter);
+      return { acknowledged: true, deletedCount: Number(storedUsers.delete(filter._id.toHexString())) };
+    },
+  };
+  const sessions = {
+    insertOne: async () => {
+      if (failSessionInsert) {
+        failSessionInsert = false;
+        throw new Error("private session backend failure");
+      }
+      return { acknowledged: true, insertedId: new ObjectId() };
+    },
+  };
+  const db = { collection: (name: string) => name === "users" ? users : sessions };
+  const credentials = JSON.stringify({ email: "retry@example.com", password: "correct horse battery staple" });
+
+  await withServer({ db }, async (baseUrl) => {
+    const failedRegistration = await post(baseUrl, "register", credentials);
+    assert.equal(failedRegistration.status, 500);
+    assert.deepEqual(await failedRegistration.json(), { error: "internal_error" });
+    assert.equal(storedUsers.size, 0);
+    assert.deepEqual(deletionFilters, [{ _id: insertedUserIds[0] }]);
+
+    const retry = await post(baseUrl, "register", credentials);
+    assert.equal(retry.status, 201);
+    assert.equal(storedUsers.size, 1);
+
+    const duplicate = await post(baseUrl, "register", credentials);
+    assert.equal(duplicate.status, 409);
+    assert.equal(storedUsers.size, 1);
+    assert.equal(deletionFilters.length, 1, "duplicate registration must not delete the existing user");
+  });
+});
+
+test("registration keeps both session and rollback failures internal and returns a sanitized error", async () => {
+  const sessionFailure = new Error("private session backend failure");
+  const rollbackFailure = new Error("private user cleanup failure");
+  const users = {
+    insertOne: async () => ({ acknowledged: true, insertedId: new ObjectId() }),
+    deleteOne: async () => { throw rollbackFailure; },
+  };
+  const sessions = { insertOne: async () => { throw sessionFailure; } };
+  const db = { collection: (name: string) => name === "users" ? users : sessions };
+  const auth = createAuthApi({
+    db: db as unknown as Db,
+    isReady: () => true,
+    rateLimitMax: 20,
+    rateLimitWindowMs: 60_000,
+    kdfConcurrency: 2,
+  });
+  let capturedError: unknown;
+  auth.router.use(((error: unknown, _request, _response, next) => {
+    capturedError = error;
+    next(error);
+  }) satisfies ErrorRequestHandler);
+  const app = createApp({
+    checks: { mongo: async () => true, redis: async () => true },
+    applicationReady: () => true,
+    authRouter: auth.router,
+  });
+  const server = createServer(app);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("test server did not bind a TCP port");
+
+  try {
+    const response = await post(`http://127.0.0.1:${address.port}`, "register", JSON.stringify({
+      email: "rollback@example.com",
+      password: "correct horse battery staple",
+    }));
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), { error: "internal_error" });
+    assert.ok(capturedError instanceof AggregateError);
+    assert.deepEqual(capturedError.errors, [sessionFailure, rollbackFailure]);
+    assert.equal(capturedError.cause, sessionFailure);
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
 });
 
 test("sessions are accepted only from a well-formed Authorization bearer header", async () => {

@@ -254,7 +254,16 @@ export function createAuthApi(options: AuthOptions): AuthApi {
 
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(now() + SESSION_TTL_MS);
-    await sessions.insertOne({ userId: insertedId, tokenHash: tokenHash(token), createdAt, expiresAt });
+    try {
+      await sessions.insertOne({ userId: insertedId, tokenHash: tokenHash(token), createdAt, expiresAt });
+    } catch (sessionError) {
+      try {
+        await users.deleteOne({ _id: insertedId });
+      } catch (rollbackError) {
+        throw new AggregateError([sessionError, rollbackError], "Registration session creation and rollback failed", { cause: sessionError });
+      }
+      throw sessionError;
+    }
     response.status(201).json({ token, tokenType: "Bearer", expiresAt: expiresAt.toISOString(), user: toPublicUser({ _id: insertedId, ...user }) });
   });
 
