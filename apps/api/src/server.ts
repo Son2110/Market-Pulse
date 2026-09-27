@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { createAuthApi } from "./auth.js";
 import { readConfig } from "./config.js";
 import { createApp } from "./health.js";
 import { connectWithRetry, createStores } from "./stores.js";
@@ -6,9 +7,17 @@ import { connectWithRetry, createStores } from "./stores.js";
 const config = readConfig();
 const stores = createStores(config);
 let connectedBefore = false;
+let authReady = false;
 let shuttingDown = false;
 let startupPromise: Promise<boolean> | undefined;
 const shutdownController = new AbortController();
+const auth = createAuthApi({
+  db: stores.mongo.db(),
+  isReady: () => authReady,
+  rateLimitMax: config.authRateLimitMax,
+  rateLimitWindowMs: config.authRateLimitWindowMs,
+  kdfConcurrency: config.authKdfConcurrency,
+});
 
 stores.redis.on("error", () => {
   console.warn(JSON.stringify({ event: "dependency_error", service: "redis" }));
@@ -18,7 +27,12 @@ stores.redis.on("end", () => {
   if (connectedBefore && !shuttingDown) void shutdown("redis_disconnected", 1);
 });
 
-const server = createServer(createApp({ checks: stores.checks, timeoutMs: config.dependencyTimeoutMs }));
+const server = createServer(createApp({
+  checks: stores.checks,
+  timeoutMs: config.dependencyTimeoutMs,
+  applicationReady: () => authReady,
+  authRouter: auth.router,
+}));
 server.listen(config.port, config.host, () => {
   console.info(JSON.stringify({ event: "api_listening", port: config.port }));
   startupPromise = connectStores();
@@ -33,6 +47,14 @@ async function connectStores(): Promise<boolean> {
     connectWithRetry("redis", () => stores.redis.connect(), config.connectAttempts, config.connectDelayMs, shutdownController.signal),
   ]);
   connectedBefore = mongoReady && redisReady;
+  if (!connectedBefore) return false;
+  try {
+    await auth.initialize();
+    authReady = true;
+  } catch {
+    console.warn(JSON.stringify({ event: "auth_indexes_unavailable" }));
+    return false;
+  }
   return connectedBefore;
 }
 

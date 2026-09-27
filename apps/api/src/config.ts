@@ -6,6 +6,9 @@ export interface ApiConfig {
   connectAttempts: number;
   connectDelayMs: number;
   dependencyTimeoutMs: number;
+  authRateLimitMax: number;
+  authRateLimitWindowMs: number;
+  authKdfConcurrency: number;
 }
 
 function integerSetting(name: string, value: string | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -42,5 +45,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     connectAttempts: integerSetting("CONNECT_ATTEMPTS", env.CONNECT_ATTEMPTS, 5, 1, 10),
     connectDelayMs: integerSetting("CONNECT_DELAY_MS", env.CONNECT_DELAY_MS, 500, 0, 5000),
     dependencyTimeoutMs: integerSetting("DEPENDENCY_TIMEOUT_MS", env.DEPENDENCY_TIMEOUT_MS, 1000, 100, 10000),
+    authRateLimitMax: integerSetting("AUTH_RATE_LIMIT_MAX", env.AUTH_RATE_LIMIT_MAX, 20, 1, 1000),
+    authRateLimitWindowMs: integerSetting("AUTH_RATE_LIMIT_WINDOW_MS", env.AUTH_RATE_LIMIT_WINDOW_MS, 60_000, 1000, 3_600_000),
+    authKdfConcurrency: integerSetting("AUTH_KDF_CONCURRENCY", env.AUTH_KDF_CONCURRENCY, 2, 1, 2),
   };
 }

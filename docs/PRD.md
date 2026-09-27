@@ -1,7 +1,7 @@
 # Yêu cầu sản phẩm và giới hạn ba tuần
 
 **Sản phẩm:** MarketPulse VN — nền tảng thông tin thị trường Việt Nam theo sự kiện  
-**Trạng thái:** MP-03 đã thêm scaffold local gồm API chỉ có health check, web shell trống có chủ đích, MongoDB/Redis Compose và collector chỉ đọc fixture. Chưa có luồng sản phẩm, trang được thiết kế, live adapter hay deployment; yêu cầu gốc nằm trong [MarketPulse_VN_Project_Documentation.md](../MarketPulse_VN_Project_Documentation.md).
+**Trạng thái:** MP-04 đã thêm lát cắt API auth local gồm đăng ký, đăng nhập, đăng xuất và endpoint user hiện tại; web shell vẫn trống có chủ đích, chưa có trang được thiết kế, API thị trường/watchlist, live adapter hay deployment. Phạm vi auth đầy đủ theo FR-01 vẫn còn các phần hoãn trong bảng dưới; yêu cầu gốc nằm trong [MarketPulse_VN_Project_Documentation.md](../MarketPulse_VN_Project_Documentation.md).
 
 ## Mục tiêu sản phẩm
 

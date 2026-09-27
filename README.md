@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Event-driven market intelligence for Vietnam</strong></p>
 
-**Project status: MP-03 local scaffold.** The repository now contains a runnable API health shell, blank React/Vite app wiring, local MongoDB/Redis Compose services and a fixture-only Python collector. Market/account routes, designed product screens, verified live data and production deployment are not present. The roadmap describes a three-week, local-first portfolio demo; the broader product remains a longer-term plan.
+**Project status: MP-04 local auth API slice.** The API now supports demo account registration, login, logout and the authenticated user endpoint, alongside its health checks. The React/Vite app remains intentionally blank; market and watchlist routes, designed product screens, verified live data and production deployment are not present. The roadmap describes a three-week, local-first portfolio demo; the broader product remains a longer-term plan.
 
 MarketPulse VN is designed to bring Vietnamese equities, market indices, gold, foreign exchange, macro data, financial news and public events into one research experience. The central idea is to show market movement alongside relevant events while making data source and freshness visible. A nearby event is context, not proof of cause.
 
@@ -70,7 +70,7 @@ The brief is the product context; the PRD and roadmap define the smaller demo bo
 - [GDELT DOC API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) is a candidate for later news research; the project does not promise a particular archive or Vietnam coverage.
 - MongoDB’s [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) inform the replay and uniqueness design.
 
-The canonical market-data schema and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). The API currently offers only `/health/live` and `/health/ready`; the web root intentionally renders nothing until its first Stitch-designed page. Run the scaffold checks with:
+The canonical market-data schema and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). The API offers `/health/live`, `/health/ready` and the local auth routes described in the [local development guide](docs/LOCAL_DEVELOPMENT.md); the web root intentionally renders nothing until its first Stitch-designed page. Run the local checks with:
 
 ```sh
 python -m pip install -r requirements-dev.txt

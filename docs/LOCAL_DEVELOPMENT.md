@@ -1,6 +1,6 @@
 # Local development
 
-MP-03 supplies the local application scaffold. The API exposes liveness and dependency readiness only; it has no market or account routes. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, and the authenticated user endpoint. It has no market or watchlist routes yet. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -20,16 +20,31 @@ docker compose config --quiet
 docker compose up --build --wait
 ```
 
-Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks; its response does not include internal errors.
+Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks and the auth indexes have initialized; its response does not include internal errors.
 
-Run the real service integration check from another terminal while the stack is running:
+## Authentication API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/auth/register` | Create a local user and issue a bearer session. |
+| `POST` | `/api/auth/login` | Verify credentials and issue a bearer session. |
+| `POST` | `/api/auth/logout` | Revoke the presented session; returns 204. |
+| `GET` | `/api/auth/me` | Return the user belonging to the presented session. |
+
+Register and login accept a JSON object with string `email` and `password` fields and reject additional fields. Email is trimmed and lowercased. Passwords must contain 15–128 Unicode characters and at most 512 UTF-8 bytes; the API stores a salted scrypt hash. The server assigns the `USER` role. Login and registration return `{ token, tokenType, expiresAt, user }`; the user object contains only `id`, `email`, `role`, and `createdAt`.
+
+Send the opaque token only in `Authorization: Bearer <token>` for `/me` and `/logout`. The API does not use cookies or query-string tokens. Responses from auth routes use `Cache-Control: no-store`. Sessions expire after eight hours and logout deletes the session; requests check expiry immediately even while MongoDB's TTL cleanup is pending. MongoDB stores only the SHA-256 token digest. The user collection has a unique normalized-email index; sessions live in a separate collection with a unique token-digest index and an expiry TTL index.
+
+The process limits registration and login attempts per remote IP, without trusting `X-Forwarded-For`. Defaults are 20 attempts per 60 seconds and at most two concurrent scrypt operations. `AUTH_RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, and `AUTH_KDF_CONCURRENCY` are bounded configuration settings. The limiter is in-memory, resets when the API restarts, and is intended for the single-process local demo; it is not production hardening.
+
+Run the real service integration checks from another terminal while the stack is running:
 
 ```powershell
 npm ci
 npm run test:integration
 ```
 
-The test uses a unique MongoDB test collection and Redis key, verifies write/read round trips, closes its Redis client connection to check that readiness fails, reconnects that client and checks readiness again, then removes only the collection and key it created. This exercises client disconnect/reconnect against the live Redis service; it does not stop the Compose Redis container. If a host port was changed, set the matching URLs before running the host-side test, for example `$env:MONGODB_URL="mongodb://127.0.0.1:27018/marketpulse"` and `$env:REDIS_URL="redis://127.0.0.1:6380"`. Compose volumes remain available after `docker compose down`; `docker compose down -v` removes them.
+The existing health integration check uses a unique MongoDB collection and Redis key, verifies read/write round trips and readiness across a client disconnect, then removes only those records. The auth integration check creates and drops its own uniquely named test database; it verifies registration races, stored hashes/digests, login, principal isolation, session expiry, and logout revocation against real MongoDB. Neither test stops the Compose Redis container. If a host port was changed, set the matching URLs before running the host-side test, for example `$env:MONGODB_URL="mongodb://127.0.0.1:27018/marketpulse"` and `$env:REDIS_URL="redis://127.0.0.1:6380"`. Compose volumes remain available after `docker compose down`; `docker compose down -v` removes them.
 
 To run the fixture-only collector once:
 
@@ -50,7 +65,7 @@ npm ci
 npm run dev:api
 ```
 
-If the full Compose stack is already running, stop its API and web containers first to free ports 3001 and 5173. In a second terminal, run `npm run dev:web`. Host processes default to loopback. The API reads `MONGODB_URL`, `REDIS_URL`, `PORT` and `HOST` from the process environment; Node scripts do not load `.env` automatically, and the default URLs match the Compose database ports. Stop each foreground process with Ctrl+C. If the API exhausts startup retries, check the database containers and start the API again.
+If the full Compose stack is already running, stop its API and web containers first to free ports 3001 and 5173. In a second terminal, run `npm run dev:web`. Host processes default to loopback. The API reads `MONGODB_URL`, `REDIS_URL`, `PORT`, `HOST`, and the `AUTH_*` settings from the process environment; Node scripts do not load `.env` automatically, and the default URLs match the Compose database ports. Stop each foreground process with Ctrl+C. If the API exhausts startup retries, check the database containers and start the API again.
 
 After Redis disconnects, the API exits and Compose attempts up to five restarts. MongoDB readiness failures return 503 while `/health/live` remains available. If the Redis restart limit is exhausted, recover the API with `docker compose up -d --force-recreate api`; the database volumes remain untouched.
 
