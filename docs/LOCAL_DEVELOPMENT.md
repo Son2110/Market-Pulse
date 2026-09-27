@@ -4,7 +4,7 @@ MP-03 supplies the local application scaffold. The API exposes liveness and depe
 
 ## Requirements
 
-- Docker Desktop with Docker Compose v2 or newer, with the engine running.
+- Docker Desktop with Docker Compose v2 or newer; start it and wait until the engine is running before using Compose.
 - Node.js 22.15 or newer in the Node 22 line, with npm 10.9 or newer.
 - Python 3.10 for host-side fixture checks. The collector container and CI use Python 3.12.
 
