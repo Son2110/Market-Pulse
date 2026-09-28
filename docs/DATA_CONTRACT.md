@@ -4,6 +4,12 @@ Hợp đồng JSON Schema tại [`packages/schemas/market-data-v1.schema.json`](
 
 Fixture nhỏ nằm tại [`fixtures/market/mp-02-synthetic.json`](../fixtures/market/mp-02-synthetic.json). Toàn bộ giá và volume do project tự tạo, issuer chỉ được ghi bằng symbol. Ba ngày `2026-09-21` đến `2026-09-23` là ngày phiên được chọn để thử nghiệm, chưa xác minh lịch giao dịch Việt Nam. Không dùng fixture làm giá thật, bằng chứng freshness hay kết quả provider.
 
+## API đọc candle ngày
+
+`GET /api/assets/:symbol/history` trả envelope canonical v1 gồm đúng asset đã chọn và các candle ngày còn trong fixture, giữ nguyên từng record cùng provenance. Route công khai không cần bearer token vì nội dung chỉ là fixture tổng hợp. `interval` mặc định là `1d`; `from` và `to` là ngày ISO lịch Việt Nam hợp lệ, inclusive. Query trùng, nested, lạ, ngày sai hoặc interval khác trả 400; symbol không có trong fixture trả 404. Asset đã biết nhưng range không có candle trả 200 với `status: no_data`, mảng candle rỗng và `asOf: null`.
+
+`meta.availableRange` mô tả toàn bộ chuỗi fixture; `meta.asOf` là timestamp gốc của candle mới nhất thực sự trả về. Filter lịch sử không được dùng timestamp của candle mới hơn. Response luôn giữ `SYNTHETIC FIXTURE — NOT MARKET DATA`, `fixture / unknown`, `sessionCalendar: unverified`, currency/unit, index volume `null` và timestamp nguyên bản. Ngày thiếu vẫn thiếu; API không nội suy hoặc tuyên bố bao phủ lịch phiên. API đặt `Cache-Control: no-store` trong lát cắt này.
+
 ## Cấu trúc và đơn vị
 
 Envelope có `schemaVersion`, nhãn `dataset`, danh mục `assets`, cùng các mảng `candles`, `quotes` và `indexObservations`. Mỗi asset có `assetId` ổn định theo dạng `VN:{exchange}:{symbol}`, symbol viết hoa, loại equity/index và múi giờ `Asia/Ho_Chi_Minh`. Equity dùng `currency: VND`, `unit: VND` (đồng, không phải nghìn đồng). Index dùng `currency: null`, `unit: index_point`; không diễn giải điểm chỉ số như tiền.

@@ -1,7 +1,7 @@
 # Yêu cầu sản phẩm và giới hạn ba tuần
 
 **Sản phẩm:** MarketPulse VN — nền tảng thông tin thị trường Việt Nam theo sự kiện  
-**Trạng thái:** MP-04 đã thêm lát cắt API auth local gồm đăng ký, đăng nhập, đăng xuất và endpoint user hiện tại; web shell vẫn trống có chủ đích, chưa có trang được thiết kế, API thị trường/watchlist, live adapter hay deployment. Phạm vi auth đầy đủ theo FR-01 vẫn còn các phần hoãn trong bảng dưới; yêu cầu gốc nằm trong [MarketPulse_VN_Project_Documentation.md](../MarketPulse_VN_Project_Documentation.md).
+**Trạng thái:** MP-05 thêm API đọc lịch sử candle ngày từ fixture canonical; MP-04 cung cấp lát cắt API auth local gồm đăng ký, đăng nhập, đăng xuất và endpoint user hiện tại. Web shell vẫn trống có chủ đích; search, watchlist, live adapter và deployment chưa có. Đây chỉ là lát cắt API của FR-04, không hoàn tất yêu cầu gốc; xem tiến độ tại [roadmap](ROADMAP.md) và yêu cầu gốc trong [MarketPulse_VN_Project_Documentation.md](../MarketPulse_VN_Project_Documentation.md).
 
 ## Mục tiêu sản phẩm
 

@@ -1,6 +1,6 @@
 # Local development
 
-The local API supports demo account registration, login, logout, and the authenticated user endpoint. It has no market or watchlist routes yet. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, and public fixture-backed daily history. It has no search or watchlist routes yet. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ docker compose config --quiet
 docker compose up --build --wait
 ```
 
-Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks and the auth indexes have initialized; its response does not include internal errors.
+Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks and the auth indexes and bundled market fixture have initialized; its response does not include internal errors.
 
 ## Authentication API
 
@@ -36,6 +36,14 @@ Register and login accept a JSON object with string `email` and `password` field
 Send the opaque token only in `Authorization: Bearer <token>` for `/me` and `/logout`. The API does not use cookies or query-string tokens. Responses from auth routes use `Cache-Control: no-store`. Sessions expire after eight hours and logout deletes the session; requests check expiry immediately even while MongoDB's TTL cleanup is pending. MongoDB stores only the SHA-256 token digest. The user collection has a unique normalized-email index; sessions live in a separate collection with a unique token-digest index and an expiry TTL index.
 
 The process limits registration and login attempts per remote IP, without trusting `X-Forwarded-For`. Defaults are 20 attempts per 60 seconds and at most two concurrent scrypt operations. `AUTH_RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, and `AUTH_KDF_CONCURRENCY` are bounded configuration settings. The limiter is in-memory, resets when the API restarts, and is intended for the single-process local demo; it is not production hardening.
+
+## Daily history API
+
+`GET /api/assets/:symbol/history` returns a canonical v1 envelope for one known fixture asset. The route is public and requires no bearer token because the committed dataset is synthetic demo content. It reads the fixture bundled with the API image; it does not contact a market-data provider.
+
+The optional query parameters are `interval=1d` (the default), `from=YYYY-MM-DD`, and `to=YYYY-MM-DD`. Bounds are inclusive and must be valid calendar dates; duplicate, nested, unknown or unsupported parameters return 400. Symbols are case-normalized and limited to 32 safe characters. An unknown symbol returns 404. A known symbol with no candles in the requested range returns 200 with `meta.status: "no_data"`, the selected asset, an empty candle array and `meta.asOf: null`. Missing dates remain absent; the API does not infer exchange-calendar coverage or fill gaps. Responses use `Cache-Control: no-store`.
+
+The canonical `data` envelope preserves the fixture dataset label, `fixture / unknown` freshness, `unverified` session calendar, original source fields, units, null index volume and candle timestamps. `meta.availableRange` covers the entire fixture series; `meta.asOf` is the timestamp of the latest candle actually returned. If the fixture cannot be loaded or its required shape is invalid, readiness remains 503 and the route returns a sanitized 503 response.
 
 Run the real service integration checks from another terminal while the stack is running:
 
