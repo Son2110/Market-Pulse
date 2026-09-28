@@ -51,6 +51,12 @@ API auth local có `POST /api/auth/register`, `POST /api/auth/login`, `POST /api
 
 Kiểm tra local đạt: lint, typecheck, build, 17 API unit tests, fixture validation, 24 contract tests, 2 collector tests, docs check/build và 2 integration tests MongoDB/Redis (0 skip). `docker compose up --wait` đưa API, web, MongoDB và Redis tới healthy; smoke test nhận HTTP 200 ở `/health/live`, `/health/ready` và web root, cùng 401 tại `/api/auth/me` khi không có bearer token. Không tạo tài khoản trong smoke test. GitHub Actions trên branch này chưa được xác nhận.
 
+### Tiến độ ghi nhận · MP-05 · 28/09/2026
+
+API có `GET /api/assets/:symbol/history`, đọc fixture canonical một lần qua provider adapter và không yêu cầu đăng nhập vì dữ liệu này chỉ là fixture tổng hợp công khai. `interval` mặc định `1d`; `from`/`to` là ngày ISO hợp lệ và inclusive. Query sai trả 400, symbol không biết trả 404, range rỗng của asset đã biết trả 200 với `status: no_data` và `asOf: null`. Response giữ nguyên asset/candle được chọn cùng provenance và nhãn `SYNTHETIC FIXTURE — NOT MARKET DATA`, freshness `fixture / unknown`, lịch phiên `unverified`, đơn vị, volume null của VNINDEX và timestamp fixture; ngày thiếu không được bù. `availableRange` là toàn chuỗi; `asOf` theo candle mới nhất trong kết quả. API đặt `Cache-Control: no-store`. Fixture hỏng hoặc thiếu làm readiness 503, còn liveness độc lập; lỗi route đã được khử chi tiết nội bộ.
+
+Đây là phần API-only của FR-04. Chưa có trang giao diện, search, nguồn live đã xác minh, ingestion hoặc cache; cổng source live vẫn **NOT VERIFIED**. Kiểm tra local đạt: lint, typecheck, 35 API unit tests, build, fixture validator, 24 contract tests, 2 collector tests, docs check (34 đích link local) và docs build (11 tài liệu). `docker compose build api` thành công và `docker compose up --detach --wait` đưa MongoDB, Redis, API và web tới healthy. Smoke test từ API container xác nhận health/web, FPT có đúng hai candle fixture trong range inclusive cùng source/freshness/as-of, range rỗng trả `no_data`/`asOf: null`, symbol lạ trả 404 và response `no-store`. Hai envelope API thực tế (có candle và rỗng) đều qua validator Python hiện có với `fixture_only=False`. Integration MongoDB/Redis đạt 2 test, 0 skip bằng host URL tại `127.0.0.1:27018` và `127.0.0.1:6379`. GitHub Actions trên branch này chưa được xác nhận.
+
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |

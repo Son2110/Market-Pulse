@@ -22,7 +22,7 @@ Portal build chỉ dùng thư viện chuẩn của Python 3.12; workflow không 
 
 ## Luồng ứng dụng local hiện tại
 
-`Application CI` kiểm tra đúng scaffold MP-03. API chỉ có `/health/live` và `/health/ready`, web root cố ý trống tới khi có page được thiết kế trong Stitch, còn collector chỉ xác thực fixture. Những check này không chứng minh đã có luồng user, live data, E2E sản phẩm hay deploy.
+`Application CI` kiểm tra API health/auth cùng route lịch sử fixture của MP-05; smoke test xác nhận response FPT trong API image có schema/provenance và hai candle được lọc. Web root cố ý trống tới khi có page được thiết kế trong Stitch, còn collector chỉ xác thực fixture. Những check này không chứng minh đã có luồng frontend, live data, E2E sản phẩm hay deploy.
 
 ## Luồng ứng dụng sau này
 

@@ -1,13 +1,17 @@
 import { createServer } from "node:http";
 import { createAuthApi } from "./auth.js";
 import { readConfig } from "./config.js";
+import { createDailyHistoryRouter } from "./daily-history.js";
+import { createFixtureMarketDataProvider } from "./fixture-market-data-provider.js";
 import { createApp } from "./health.js";
 import { connectWithRetry, createStores } from "./stores.js";
 
 const config = readConfig();
 const stores = createStores(config);
+const marketData = createFixtureMarketDataProvider();
 let connectedBefore = false;
 let authReady = false;
+let marketDataReady = false;
 let shuttingDown = false;
 let startupPromise: Promise<boolean> | undefined;
 const shutdownController = new AbortController();
@@ -30,8 +34,9 @@ stores.redis.on("end", () => {
 const server = createServer(createApp({
   checks: stores.checks,
   timeoutMs: config.dependencyTimeoutMs,
-  applicationReady: () => authReady,
+  applicationReady: () => authReady && marketDataReady,
   authRouter: auth.router,
+  dailyHistoryRouter: createDailyHistoryRouter(marketData),
 }));
 server.listen(config.port, config.host, () => {
   console.info(JSON.stringify({ event: "api_listening", port: config.port }));
@@ -54,6 +59,12 @@ async function connectStores(): Promise<boolean> {
   } catch {
     console.warn(JSON.stringify({ event: "auth_indexes_unavailable" }));
     return false;
+  }
+  try {
+    await marketData.initialize();
+    marketDataReady = true;
+  } catch {
+    console.warn(JSON.stringify({ event: "market_data_fixture_unavailable" }));
   }
   return connectedBefore;
 }
