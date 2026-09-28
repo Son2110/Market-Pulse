@@ -83,7 +83,19 @@ function validateFixture(value: unknown): FixtureDocument {
     assets.set(asset.assetId, asset);
     symbols.add(asset.symbol);
   }
-  if (!value.candles.every((candle) => validCandle(candle, assets))) throw new Error();
+  const candleIdentities = new Set<string>();
+  for (const candle of value.candles) {
+    if (!validCandle(candle, assets)) throw new Error();
+    const identity = JSON.stringify([
+      candle.assetId,
+      candle.source.provider,
+      candle.interval,
+      candle.tradingDate,
+      candle.adjustmentBasis,
+    ]);
+    if (candleIdentities.has(identity)) throw new Error();
+    candleIdentities.add(identity);
+  }
   return value as unknown as FixtureDocument;
 }
 

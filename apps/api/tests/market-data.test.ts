@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { createFixtureMarketDataProvider } from "../src/fixture-market-data-provider.js";
 
-const fixture = JSON.parse(await (await import("node:fs/promises")).readFile(
-  new URL("../../../fixtures/market/mp-02-synthetic.json", import.meta.url), "utf8",
-)) as {
+const fixtureSource = await readFile(new URL("../../../fixtures/market/mp-02-synthetic.json", import.meta.url), "utf8");
+const fixture = JSON.parse(fixtureSource) as {
   dataset: { label: string; freshness: string };
-  assets: Array<{ symbol: string; assetId: string }>;
+  assets: Array<Record<string, unknown> & { symbol: string; assetId: string }>;
   candles: Array<Record<string, unknown> & { assetId: string; tradingDate: string }>;
 };
 
@@ -77,6 +76,114 @@ test("malformed local fixture shape fails closed without exposing its path", asy
       && !error.message.includes(fixturePath)
     ));
     assert.equal(provider.ready, false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("duplicate candle identities fail closed when record id or OHLC differs", async () => {
+  const firstFptCandle = fixture.candles.find((candle) => candle.assetId === "VN:HOSE:FPT");
+  assert.ok(firstFptCandle);
+  const source = firstFptCandle.source as { provider: string; mode: string; recordId: string };
+  const duplicateVariants = [
+    {
+      name: "record-id",
+      candle: {
+        ...structuredClone(firstFptCandle),
+        source: { ...source, recordId: `${source.recordId}-duplicate` },
+      },
+    },
+    {
+      name: "ohlc",
+      candle: { ...structuredClone(firstFptCandle), high: (firstFptCandle.high as number) + 1 },
+    },
+  ];
+  const directory = await mkdtemp(join(tmpdir(), "market-pulse-duplicate-candle-"));
+
+  try {
+    for (const variant of duplicateVariants) {
+      const invalidFixture = structuredClone(fixture);
+      invalidFixture.candles.push(variant.candle);
+      const fixturePath = join(directory, `${variant.name}.json`);
+      await writeFile(fixturePath, JSON.stringify(invalidFixture), "utf8");
+      const provider = createFixtureMarketDataProvider(pathToFileURL(fixturePath));
+      const isSanitizedUnavailable = (error: unknown) => (
+        error instanceof Error
+        && error.message === "Market data is unavailable."
+        && !error.message.includes(fixturePath)
+      );
+
+      await assert.rejects(provider.initialize(), isSanitizedUnavailable);
+      assert.equal(provider.ready, false);
+      await assert.rejects(provider.getDailyHistory({
+        symbol: "FPT",
+        interval: "1d",
+        range: { from: null, to: null },
+      }), isSanitizedUnavailable);
+      assert.equal(provider.ready, false);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("candle identity allows separate adjustment bases, assets, and dates", async () => {
+  const expandedFixture = structuredClone(fixture);
+  const firstFptCandle = expandedFixture.candles.find((candle) => candle.assetId === "VN:HOSE:FPT");
+  const fptAsset = expandedFixture.assets.find((asset) => asset.assetId === "VN:HOSE:FPT");
+  assert.ok(firstFptCandle);
+  assert.ok(fptAsset);
+  const source = firstFptCandle.source as { provider: string; mode: string; recordId: string };
+  const alternateAsset = { ...fptAsset, assetId: "VN:HOSE:TST", symbol: "TST" };
+  expandedFixture.assets.push(alternateAsset);
+
+  const differentBasis = structuredClone(firstFptCandle);
+  differentBasis.adjustmentBasis = "split_adjusted";
+  differentBasis.source = { ...source, recordId: `${source.recordId}-split-adjusted` };
+
+  const differentDate = structuredClone(firstFptCandle);
+  differentDate.tradingDate = "2026-09-20";
+  differentDate.asOf = "2026-09-20T15:00:00+07:00";
+  differentDate.ingestedAt = "2026-09-20T15:05:00+07:00";
+  differentDate.source = { ...source, recordId: `${source.recordId}-different-date` };
+
+  const differentAsset = structuredClone(firstFptCandle);
+  differentAsset.assetId = alternateAsset.assetId;
+  differentAsset.source = { ...source, recordId: `${source.recordId}-different-asset` };
+  expandedFixture.candles.push(differentBasis, differentDate, differentAsset);
+  expandedFixture.candles.sort((left, right) => (
+    left.assetId.localeCompare(right.assetId)
+    || left.tradingDate.localeCompare(right.tradingDate)
+    || String(left.adjustmentBasis).localeCompare(String(right.adjustmentBasis))
+  ));
+
+  const directory = await mkdtemp(join(tmpdir(), "market-pulse-distinct-candle-"));
+  const fixturePath = join(directory, "distinct-identities.json");
+
+  try {
+    await writeFile(fixturePath, JSON.stringify(expandedFixture), "utf8");
+    const provider = createFixtureMarketDataProvider(pathToFileURL(fixturePath));
+    await provider.initialize();
+    assert.equal(provider.ready, true);
+
+    const fptHistory = await provider.getDailyHistory({
+      symbol: "FPT",
+      interval: "1d",
+      range: { from: null, to: null },
+    });
+    assert.equal(fptHistory?.candles.length, 5);
+    assert.ok(fixture.candles
+      .filter((candle) => candle.assetId === "VN:HOSE:FPT")
+      .every((original) => fptHistory?.candles.some((candle) => JSON.stringify(candle) === JSON.stringify(original))));
+    assert.ok(fptHistory?.candles.some((candle) => candle.adjustmentBasis === "split_adjusted"));
+    assert.ok(fptHistory?.candles.some((candle) => candle.tradingDate === "2026-09-20"));
+
+    const alternateHistory = await provider.getDailyHistory({
+      symbol: "TST",
+      interval: "1d",
+      range: { from: null, to: null },
+    });
+    assert.deepEqual(alternateHistory?.candles, [differentAsset]);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
