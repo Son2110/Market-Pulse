@@ -2,6 +2,7 @@ import { open } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   MarketDataUnavailableError,
+  type AssetCatalogProvider,
   type CanonicalAsset,
   type CanonicalCandle,
   type CanonicalDataset,
@@ -99,7 +100,7 @@ function validateFixture(value: unknown): FixtureDocument {
   return value as unknown as FixtureDocument;
 }
 
-export class FixtureMarketDataProvider implements MarketDataProvider {
+export class FixtureMarketDataProvider implements MarketDataProvider, AssetCatalogProvider {
   private fixturePromise: Promise<FixtureDocument> | undefined;
   private loaded = false;
 
@@ -135,6 +136,11 @@ export class FixtureMarketDataProvider implements MarketDataProvider {
         to: sourceCandles.at(-1)?.tradingDate ?? null,
       },
     };
+  }
+
+  async getAssets(): Promise<CanonicalAsset[]> {
+    const fixture = await this.loadOnce();
+    return structuredClone(fixture.assets);
   }
 
   private loadOnce(): Promise<FixtureDocument> {

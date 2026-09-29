@@ -1,6 +1,6 @@
 # Local development
 
-The local API supports demo account registration, login, logout, the authenticated user endpoint, and public fixture-backed daily history. It has no search or watchlist routes yet. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ docker compose config --quiet
 docker compose up --build --wait
 ```
 
-Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks and the auth indexes and bundled market fixture have initialized; its response does not include internal errors.
+Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, and the fixture plus its ten-entry company-reference catalog validate; its response does not include internal errors.
 
 ## Authentication API
 
@@ -44,6 +44,18 @@ The process limits registration and login attempts per remote IP, without trusti
 The optional query parameters are `interval=1d` (the default), `from=YYYY-MM-DD`, and `to=YYYY-MM-DD`. Bounds are inclusive and must be valid calendar dates; duplicate, nested, unknown or unsupported parameters return 400. Symbols are case-normalized and limited to 32 safe characters. An unknown symbol returns 404. A known symbol with no candles in the requested range returns 200 with `meta.status: "no_data"`, the selected asset, an empty candle array and `meta.asOf: null`. Missing dates remain absent; the API does not infer exchange-calendar coverage or fill gaps. Responses use `Cache-Control: no-store`.
 
 The canonical `data` envelope preserves the fixture dataset label, `fixture / unknown` freshness, `unverified` session calendar, original source fields, units, null index volume and candle timestamps. `meta.availableRange` covers the entire fixture series; `meta.asOf` is the timestamp of the latest candle actually returned. If the fixture cannot be loaded or its required shape is invalid, readiness remains 503 and the route returns a sanitized 503 response.
+
+## Stock search API
+
+`GET /api/assets/search?q=...` searches symbol, company name and curated aliases for exactly the ten equity assets in the bundled fixture. For example:
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:3001/api/assets/search?q=Vietcombank"
+```
+
+The query must contain exactly one nonblank `q` value of at most 100 decoded Unicode codepoints. Repeated, nested, unknown, missing, blank and overlong parameters return 400 `invalid_query`. Matching is literal substring search after Unicode accent removal, `đ` folding, lowercasing and whitespace collapse; results prioritize exact symbol, symbol prefix, then alphabetical symbol. It does not provide fuzzy ranking or recent-search suggestions.
+
+Each result returns the unchanged canonical asset, `companyName`, `aliases`, and `reference` with official source URLs and `reviewedOn`. Top-level metadata identifies `fixture equities`, `fixture / unknown`, provider `marketpulse-fixture`, the synthetic label and `asOf: null`; no market observation is associated with the reference snapshot. `reviewedOn` is not a market as-of date, and the curated company names do not guarantee current registration details. `VNINDEX` is excluded. Responses, including errors, use `Cache-Control: no-store`. If catalog coverage differs from the ten loaded fixture equities or reference metadata is invalid, search returns a sanitized 503 and readiness stays false.
 
 Run the real service integration checks from another terminal while the stack is running:
 

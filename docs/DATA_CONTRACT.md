@@ -10,6 +10,14 @@ Fixture nhỏ nằm tại [`fixtures/market/mp-02-synthetic.json`](../fixtures/m
 
 `meta.availableRange` mô tả toàn bộ chuỗi fixture; `meta.asOf` là timestamp gốc của candle mới nhất thực sự trả về. Filter lịch sử không được dùng timestamp của candle mới hơn. Response luôn giữ `SYNTHETIC FIXTURE — NOT MARKET DATA`, `fixture / unknown`, `sessionCalendar: unverified`, currency/unit, index volume `null` và timestamp nguyên bản. Ngày thiếu vẫn thiếu; API không nội suy hoặc tuyên bố bao phủ lịch phiên. API đặt `Cache-Control: no-store` trong lát cắt này.
 
+## API tìm kiếm cổ phiếu
+
+`GET /api/assets/search?q=...` là endpoint công khai, chỉ tìm trong đúng mười equity của fixture đã join với catalog tham chiếu theo symbol; asset canonical được giữ nguyên và `assetId` phải duy nhất. `VNINDEX` và mọi mã chỉ có trong catalog đều không thể xuất hiện. Catalog cung cấp tên công ty, bí danh, URL nguồn chính thức và `reviewedOn`; đây là snapshot tham chiếu được tuyển chọn, không đảm bảo tình trạng đăng ký hiện tại. Không sao chép giá hay fundamentals từ các nguồn đó.
+
+Query phải có đúng một tham số `q`; giá trị sau URL decode tối đa 100 Unicode codepoint trước normalization. Thiếu/rỗng/chỉ có khoảng trắng, chỉ còn dấu kết hợp sau normalization, trùng, nested, tham số lạ hoặc quá dài trả 400 `invalid_query`. Search chuẩn hóa Unicode, bỏ dấu kết hợp, quy `đ` về `d`, không phân biệt hoa thường và gộp khoảng trắng; nó tìm substring literal trong symbol, tên và bí danh, không dùng regex, fuzzy hay lịch sử tìm gần đây. Kết quả được xếp symbol khớp chính xác trước, tiếp theo symbol có tiền tố khớp, rồi các kết quả khác theo symbol tăng dần.
+
+Response gồm asset canonical nguyên vẹn, tên/bí danh và provenance từng công ty. Metadata ghi `scope: fixture equities`, `dataset: fixture / unknown`, `provider: marketpulse-fixture`, nhãn synthetic và `asOf: null`: catalog tham khảo không phải quan sát thị trường. `reviewedOn` là ngày rà soát nguồn tham khảo, không phải market as-of. Nếu catalog trùng hoặc không phủ chính xác mười equity đã nạp, API trả 503 đã khử chi tiết và readiness không đạt. Mọi response, kể cả lỗi, đặt `Cache-Control: no-store`.
+
 ## Cấu trúc và đơn vị
 
 Envelope có `schemaVersion`, nhãn `dataset`, danh mục `assets`, cùng các mảng `candles`, `quotes` và `indexObservations`. Mỗi asset có `assetId` ổn định theo dạng `VN:{exchange}:{symbol}`, symbol viết hoa, loại equity/index và múi giờ `Asia/Ho_Chi_Minh`. Equity dùng `currency: VND`, `unit: VND` (đồng, không phải nghìn đồng). Index dùng `currency: null`, `unit: index_point`; không diễn giải điểm chỉ số như tiền.
