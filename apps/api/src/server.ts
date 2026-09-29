@@ -4,14 +4,17 @@ import { readConfig } from "./config.js";
 import { createDailyHistoryRouter } from "./daily-history.js";
 import { createFixtureMarketDataProvider } from "./fixture-market-data-provider.js";
 import { createApp } from "./health.js";
+import { createStockSearchRouter, StockSearchService } from "./stock-search.js";
 import { connectWithRetry, createStores } from "./stores.js";
 
 const config = readConfig();
 const stores = createStores(config);
 const marketData = createFixtureMarketDataProvider();
+const stockSearch = new StockSearchService(marketData);
 let connectedBefore = false;
 let authReady = false;
 let marketDataReady = false;
+let stockSearchReady = false;
 let shuttingDown = false;
 let startupPromise: Promise<boolean> | undefined;
 const shutdownController = new AbortController();
@@ -34,8 +37,9 @@ stores.redis.on("end", () => {
 const server = createServer(createApp({
   checks: stores.checks,
   timeoutMs: config.dependencyTimeoutMs,
-  applicationReady: () => authReady && marketDataReady,
+  applicationReady: () => authReady && marketDataReady && stockSearchReady,
   authRouter: auth.router,
+  stockSearchRouter: createStockSearchRouter(stockSearch),
   dailyHistoryRouter: createDailyHistoryRouter(marketData),
 }));
 server.listen(config.port, config.host, () => {
@@ -65,6 +69,14 @@ async function connectStores(): Promise<boolean> {
     marketDataReady = true;
   } catch {
     console.warn(JSON.stringify({ event: "market_data_fixture_unavailable" }));
+  }
+  if (marketDataReady) {
+    try {
+      await stockSearch.initialize();
+      stockSearchReady = true;
+    } catch {
+      console.warn(JSON.stringify({ event: "asset_search_catalog_unavailable" }));
+    }
   }
   return connectedBefore;
 }

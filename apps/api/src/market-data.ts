@@ -60,6 +60,10 @@ export interface MarketDataProvider {
   getDailyHistory(request: DailyHistoryRequest): Promise<DailyHistorySeries | null>;
 }
 
+export interface AssetCatalogProvider {
+  getAssets(): Promise<CanonicalAsset[]>;
+}
+
 export class MarketDataUnavailableError extends Error {
   constructor() {
     super("Market data is unavailable.");

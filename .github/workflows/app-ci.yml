@@ -75,6 +75,21 @@ jobs:
             throw new Error("Smoke test failed for fixture daily history");
           }
           console.log("OK fixture daily history");
+          const searchResponse = await fetch("http://127.0.0.1:3001/api/assets/search?q=Vietcombank");
+          const search = await searchResponse.json();
+          if (!searchResponse.ok
+            || searchResponse.headers.get("cache-control") !== "no-store"
+            || search.data?.length !== 1
+            || search.data[0]?.asset?.symbol !== "VCB"
+            || search.data[0]?.asset?.assetId !== "VN:HOSE:VCB"
+            || search.data[0]?.reference?.reviewedOn !== "2026-09-29"
+            || search.meta?.scope !== "fixture equities"
+            || search.meta?.dataset !== "fixture / unknown"
+            || search.meta?.provider !== "marketpulse-fixture"
+            || search.meta?.asOf !== null) {
+            throw new Error("Smoke test failed for fixture-backed asset search");
+          }
+          console.log("OK fixture-backed asset search");
           NODE
       - name: Run fixture collector container
         run: docker compose --profile collector run --rm collector
