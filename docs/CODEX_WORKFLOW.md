@@ -5,7 +5,7 @@ Quy trình này tách riêng bước lập kế hoạch, triển khai và đánh
 ## Vai trò
 
 1. GPT-6 Astra ở mức suy luận medium điều phối, đọc brief và tài liệu liên quan, giao việc triển khai có giới hạn, sau đó tự đánh giá kết quả.
-2. GPT-6 Luna ở mức suy luận max chỉ triển khai phần được giao, giữ nguyên các thay đổi khác, chạy các kiểm tra đã nêu và báo cáo file, bằng chứng cùng hạn chế. Không giao việc tiếp cho agent khác.
+2. GPT-6.1 Sol ở mức suy luận high chỉ triển khai phần được giao, giữ nguyên các thay đổi khác, chạy các kiểm tra đã nêu và báo cáo file, bằng chứng cùng hạn chế. Không giao việc tiếp cho agent khác.
 3. Nếu model hoặc khả năng được yêu cầu không có sẵn, hãy nói rõ; không tự thay bằng model khác hay khẳng định đã dùng model được yêu cầu.
 4. Chỉ làm một task tại một thời điểm với một worker. Hoàn tất triển khai, kiểm tra bắt buộc và review độc lập rồi mới bắt đầu task kế tiếp. Không triển khai nhiều task song song và không giao việc tiếp cho agent khác.
 5. Ghi rõ phạm vi file, tiêu chí nghiệm thu và lệnh kiểm tra trước khi giao việc. Không giao câu hỏi chỉ cần giải thích hoặc nghiên cứu thành việc viết code.
@@ -73,11 +73,11 @@ model = "gpt-6-astra"
 model_reasoning_effort = "medium"
 
 [profiles.implementation]
-model = "gpt-6-luna"
-model_reasoning_effort = "max"
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
 ~~~
 
-Khi Luna có sẵn, không thay vai trò triển khai bằng Astra. Profile triển khai dành cho task có giới hạn, không phải agent tự chạy định kỳ.
+Khi GPT-6.1 Sol có sẵn, không thay vai trò triển khai bằng Astra. Profile triển khai dành cho task có giới hạn, không phải agent tự chạy định kỳ.
 
 ## Tài liệu tham khảo
 

@@ -1,6 +1,6 @@
 # Local development
 
-The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web app intentionally renders a blank root until a page is designed in Stitch. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web root is a Vietnamese search page designed in Stitch; it shows company reference information on the same page, with no price/chart or dedicated stock route yet. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -20,7 +20,9 @@ docker compose config --quiet
 docker compose up --build --wait
 ```
 
-Open `http://127.0.0.1:5173` to confirm Vite is serving the intentionally blank app shell. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, and the fixture plus its ten-entry company-reference catalog validate; its response does not include internal errors.
+Open `http://127.0.0.1:5173` and submit `FPT`, `Vietcombank`, `Hòa Phát`, or `vin`. The page makes a same-origin request through Vite's `/api` proxy; Compose sets the server-only `API_PROXY_TARGET` to `http://api:3001`. Search `vin` returns VHM, VIC, VNM in that order. Select a result to inspect reference information and HTTPS source links. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, and the fixture plus its ten-entry company-reference catalog validate; its response does not include internal errors.
+
+The initial page invites a search. Pending requests show loading; an unknown query shows an empty state; unavailable services or malformed responses show an error with retry. Blank or overlong queries have an inline validation message. Requests time out after ten seconds; a new submission cancels the previous request and prevents stale results from replacing the newer search. Company names, exchange, currency, timezone and reference dates come from the API. The reference review date is not a market as-of time. The demo labels do not assert live coverage or freshness. See [the search design handoff](FR03_SEARCH_DESIGN.md) for design references and QA evidence.
 
 ## Authentication API
 
@@ -85,7 +87,7 @@ npm ci
 npm run dev:api
 ```
 
-If the full Compose stack is already running, stop its API and web containers first to free ports 3001 and 5173. In a second terminal, run `npm run dev:web`. Host processes default to loopback. The API reads `MONGODB_URL`, `REDIS_URL`, `PORT`, `HOST`, and the `AUTH_*` settings from the process environment; Node scripts do not load `.env` automatically, and the default URLs match the Compose database ports. Stop each foreground process with Ctrl+C. If the API exhausts startup retries, check the database containers and start the API again.
+If the full Compose stack is already running, stop its API and web containers first to free ports 3001 and 5173. In a second terminal, run `npm run dev:web`. Host processes default to loopback. Vite proxies `/api` to `http://127.0.0.1:3001` by default; if the host API uses another port, set `$env:API_PROXY_TARGET="http://127.0.0.1:3002"` in the web terminal before starting Vite. This variable configures the development server, is not a `VITE_*` client value, and contains no credential. No broad CORS policy or production hosting is introduced. The API reads `MONGODB_URL`, `REDIS_URL`, `PORT`, `HOST`, and the `AUTH_*` settings from the process environment; Node scripts do not load `.env` automatically, and the default URLs match the Compose database ports. Stop each foreground process with Ctrl+C. If the API exhausts startup retries, check the database containers and start the API again.
 
 After Redis disconnects, the API exits and Compose attempts up to five restarts. MongoDB readiness failures return 503 while `/health/live` remains available. If the Redis restart limit is exhausted, recover the API with `docker compose up -d --force-recreate api`; the database volumes remain untouched.
 

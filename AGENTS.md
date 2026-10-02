@@ -7,7 +7,7 @@ MarketPulse VN is a planning-stage market intelligence project for Vietnam. Read
 ## Codex workflow
 
 - Use GPT-6 Astra at medium reasoning as the requested coordinator for planning and independent review.
-- Use GPT-6 Luna at max reasoning for explicitly delegated implementation with a bounded write scope, acceptance criteria and required checks. Do not recursively delegate.
+- Use GPT-6.1 Sol at high reasoning for explicitly delegated implementation with a bounded write scope, acceptance criteria and required checks. Do not recursively delegate.
 - If a requested model or capability is unavailable, report that limitation; do not silently substitute or claim a model switch.
 - The coordinator reviews worker changes and verification evidence independently. Workers report changed files, checks run and limitations.
 - Work on one task at a time with one worker. Finish implementation, required checks and independent review before starting another task. Do not run parallel task implementations or delegate recursively.

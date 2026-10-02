@@ -90,6 +90,16 @@ jobs:
             throw new Error("Smoke test failed for fixture-backed asset search");
           }
           console.log("OK fixture-backed asset search");
+          const proxiedResponse = await fetch("http://127.0.0.1:5173/api/assets/search?q=vin");
+          const proxiedSearch = await proxiedResponse.json();
+          if (!proxiedResponse.ok
+            || proxiedResponse.headers.get("cache-control") !== "no-store"
+            || proxiedSearch.data?.map((result) => result.asset.symbol).join(",") !== "VHM,VIC,VNM"
+            || proxiedSearch.meta?.provider !== "marketpulse-fixture"
+            || proxiedSearch.meta?.asOf !== null) {
+            throw new Error("Smoke test failed for same-origin web search proxy");
+          }
+          console.log("OK same-origin web search proxy");
           NODE
       - name: Run fixture collector container
         run: docker compose --profile collector run --rm collector
