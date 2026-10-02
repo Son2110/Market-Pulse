@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { errorMessage, fetchSearch, queryError, type SearchResponse, type SearchResult } from "./stock-search.js";
+import StockDetail from "./StockDetail.js";
+import { stockRoute } from "./stock-detail.js";
 import "./styles.css";
 
 type SearchState =
@@ -18,6 +20,7 @@ function CompanyReference({ company, response }: { company: SearchResult; respon
     <span className="symbol-tag">{company.asset.symbol}</span>
     <h2 id="company-heading">{company.companyName}</h2>
     <p className="muted">Cổ phiếu · {company.asset.exchange}</p>
+    <a className="detail-link" href={`/stocks/${encodeURIComponent(company.asset.symbol)}?search=${encodeURIComponent(new URLSearchParams(window.location.search).get("q") ?? company.asset.symbol)}`}>Xem chi tiết & biểu đồ ngày →</a>
     <div className="panel-section">
       <h3>Thông tin tham chiếu</h3>
       <dl>
@@ -42,15 +45,19 @@ function CompanyReference({ company, response }: { company: SearchResult; respon
   </aside>;
 }
 
-export default function App() {
-  const [draft, setDraft] = useState("");
+function SearchPage() {
+  const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [state, setState] = useState<SearchState>({ status: "initial" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const requestId = useRef(0);
   const controller = useRef<AbortController | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
-  useEffect(() => () => { requestId.current += 1; controller.current?.abort(); }, []);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search).get("q");
+    if (query && !queryError(query)) void search(query);
+    return () => { requestId.current += 1; controller.current?.abort(); };
+  }, []);
 
   async function search(query: string) {
     const id = ++requestId.current;
@@ -63,6 +70,7 @@ export default function App() {
       return;
     }
     const next = new AbortController();
+    window.history.replaceState(null, "", `/?q=${encodeURIComponent(query)}`);
     controller.current = next;
     setState({ status: "loading", query });
     try {
@@ -121,7 +129,7 @@ export default function App() {
                 <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{company.asset.exchange} · Cổ phiếu</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
               </button></li>;
             })}</ul>
-            <p className="scope-note">Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp để xem thông tin tham khảo.</p>
+            <p className="scope-note">Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày.</p>
           </> : <div className={`state-panel ${state.status === "error" ? "error-panel" : ""}`}>
             <span className={`state-icon ${state.status === "loading" ? "loading-icon" : ""}`} aria-hidden="true"><SearchIcon /></span>
             <h3>{state.status === "initial" ? "Bắt đầu với một doanh nghiệp" : state.status === "loading" ? "Đang tìm doanh nghiệp…" : state.status === "empty" ? "Chưa tìm thấy kết quả" : "Chưa thể tìm kiếm"}</h3>
@@ -136,4 +144,9 @@ export default function App() {
     </main>
     <footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ minh họa và nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>
   </>;
+}
+
+export default function App() {
+  const route = stockRoute(window.location.pathname);
+  return route.kind === "search" ? <SearchPage /> : <StockDetail symbol={route.kind === "detail" ? route.symbol : null} />;
 }

@@ -1,6 +1,6 @@
 # Local development
 
-The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web root is a Vietnamese search page designed in Stitch; it shows company reference information on the same page, with no price/chart or dedicated stock route yet. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web root is a Vietnamese search page designed in Stitch; it shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -20,9 +20,17 @@ docker compose config --quiet
 docker compose up --build --wait
 ```
 
-Open `http://127.0.0.1:5173` and submit `FPT`, `Vietcombank`, `Hòa Phát`, or `vin`. The page makes a same-origin request through Vite's `/api` proxy; Compose sets the server-only `API_PROXY_TARGET` to `http://api:3001`. Search `vin` returns VHM, VIC, VNM in that order. Select a result to inspect reference information and HTTPS source links. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, and the fixture plus its ten-entry company-reference catalog validate; its response does not include internal errors.
+Open `http://127.0.0.1:5173` and submit `FPT`, `Vietcombank`, `Hòa Phát`, or `vin`. The page makes a same-origin request through Vite's `/api` proxy; Compose sets the server-only `API_PROXY_TARGET` to `http://api:3001`. Search `vin` returns VHM, VIC, VNM in that order. Select a result to inspect reference information and HTTPS source links, then follow “Xem chi tiết & biểu đồ ngày”. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, and the fixture plus its ten-entry company-reference catalog validate; its response does not include internal errors.
 
 The initial page invites a search. Pending requests show loading; an unknown query shows an empty state; unavailable services or malformed responses show an error with retry. Blank or overlong queries have an inline validation message. Requests time out after ten seconds; a new submission cancels the previous request and prevents stale results from replacing the newer search. Company names, exchange, currency, timezone and reference dates come from the API. The reference review date is not a market as-of time. The demo labels do not assert live coverage or freshness. See [the search design handoff](FR03_SEARCH_DESIGN.md) for design references and QA evidence.
+
+## Stock detail page
+
+Open `http://127.0.0.1:5173/stocks/FPT` directly or follow the link from search. Lowercase symbols normalize to uppercase. Reloading the detail URL works; “Quay lại tìm kiếm” restores the submitted query when opened from search. Navigation uses ordinary links and full page loads. Unsafe/malformed paths and `VNINDEX` display an invalid-route state; a valid but unknown symbol displays the API's unknown-symbol state. Vite rejects some malformed URL encodings before React receives the path.
+
+The page requests history and optional company reference information through the same-origin proxy. History loading, empty results, HTTP/network failures, invalid response data and retry are distinct states. A reference lookup failure preserves valid price history under a generic stock name. With the committed fixture, FPT shows 102,500 VND at 23/09/2026 and +1,500 VND (+1.49%) versus the previous available observation on 22/09/2026. That comparison is not a verified previous trading session. A single observation has no fabricated comparison; no-data results show no price or chart and no as-of.
+
+The fixture has only three daily observations per asset. The chart places actual dates proportionally, preserves every marker and breaks the line across gaps greater than one calendar day because the session calendar is unverified. The responsive chart keeps text readable; the daily table scrolls within its own region on narrow screens. Currency, volume units, timezone, source, as-of, freshness and adjustment basis are visible. Neither the chart nor company reference dates assert current market coverage. See [the detail design handoff](FR04_DETAIL_DESIGN.md) for scope and QA evidence.
 
 ## Authentication API
 
@@ -107,3 +115,5 @@ python scripts/build_docs.py
 ```
 
 Run `npm run test:integration` with local MongoDB and Redis available. It fails with a clear message if either dependency cannot be reached; it does not skip.
+
+The unit suite includes detail routing, history contract validation, closing-price calculations, chart gaps/responsive geometry and request failures. Application CI also checks `/stocks/FPT` serves the web entry and the same-origin history proxy returns the three fixture candles with their original as-of and freshness. Browser state/responsive QA evidence is recorded in [the MP-07 handoff](FR04_DETAIL_DESIGN.md); those manual checks are not a committed E2E suite.

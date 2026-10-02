@@ -54,6 +54,7 @@ jobs:
             ["http://127.0.0.1:3001/health/live", '"status":"alive"'],
             ["http://127.0.0.1:3001/health/ready", '"status":"ready"'],
             ["http://127.0.0.1:5173/", '<div id="root"></div>'],
+            ["http://127.0.0.1:5173/stocks/FPT", '<div id="root"></div>'],
           ];
           for (const [url, expected] of checks) {
             const response = await fetch(url);
@@ -100,6 +101,18 @@ jobs:
             throw new Error("Smoke test failed for same-origin web search proxy");
           }
           console.log("OK same-origin web search proxy");
+          const proxiedHistoryResponse = await fetch("http://127.0.0.1:5173/api/assets/FPT/history");
+          const proxiedHistory = await proxiedHistoryResponse.json();
+          if (!proxiedHistoryResponse.ok
+            || proxiedHistoryResponse.headers.get("cache-control") !== "no-store"
+            || proxiedHistory.data?.assets?.[0]?.symbol !== "FPT"
+            || proxiedHistory.data?.candles?.length !== 3
+            || proxiedHistory.data.candles.at(-1)?.close !== 102500
+            || proxiedHistory.meta?.asOf !== "2026-09-23T15:00:00+07:00"
+            || proxiedHistory.data?.dataset?.freshness !== "fixture / unknown") {
+            throw new Error("Smoke test failed for same-origin web history proxy");
+          }
+          console.log("OK same-origin web history proxy");
           NODE
       - name: Run fixture collector container
         run: docker compose --profile collector run --rm collector
