@@ -119,3 +119,74 @@ dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
   .site-footer > div { padding: 22px 20px; display: grid; gap: 9px; }
 }
 @media (prefers-reduced-motion: reduce) { .loading-icon { animation: none; } }
+.brand-link { color: inherit; text-decoration: none; }
+.detail-link { display: inline-block; margin-top: 18px; font-size: 13px; font-weight: 600; line-height: 1.7; }
+.detail-page { padding-top: 22px; }
+.back-link { display: inline-block; font-size: 13px; margin-bottom: 22px; }
+.detail-notice { margin: 0 0 24px; padding: 15px 20px; }
+.detail-card { background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: 24px; min-width: 0; }
+.detail-card h2 { font-size: 17px; font-weight: 650; line-height: 1.5; }
+.price-hero { margin-bottom: 24px; }
+.price-hero-top { display: flex; justify-content: space-between; gap: 30px; align-items: flex-start; }
+.price-hero h1 { margin-top: 8px; font-size: 26px; letter-spacing: -.6px; overflow-wrap: anywhere; }
+.price-hero h1 + p { margin-top: 8px; }
+.asset-line { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.asset-line .symbol-tag { margin: 0; }
+.closing-price { text-align: right; flex: 0 0 38%; }
+.closing-price p { line-height: 1.65; }
+.closing-price .price-value { color: #172923; font-size: 34px; font-weight: 650; line-height: 1.3; margin: 4px 0; white-space: nowrap; }
+.price-value span { font-size: 14px; font-weight: 400; color: var(--muted); }
+.price-up { color: #176b52; font-weight: 600; font-size: 14px; }
+.price-down { color: #a43d2f; font-weight: 600; font-size: 14px; }
+.ohlcv-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 24px 0 0; padding-top: 20px; border-top: 1px solid var(--border); }
+.ohlcv-grid div { display: block; padding: 14px; background: #f2f5ef; border: 1px solid #e4e9e2; border-radius: 5px; }
+.ohlcv-grid dt { margin-bottom: 8px; }
+.ohlcv-grid dd { text-align: left; font-weight: 600; font-size: 15px; }
+.ohlcv-grid dd span { font-size: 12px; font-weight: 400; }
+.detail-workspace { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr); align-items: start; gap: 24px; }
+.detail-main-column { display: grid; gap: 24px; min-width: 0; }
+.detail-section-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
+.chart-key { color: var(--green); font-size: 12px; white-space: nowrap; padding-top: 3px; }
+.closing-chart { width: 100%; height: auto; display: block; stroke-width: 1; overflow: visible; }
+.closing-chart text { stroke: none; font-family: inherit; font-size: 12px; fill: #596b63; }
+.closing-chart .chart-value { fill: #172923; font-size: 13px; font-weight: 600; }
+.chart-grid { stroke: #dde5dd; stroke-dasharray: 3 5; }
+.chart-line { stroke: var(--green); stroke-width: 2.5; fill: none; }
+.chart-point { stroke: var(--green); stroke-width: 2.5; fill: white; }
+.chart-note { margin-top: 2px; }
+.source-panel h2 { margin-bottom: 12px; }
+.source-panel dl div { padding: 11px 0; line-height: 1.6; }
+.source-panel dl dt { flex: 1; }
+.source-panel dl dd { flex: 1.2; }
+.source-panel .source-list { margin-top: 12px; }
+.source-panel .reference-note { margin-top: 18px; }
+.table-scroll { overflow-x: auto; }
+.table-scroll:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
+.history-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.history-table th, .history-table td { padding: 13px 10px; text-align: right; border-bottom: 1px solid #e4e9e2; }
+.history-table thead { background: #f5f7f1; color: #596b63; }
+.history-table thead th { font-size: 11px; font-weight: 600; }
+.history-table th:first-child { text-align: left; }
+.history-table tbody th { font-weight: 400; }
+.history-table tbody td:nth-child(5) { font-weight: 650; }
+.detail-state { margin-top: 8px; }
+.detail-state h1 { font-size: 23px; margin-bottom: 13px; }
+@media (max-width: 1000px) { .detail-workspace { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) {
+  .price-hero-top { display: grid; gap: 22px; }
+  .closing-price { text-align: left; }
+  .ohlcv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-card { padding: 20px; }
+}
+@media (max-width: 520px) {
+  .detail-page { padding-top: 20px; }
+  .detail-notice { padding: 14px; }
+  .detail-card { padding: 16px; }
+  .price-hero h1 { font-size: 23px; }
+  .closing-price .price-value { font-size: 32px; }
+  .ohlcv-grid { gap: 8px; }
+  .ohlcv-grid div { padding: 11px; }
+  .ohlcv-grid dd { font-size: 14px; }
+  .detail-section-heading { display: grid; gap: 8px; }
+  .source-panel dl div { gap: 12px; }
+}

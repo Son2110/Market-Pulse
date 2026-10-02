@@ -79,6 +79,14 @@ Kiểm tra runtime ngày 29/09: Compose build từ `main` đưa cả bốn servi
 
 ## Tuần 2 — hoàn thành luồng người dùng chính
 
+### Tiến độ ghi nhận · MP-07 · 02/10/2026
+
+Trang `/stocks/:symbol` nối từ search đã chọn, với giá đóng cửa/OHLCV fixture mới nhất, thay đổi so với quan sát có sẵn trước đó, biểu đồ đường và bảng dữ liệu ngày. Source/as-of/freshness, VND, khối lượng cổ phiếu, UTC+7 và lịch phiên chưa xác minh hiện rõ; không gọi là giá hiện tại hoặc tự bù ngày thiếu. Query search được giữ khi quay lại; direct link/reload, loading/no-data/error/retry và lỗi reference độc lập đã có. Chỉ ba ngày fixture; candlestick/intraday/timeframe/indicator/news/event và nguồn live còn hoãn. Tiêu chí mở detail của lát cắt FR-03 đã có, nhưng FR-03/FR-04 theo mô tả gốc vẫn chưa hoàn tất. Xem [bàn giao thiết kế MP-07](FR04_DETAIL_DESIGN.md).
+
+Coordinator đã review độc lập và QA Edge responsive 1440/768/390/320px cùng trạng thái lỗi/loading/empty, baseline thiếu/0%, gap và metadata sai. Không có pageerror hoặc overflow ngang; chart mobile đã sửa để text đọc được. Docker build/start đạt healthy, HTTP direct route/history proxy và browser 390px search → detail → reload qua port 5173 đạt. GitHub Actions trên nhánh này chưa được xác nhận; cổng nguồn live vẫn **NOT VERIFIED**.
+
+Checks cuối local đạt lint, typecheck, 65 unit tests (47 API + 18 client, 0 skip), build, docs check (43 đích local) và docs build (13 tài liệu nguồn). Tài liệu yêu cầu gốc giữ nguyên; API/schema/fixture không đổi.
+
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
 | D8 · Thứ Năm 01/10 | Build · 2,4 giờ | MP-06 tìm kiếm mã và tên công ty | Tìm trong tập mã đã seed/ingest, trả symbol ổn định và mở trang chi tiết. Phụ thuộc MP-02. |
