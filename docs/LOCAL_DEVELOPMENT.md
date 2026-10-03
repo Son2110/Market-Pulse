@@ -1,6 +1,6 @@
 # Local development
 
-The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web root is a Vietnamese search page designed in Stitch; it shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web root is a Vietnamese search page designed in Stitch; it shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. `/market` shows the latest fixture VN-Index level, its change against the previous available observation and a daily closing-level table. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -31,6 +31,14 @@ Open `http://127.0.0.1:5173/stocks/FPT` directly or follow the link from search.
 The page requests history and optional company reference information through the same-origin proxy. History loading, empty results, HTTP/network failures, invalid response data and retry are distinct states. A reference lookup failure preserves valid price history under a generic stock name. With the committed fixture, FPT shows 102,500 VND at 23/09/2026 and +1,500 VND (+1.49%) versus the previous available observation on 22/09/2026. That comparison is not a verified previous trading session. A single observation has no fabricated comparison; no-data results show no price or chart and no as-of.
 
 The fixture has only three daily observations per asset. The chart places actual dates proportionally, preserves every marker and breaks the line across gaps greater than one calendar day because the session calendar is unverified. The responsive chart keeps text readable; the daily table scrolls within its own region on narrow screens. Currency, volume units, timezone, source, as-of, freshness and adjustment basis are visible. Neither the chart nor company reference dates assert current market coverage. See [the detail design handoff](FR04_DETAIL_DESIGN.md) for scope and QA evidence.
+
+## VN-Index overview page
+
+Open `http://127.0.0.1:5173/market` directly or use “Tổng quan” in the shared header. `/market/` and reload work. The header links overview, stock search and detail using ordinary page loads; the detail page's search link preserves its submitted query. `VNINDEX` continues to be unsupported at `/stocks/VNINDEX` because the stock detail page accepts equities.
+
+The page requests `GET /api/assets/VNINDEX/history` through the same-origin proxy. The committed fixture shows 1,308 index points at 23/09/2026, with -2 points (-0.15%) versus the previous available observation on 22/09/2026 and three closing levels of 1,300, 1,310 and 1,308. This is not a verified previous trading session or a current index level. Units are `index_point`, currency is `null` (“Không áp dụng”), and volume is `null`/`not_available`; no market breadth or total liquidity is inferred.
+
+Loading, no-data, HTTP/network/timeout failures, invalid response data and retry are handled explicitly. A single observation has no fabricated comparison; a zero change remains 0%; empty history has no numeric level/change or as-of. The source panel shows fixture provenance, unknown freshness, UTC+7, the unverified session calendar and available range. The page uses the shared Stitch design system and has a page title, active navigation, keyboard skip-link and responsive layout. See [the overview design handoff](FR02_OVERVIEW_DESIGN.md) for scope and coordinator QA evidence.
 
 ## Authentication API
 
@@ -116,4 +124,4 @@ python scripts/build_docs.py
 
 Run `npm run test:integration` with local MongoDB and Redis available. It fails with a clear message if either dependency cannot be reached; it does not skip.
 
-The unit suite includes detail routing, history contract validation, closing-price calculations, chart gaps/responsive geometry and request failures. Application CI also checks `/stocks/FPT` serves the web entry and the same-origin history proxy returns the three fixture candles with their original as-of and freshness. Browser state/responsive QA evidence is recorded in [the MP-07 handoff](FR04_DETAIL_DESIGN.md); those manual checks are not a committed E2E suite.
+The unit suite currently has 74 tests: 47 API, 8 search client, 10 detail client and 9 overview client. It includes detail and overview routing, equity/index history contract validation, closing-price calculations, chart gaps/responsive geometry and request failures. Application CI also checks `/stocks/FPT` and `/market` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. Browser state/responsive QA evidence is recorded in [the MP-07 handoff](FR04_DETAIL_DESIGN.md) and [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md); those manual checks are not a committed E2E suite.
