@@ -95,6 +95,16 @@ Coordinator đã QA Edge bằng API thực và response chặn tạm: responsive
 
 Checks cuối local đạt lint, typecheck, 74 unit tests (47 API + 27 client, 0 fail/skip), build, docs check (50 đích local), docs build (14 tài liệu nguồn) và `git diff --check`. Tài liệu yêu cầu gốc giữ nguyên.
 
+### D11 review UX và chất lượng dữ liệu · 03/10/2026 (thực hiện trước D11 · 04/10)
+
+**PASS cho UX và dữ liệu fixture hiện có.** Trên `main` đã merge PR #14, [commit `658ca47`](https://github.com/Son2110/Market-Pulse/commit/658ca47e0adcfaf619db670679c50cbb9cb38774), [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/37103098432) và [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/37103098426) đều thành công. Application CI hoàn tất lint, typecheck, build, 74 Node unit tests (47 API + 27 client), fixture validator, 24 Python contract tests, 2 collector tests, Compose build/start/health/HTTP smoke/collector và 2 integration tests MongoDB/Redis; 0 test bị skip.
+
+Coordinator rebuild Docker web từ đúng commit `main` trên; cả bốn service Compose healthy. Audit HTTP qua web proxy đối chiếu đủ 11 assets và 33 candles với fixture canonical, gồm metadata/provenance; exact-symbol search của cả mười equity trả đúng asset, response có `no-store`.
+
+QA trình duyệt thủ công bằng script Playwright tạm và Edge kiểm tra search/detail/market ở 1440/768/390/320px với `Asia/Ho_Chi_Minh` và `America/Los_Angeles` (24 view); không có overflow ngang/pageerror, ảnh 390px của cả ba trang đã được xem trực tiếp. Hai múi giờ trình duyệt đều hiển thị `15:00:00 23/09/2026 UTC+7`; VND, `index_point`, tiền tệ không áp dụng của index, ngày rà soát reference riêng và nhãn fixture/unknown/unverified hiển thị đúng. Skip link, search/select VIC bằng Enter và luồng `vin` → VIC detail/chart → reload → back giữ query đạt; overview/reload/search có `aria-current` đúng. Mock response tạm cho từng trang xác nhận loading, empty, HTTP 503 và retry thành công; empty không bịa giá/chart, không có pageerror. Đây là QA thủ công tạm thời, chưa phải E2E suite đã commit.
+
+Không phát hiện lỗi cần sửa code trong phạm vi review này. Nguồn live vẫn **NOT VERIFIED**; UI auth và watchlist còn chờ MP-09. Kết quả này không phải GATE-3, hoàn tất MVP hay nghiệm thu production. Sau khi bản ghi này được merge, task kế tiếp duy nhất là MP-09 watchlist có xác thực.
+
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
 | D8 · Thứ Năm 01/10 | Build · 2,4 giờ | MP-06 tìm kiếm mã và tên công ty | Tìm trong tập mã đã seed/ingest, trả symbol ổn định và mở trang chi tiết. Phụ thuộc MP-02. |
