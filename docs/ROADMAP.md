@@ -105,6 +105,16 @@ QA trình duyệt thủ công bằng script Playwright tạm và Edge kiểm tra
 
 Không phát hiện lỗi cần sửa code trong phạm vi review này. Nguồn live vẫn **NOT VERIFIED**; UI auth và watchlist còn chờ MP-09. Kết quả này không phải GATE-3, hoàn tất MVP hay nghiệm thu production. Sau khi bản ghi này được merge, task kế tiếp duy nhất là MP-09 watchlist có xác thực.
 
+### Tiến độ ghi nhận · MP-09 API · 03/10/2026 (thực hiện trước D12 · 05/10)
+
+Đã thêm API watchlist có xác thực cho đúng một danh sách mỗi user: đọc/tạo/đổi tên/xóa và thêm/bỏ mã trong mười equity canonical của fixture. MongoDB lưu collection `watchlists` riêng, owner ObjectId lấy từ phiên server, unique index theo user, danh sách symbol bounded và cập nhật atomic. Mọi query/field dư bị từ chối; ID không tồn tại và ID của user khác cùng trả 404. Symbol phải uppercase canonical, loại trừ VNINDEX; thêm lặp không trùng và bỏ lặp không lỗi. Readiness chờ catalog và index watchlist; lỗi được khử chi tiết và response đặt `no-store`. Không lưu giá, dữ liệu doanh nghiệp hoặc market as-of trong watchlist; timestamp chỉ là thời điểm dữ liệu tài khoản thay đổi.
+
+Kiểm tra local đạt: lint, typecheck, build, 83 unit tests (56 API + 27 client, 0 fail/skip), fixture validator, 24 Python contract tests, 2 collector tests, docs check (51 đích local), docs build (14 tài liệu nguồn) và `git diff --check`. Integration MongoDB/Redis đạt 3 test cấp cao cùng 6 subtest watchlist (runner báo 9 test, 0 fail/skip), dùng database test có tên duy nhất và chỉ xóa database do test tạo. Test đăng ký hai user bằng auth thật, kiểm tra mọi route thiếu/sai token, user B không thấy/sửa/xóa/thêm/bỏ dữ liệu user A, owner giả từ header/query/body, create đồng thời, add đồng thời không mất/trùng symbol, đủ mười mã và từ chối mã thứ mười một/index, remove lặp, delete/recreate, expiry và logout.
+
+Coordinator rebuild Docker API thành công; Compose đưa cả bốn service tới healthy. HTTP health/live và ready trả 200; cả sáu route watchlist không token trả 401 `unauthorized` cùng `no-store` qua API port 3001 và proxy web port 5173. Web root, `/stocks/FPT`, `/market` vẫn trả HTML 200; FPT history qua proxy giữ ba candle fixture và close mới nhất 102.500 VND. Smoke không tạo thêm tài khoản. GitHub Actions trên nhánh này chưa được xác nhận.
+
+Đây chỉ là lát cắt API của MP-09/FR-06. UI auth, UI watchlist và giá/thay đổi mới nhất còn chờ các bước serial có thiết kế Stitch; có thể compose API history hiện có và giữ đủ nhãn nguồn/as-of/freshness. MP-09 chưa hoàn tất, GATE-3 chưa được nghiệm thu; cổng nguồn live vẫn **NOT VERIFIED**. Không đổi lịch hay mở MP-10 từ lát cắt này.
+
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
 | D8 · Thứ Năm 01/10 | Build · 2,4 giờ | MP-06 tìm kiếm mã và tên công ty | Tìm trong tập mã đã seed/ingest, trả symbol ổn định và mở trang chi tiết. Phụ thuộc MP-02. |
