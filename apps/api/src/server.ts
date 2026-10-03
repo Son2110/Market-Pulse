@@ -6,6 +6,7 @@ import { createFixtureMarketDataProvider } from "./fixture-market-data-provider.
 import { createApp } from "./health.js";
 import { createStockSearchRouter, StockSearchService } from "./stock-search.js";
 import { connectWithRetry, createStores } from "./stores.js";
+import { createWatchlistApi } from "./watchlists.js";
 
 const config = readConfig();
 const stores = createStores(config);
@@ -15,6 +16,7 @@ let connectedBefore = false;
 let authReady = false;
 let marketDataReady = false;
 let stockSearchReady = false;
+let watchlistReady = false;
 let shuttingDown = false;
 let startupPromise: Promise<boolean> | undefined;
 const shutdownController = new AbortController();
@@ -24,6 +26,12 @@ const auth = createAuthApi({
   rateLimitMax: config.authRateLimitMax,
   rateLimitWindowMs: config.authRateLimitWindowMs,
   kdfConcurrency: config.authKdfConcurrency,
+});
+const watchlists = createWatchlistApi({
+  db: stores.mongo.db(),
+  authenticate: auth.authenticate,
+  provider: marketData,
+  isReady: () => authReady && marketDataReady && watchlistReady,
 });
 
 stores.redis.on("error", () => {
@@ -37,10 +45,11 @@ stores.redis.on("end", () => {
 const server = createServer(createApp({
   checks: stores.checks,
   timeoutMs: config.dependencyTimeoutMs,
-  applicationReady: () => authReady && marketDataReady && stockSearchReady,
+  applicationReady: () => authReady && marketDataReady && stockSearchReady && watchlistReady,
   authRouter: auth.router,
   stockSearchRouter: createStockSearchRouter(stockSearch),
   dailyHistoryRouter: createDailyHistoryRouter(marketData),
+  watchlistRouter: watchlists.router,
 }));
 server.listen(config.port, config.host, () => {
   console.info(JSON.stringify({ event: "api_listening", port: config.port }));
@@ -76,6 +85,12 @@ async function connectStores(): Promise<boolean> {
       stockSearchReady = true;
     } catch {
       console.warn(JSON.stringify({ event: "asset_search_catalog_unavailable" }));
+    }
+    try {
+      await watchlists.initialize();
+      watchlistReady = true;
+    } catch {
+      console.warn(JSON.stringify({ event: "watchlist_initialization_unavailable" }));
     }
   }
   return connectedBefore;

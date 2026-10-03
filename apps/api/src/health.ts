@@ -12,6 +12,7 @@ export interface HealthOptions {
   authRouter?: Router;
   stockSearchRouter?: Router;
   dailyHistoryRouter?: Router;
+  watchlistRouter?: Router;
 }
 
 function within<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -21,7 +22,7 @@ function within<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-export function createApp({ checks, timeoutMs = 1000, applicationReady = () => true, authRouter, stockSearchRouter, dailyHistoryRouter }: HealthOptions): Express {
+export function createApp({ checks, timeoutMs = 1000, applicationReady = () => true, authRouter, stockSearchRouter, dailyHistoryRouter, watchlistRouter }: HealthOptions): Express {
   const app = express();
   app.disable("x-powered-by");
 
@@ -41,6 +42,7 @@ export function createApp({ checks, timeoutMs = 1000, applicationReady = () => t
   if (authRouter) app.use("/api/auth", authRouter);
   if (stockSearchRouter) app.use("/api/assets", stockSearchRouter);
   if (dailyHistoryRouter) app.use("/api/assets", dailyHistoryRouter);
+  if (watchlistRouter) app.use("/api/watchlists", watchlistRouter);
   app.use("/api", (_request, response) => response.status(404).json({ error: "not_found" }));
   app.use(apiErrorHandler);
 

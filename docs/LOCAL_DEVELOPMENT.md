@@ -1,6 +1,6 @@
 # Local development
 
-The local API supports demo account registration, login, logout, the authenticated user endpoint, public fixture-backed daily history, and public stock search over ten fixture equities. It has no watchlist route. The web root is a Vietnamese search page designed in Stitch; it shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. `/market` shows the latest fixture VN-Index level, its change against the previous available observation and a daily closing-level table. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, one authenticated watchlist per user, public fixture-backed daily history, and public stock search over ten fixture equities. Auth and watchlist pages remain pending. The web root is a Vietnamese search page designed in Stitch; it shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. `/market` shows the latest fixture VN-Index level, its change against the previous available observation and a daily closing-level table. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ docker compose config --quiet
 docker compose up --build --wait
 ```
 
-Open `http://127.0.0.1:5173` and submit `FPT`, `Vietcombank`, `Hòa Phát`, or `vin`. The page makes a same-origin request through Vite's `/api` proxy; Compose sets the server-only `API_PROXY_TARGET` to `http://api:3001`. Search `vin` returns VHM, VIC, VNM in that order. Select a result to inspect reference information and HTTPS source links, then follow “Xem chi tiết & biểu đồ ngày”. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, and the fixture plus its ten-entry company-reference catalog validate; its response does not include internal errors.
+Open `http://127.0.0.1:5173` and submit `FPT`, `Vietcombank`, `Hòa Phát`, or `vin`. The page makes a same-origin request through Vite's `/api` proxy; Compose sets the server-only `API_PROXY_TARGET` to `http://api:3001`. Search `vin` returns VHM, VIC, VNM in that order. Select a result to inspect reference information and HTTPS source links, then follow “Xem chi tiết & biểu đồ ngày”. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, the fixture plus its ten-entry company-reference catalog validate, and the watchlist equity catalog and unique owner index initialize; its response does not include internal errors.
 
 The initial page invites a search. Pending requests show loading; an unknown query shows an empty state; unavailable services or malformed responses show an error with retry. Blank or overlong queries have an inline validation message. Requests time out after ten seconds; a new submission cancels the previous request and prevents stale results from replacing the newer search. Company names, exchange, currency, timezone and reference dates come from the API. The reference review date is not a market as-of time. The demo labels do not assert live coverage or freshness. See [the search design handoff](FR03_SEARCH_DESIGN.md) for design references and QA evidence.
 
@@ -55,6 +55,38 @@ Send the opaque token only in `Authorization: Bearer <token>` for `/me` and `/lo
 
 The process limits registration and login attempts per remote IP, without trusting `X-Forwarded-For`. Defaults are 20 attempts per 60 seconds and at most two concurrent scrypt operations. `AUTH_RATE_LIMIT_MAX`, `AUTH_RATE_LIMIT_WINDOW_MS`, and `AUTH_KDF_CONCURRENCY` are bounded configuration settings. The limiter is in-memory, resets when the API restarts, and is intended for the single-process local demo; it is not production hardening.
 
+## Watchlist API
+
+Every route requires the existing `Authorization: Bearer <token>` session. Ownership comes exclusively from the authenticated server principal; headers such as `X-User-Id` never select another user's data. All query parameters and additional JSON fields, including owner IDs, are rejected. Responses, including authentication and validation errors, use `Cache-Control: no-store`.
+
+| Method | Path | Request | Success |
+|---|---|---|---|
+| `GET` | `/api/watchlists` | No body or query. | 200 `{ data: [] }` or `{ data: [watchlist] }`. |
+| `POST` | `/api/watchlists` | JSON `{ "name": "Theo dõi" }`. | 201 `{ data: watchlist }`. |
+| `PATCH` | `/api/watchlists/:id` | JSON containing only `name`. | 200 `{ data: watchlist }`. |
+| `DELETE` | `/api/watchlists/:id` | No body. | 204 with no response body. |
+| `PUT` | `/api/watchlists/:id/symbols/:symbol` | No body. | 200 `{ data: watchlist }`. |
+| `DELETE` | `/api/watchlists/:id/symbols/:symbol` | No body. | 200 `{ data: watchlist }`. |
+
+The public watchlist contains only `id`, `name`, alphabetically sorted `symbols`, `createdAt` and `updatedAt`. Names are trimmed, contain 1–100 Unicode codepoints and reject control characters even at their edges. Create and rename require `application/json`, accept at most 8kb and reject arrays, primitive values and extra fields. Bodyless routes reject payloads before parsing. IDs must be 24 hexadecimal characters. Symbol membership accepts only exact uppercase symbols from the ten canonical fixture equities; lowercase, unknown symbols and `VNINDEX` return 400. Repeated addition does not duplicate a symbol; repeated removal returns the list with that symbol absent. The bounded universe limits a list to ten distinct symbols.
+
+MongoDB stores watchlists separately from user/session records, with an ObjectId `userId` and a unique `{ userId: 1 }` index. Concurrent creates produce one successful list; subsequent creates return 409 `watchlist_already_exists` until deletion. Rename, addition and removal use atomic updates without upsert. Every operation addressing a list ID filters both ID and authenticated owner. Missing and foreign IDs both return 404 `not_found`. Missing, invalid, expired or logged-out sessions return 401 `unauthorized` when the service is ready. Invalid inputs return 400 `invalid_request`, malformed JSON 400 `invalid_json`, oversized JSON 413 `payload_too_large`, and unsupported media/charset 415 `unsupported_media_type`. Initialization failures leave readiness at 503 and watchlists return 503 `not_ready`; unexpected errors return sanitized 500 `internal_error`. Liveness remains independent.
+
+For example, set `$token` to the token returned by local registration or login, then use the API directly:
+
+```powershell
+$watchlistHeaders = @{ Authorization = "Bearer $token" }
+$watchlistResponse = Invoke-RestMethod "http://127.0.0.1:3001/api/watchlists" -Method Post -Headers $watchlistHeaders -ContentType "application/json" -Body '{"name":"Theo dõi"}'
+$watchlistId = $watchlistResponse.data.id
+Invoke-RestMethod "http://127.0.0.1:3001/api/watchlists/$watchlistId" -Method Patch -Headers $watchlistHeaders -ContentType "application/json" -Body '{"name":"Cổ phiếu demo"}'
+Invoke-RestMethod "http://127.0.0.1:3001/api/watchlists/$watchlistId/symbols/FPT" -Method Put -Headers $watchlistHeaders
+Invoke-RestMethod "http://127.0.0.1:3001/api/watchlists" -Headers $watchlistHeaders
+Invoke-RestMethod "http://127.0.0.1:3001/api/watchlists/$watchlistId/symbols/FPT" -Method Delete -Headers $watchlistHeaders
+Invoke-RestMethod "http://127.0.0.1:3001/api/watchlists/$watchlistId" -Method Delete -Headers $watchlistHeaders
+```
+
+Watchlist timestamps describe account-data changes in UTC and are not market as-of times. This API stores no prices, company metadata or market observations. Auth UI, watchlist UI and latest price/change display are later serial steps requiring Stitch designs; those displays can compose the existing history API while retaining its fixture/source/time/freshness labels. MP-09/FR-06 remains partial and the live-source gate remains **NOT VERIFIED**.
+
 ## Daily history API
 
 `GET /api/assets/:symbol/history` returns a canonical v1 envelope for one known fixture asset. The route is public and requires no bearer token because the committed dataset is synthetic demo content. It reads the fixture bundled with the API image; it does not contact a market-data provider.
@@ -82,7 +114,7 @@ npm ci
 npm run test:integration
 ```
 
-The existing health integration check uses a unique MongoDB collection and Redis key, verifies read/write round trips and readiness across a client disconnect, then removes only those records. The auth integration check creates and drops its own uniquely named test database; it verifies registration races, stored hashes/digests, login, principal isolation, session expiry, and logout revocation against real MongoDB. Neither test stops the Compose Redis container. If a host port was changed, set the matching URLs before running the host-side test, for example `$env:MONGODB_URL="mongodb://127.0.0.1:27018/marketpulse"` and `$env:REDIS_URL="redis://127.0.0.1:6380"`. Compose volumes remain available after `docker compose down`; `docker compose down -v` removes them.
+The existing health integration check uses a unique MongoDB collection and Redis key, verifies read/write round trips and readiness across a client disconnect, then removes only those records. Auth and watchlist integration checks each create and drop their own uniquely named test database. Auth verifies registration races, stored hashes/digests, login, principal isolation, session expiry and logout revocation. Watchlists registers two real users and verifies every route's authentication, foreign/missing ID isolation, forged ownership claims, concurrent create/add operations, the ten-symbol limit, repeated removal, delete/recreate and expired/revoked sessions. These tests do not stop the Compose Redis container. If a host port was changed, set the matching URLs before running the host-side test, for example `$env:MONGODB_URL="mongodb://127.0.0.1:27018/marketpulse"` and `$env:REDIS_URL="redis://127.0.0.1:6380"`. Compose volumes remain available after `docker compose down`; `docker compose down -v` removes them.
 
 To run the fixture-only collector once:
 
@@ -124,4 +156,4 @@ python scripts/build_docs.py
 
 Run `npm run test:integration` with local MongoDB and Redis available. It fails with a clear message if either dependency cannot be reached; it does not skip.
 
-The unit suite currently has 74 tests: 47 API, 8 search client, 10 detail client and 9 overview client. It includes detail and overview routing, equity/index history contract validation, closing-price calculations, chart gaps/responsive geometry and request failures. Application CI also checks `/stocks/FPT` and `/market` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. Browser state/responsive QA evidence is recorded in [the MP-07 handoff](FR04_DETAIL_DESIGN.md) and [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md); those manual checks are not a committed E2E suite.
+The unit suite currently has 83 tests: 56 API, 8 search client, 10 detail client and 9 overview client. It includes watchlist validation/media/body bounds/readiness/sanitized errors, detail and overview routing, equity/index history contract validation, closing-price calculations, chart gaps/responsive geometry and request failures. The integration runner reports three top-level tests plus six watchlist subtests (nine tests total). Application CI also checks `/stocks/FPT` and `/market` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. Browser state/responsive QA evidence is recorded in [the MP-07 handoff](FR04_DETAIL_DESIGN.md) and [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md); those manual checks are not a committed E2E suite.
