@@ -87,6 +87,14 @@ Coordinator đã review độc lập và QA Edge responsive 1440/768/390/320px c
 
 Checks cuối local đạt lint, typecheck, 65 unit tests (47 API + 18 client, 0 skip), build, docs check (43 đích local) và docs build (13 tài liệu nguồn). Tài liệu yêu cầu gốc giữ nguyên; API/schema/fixture không đổi.
 
+### Tiến độ ghi nhận · MP-08 · 03/10/2026
+
+Trang `/market` hiện VN-Index đóng cửa mới nhất 1.308 điểm, giảm 2 điểm (-0,15%) so với quan sát có sẵn trước đó, bảng ba quan sát ngày và source panel. Ghi rõ `index_point`, tiền tệ không áp dụng, volume không có trong mẫu, UTC+7, as-of, `fixture / unknown` và lịch phiên chưa xác minh. Có loading/no-data/error/retry, direct link/reload và header dùng chung nối overview/search/detail. Không thêm breadth, thanh khoản tổng, chỉ số khác, vàng/FX hoặc nguồn live; FR-02 gốc vẫn chưa hoàn tất. API/schema/fixture không đổi. Xem [bàn giao thiết kế MP-08](FR02_OVERVIEW_DESIGN.md).
+
+Coordinator đã QA Edge bằng API thực và response chặn tạm: responsive 1440/768/390/320px, loading/empty/error/retry, baseline thiếu/0/dương/gap và metadata sai; không có overflow ngang/pageerror. Luồng overview → search → detail → overview và quay lại search giữ query đạt. Docker web build/Compose healthy, direct `/market`, VNINDEX history proxy và browser 390px qua port 5173 đạt; khởi động lại Docker ngày 03/10 cũng đạt health/route/proxy smoke. GitHub Actions trên nhánh này chưa được xác nhận; cổng nguồn live vẫn **NOT VERIFIED**.
+
+Checks cuối local đạt lint, typecheck, 74 unit tests (47 API + 27 client, 0 fail/skip), build, docs check (50 đích local), docs build (14 tài liệu nguồn) và `git diff --check`. Tài liệu yêu cầu gốc giữ nguyên.
+
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
 | D8 · Thứ Năm 01/10 | Build · 2,4 giờ | MP-06 tìm kiếm mã và tên công ty | Tìm trong tập mã đã seed/ingest, trả symbol ổn định và mở trang chi tiết. Phụ thuộc MP-02. |

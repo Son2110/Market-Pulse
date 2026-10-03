@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { errorMessage, fetchSearch, queryError, type SearchResponse, type SearchResult } from "./stock-search.js";
 import StockDetail from "./StockDetail.js";
 import { stockRoute } from "./stock-detail.js";
+import MarketOverview from "./MarketOverview.js";
+import { isMarketRoute } from "./market-overview.js";
+import SiteHeader from "./SiteHeader.js";
 import "./styles.css";
 
 type SearchState =
@@ -101,10 +104,7 @@ function SearchPage() {
 
   return <>
     <a className="skip-link" href="#main">Đến nội dung tìm kiếm</a>
-    <header className="site-header"><div className="header-inner">
-      <div className="brand"><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12h4l2-5 4 11 2-6h6" /></svg></span><span>MarketPulse <strong>VN</strong></span></div>
-      <span className="demo-badge"><span aria-hidden="true">●</span> Bản demo</span>
-    </div></header>
+    <SiteHeader active="search" />
     <main id="main" className="page">
       <section className="search-hero" aria-labelledby="page-heading">
         <p className="eyebrow">Tra cứu doanh nghiệp</p>
@@ -147,6 +147,7 @@ function SearchPage() {
 }
 
 export default function App() {
+  if (isMarketRoute(window.location.pathname)) return <MarketOverview />;
   const route = stockRoute(window.location.pathname);
   return route.kind === "search" ? <SearchPage /> : <StockDetail symbol={route.kind === "detail" ? route.symbol : null} />;
 }

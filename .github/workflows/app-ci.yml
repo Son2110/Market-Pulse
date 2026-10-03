@@ -55,6 +55,7 @@ jobs:
             ["http://127.0.0.1:3001/health/ready", '"status":"ready"'],
             ["http://127.0.0.1:5173/", '<div id="root"></div>'],
             ["http://127.0.0.1:5173/stocks/FPT", '<div id="root"></div>'],
+            ["http://127.0.0.1:5173/market", '<div id="root"></div>'],
           ];
           for (const [url, expected] of checks) {
             const response = await fetch(url);
@@ -113,6 +114,26 @@ jobs:
             throw new Error("Smoke test failed for same-origin web history proxy");
           }
           console.log("OK same-origin web history proxy");
+          const indexResponse = await fetch("http://127.0.0.1:5173/api/assets/VNINDEX/history");
+          const index = await indexResponse.json();
+          if (!indexResponse.ok
+            || indexResponse.headers.get("cache-control") !== "no-store"
+            || index.data?.schemaVersion !== "1.0.0"
+            || index.data?.assets?.[0]?.assetId !== "VN:INDEX:VNINDEX"
+            || index.data.assets[0]?.assetType !== "index"
+            || index.data.assets[0]?.currency !== null
+            || index.data.assets[0]?.unit !== "index_point"
+            || index.data?.candles?.map((candle) => candle.close).join(",") !== "1300,1310,1308"
+            || !index.data.candles.every((candle) => candle.currency === null && candle.unit === "index_point"
+              && candle.volume === null && candle.volumeUnit === "not_available" && candle.adjustmentBasis === "not_applicable")
+            || index.meta?.status !== "available"
+            || index.meta?.provider !== "marketpulse-fixture"
+            || index.meta?.asOf !== "2026-09-23T15:00:00+07:00"
+            || index.data?.dataset?.freshness !== "fixture / unknown"
+            || index.data?.dataset?.sessionCalendar !== "unverified") {
+            throw new Error("Smoke test failed for same-origin VN-Index history proxy");
+          }
+          console.log("OK same-origin VN-Index history proxy");
           NODE
       - name: Run fixture collector container
         run: docker compose --profile collector run --rm collector

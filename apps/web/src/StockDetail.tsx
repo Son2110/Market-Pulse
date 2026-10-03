@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchSearch, queryError, type SearchResult } from "./stock-search.js";
 import { closingChart, closingSummary, DetailError, detailErrorMessage, fetchHistory, type DailyCandle, type HistoryResponse } from "./stock-detail.js";
+import SiteHeader from "./SiteHeader.js";
 
 const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 const signed = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2, minimumFractionDigits: 2, signDisplay: "exceptZero" });
@@ -112,7 +113,7 @@ export default function StockDetail({ symbol }: { symbol: string | null }) {
 
   return <>
     <a className="skip-link" href="#main">Đến nội dung chi tiết</a>
-    <header className="site-header"><div className="header-inner"><a className="brand brand-link" href={backHref}><span className="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 12h4l2-5 4 11 2-6h6" /></svg></span><span>MarketPulse <strong>VN</strong></span></a><span className="demo-badge"><span aria-hidden="true">●</span> Bản demo</span></div></header>
+    <SiteHeader searchHref={backHref} />
     <main id="main" className="page detail-page">
       <a className="back-link" href={backHref}>← Quay lại tìm kiếm</a>
       <div className="demo-notice detail-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu minh họa — không phải dữ liệu thị trường</strong><p>Fixture tổng hợp dùng cho bản demo. Độ mới chưa xác định; không phải giá hiện tại.</p></div></div>
