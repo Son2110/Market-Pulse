@@ -5,6 +5,7 @@ import { stockRoute } from "./stock-detail.js";
 import MarketOverview from "./MarketOverview.js";
 import { isMarketRoute } from "./market-overview.js";
 import SiteHeader from "./SiteHeader.js";
+import Account from "./Account.js";
 import "./styles.css";
 
 type SearchState =
@@ -147,6 +148,7 @@ function SearchPage() {
 }
 
 export default function App() {
+  if (window.location.pathname === "/account" || window.location.pathname === "/account/") return <Account />;
   if (isMarketRoute(window.location.pathname)) return <MarketOverview />;
   const route = stockRoute(window.location.pathname);
   return route.kind === "search" ? <SearchPage /> : <StockDetail symbol={route.kind === "detail" ? route.symbol : null} />;
