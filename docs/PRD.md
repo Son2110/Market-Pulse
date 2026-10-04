@@ -5,6 +5,8 @@
 
 **Tiến độ MP-09 API · 03/10/2026 (trước D12 · 05/10):** đã có một watchlist theo user đăng nhập cục bộ, với API tạo/đổi tên/xóa và thêm/bỏ mã trong đúng mười equity canonical của fixture. Server lấy owner từ phiên xác thực, dùng unique index theo user và cập nhật atomic; không nhận owner từ client. Test MongoDB thực kiểm tra phân quyền âm tính, đồng thời, expiry và logout. Response chỉ gồm ID, tên, danh sách symbol và thời điểm thay đổi dữ liệu tài khoản; chưa lưu/hiện giá, thay đổi giá hoặc market as-of. UI auth, UI watchlist và giá/thay đổi mới nhất còn chờ các bước frontend serial có thiết kế Stitch; có thể dùng API history hiện có cho dữ liệu giá. MP-09/FR-06 vẫn **một phần**, chưa qua GATE-3; cổng nguồn live vẫn **NOT VERIFIED**. Xem [hợp đồng API và hướng dẫn local](LOCAL_DEVELOPMENT.md).
 
+**Tiến độ FR-01 web · 04/10/2026:** đã có trang `/account` tiếng Việt theo thiết kế Stitch, kết nối API local để đăng ký/đăng nhập/đăng xuất, restore phiên qua `/me`, xử lý expiry và lỗi cùng lưu token/expiry theo tab. Đây là bước chuẩn bị cho MP-09; UI watchlist và giá/thay đổi mới nhất vẫn còn chờ. Không hoàn tất toàn bộ FR-01 gốc hoặc MP-09 và không thay trạng thái nguồn live **NOT VERIFIED**. Xem [bàn giao trang tài khoản](FR01_AUTH_DESIGN.md).
+
 ## Mục tiêu sản phẩm
 
 Giúp người đọc hiểu thị trường Việt Nam đang diễn biến thế nào, tài sản nào vừa biến động và những sự kiện công khai nào xảy ra gần thời điểm đó. Đây là công cụ thông tin và nghiên cứu. Sản phẩm không khuyến nghị giao dịch, không thực hiện giao dịch và không khẳng định sự kiện gây ra biến động giá.

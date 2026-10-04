@@ -113,7 +113,15 @@ Kiểm tra local đạt: lint, typecheck, build, 83 unit tests (56 API + 27 clie
 
 Coordinator rebuild Docker API thành công; Compose đưa cả bốn service tới healthy. HTTP health/live và ready trả 200; cả sáu route watchlist không token trả 401 `unauthorized` cùng `no-store` qua API port 3001 và proxy web port 5173. Web root, `/stocks/FPT`, `/market` vẫn trả HTML 200; FPT history qua proxy giữ ba candle fixture và close mới nhất 102.500 VND. Smoke không tạo thêm tài khoản. GitHub Actions trên nhánh này chưa được xác nhận.
 
-Đây chỉ là lát cắt API của MP-09/FR-06. UI auth, UI watchlist và giá/thay đổi mới nhất còn chờ các bước serial có thiết kế Stitch; có thể compose API history hiện có và giữ đủ nhãn nguồn/as-of/freshness. MP-09 chưa hoàn tất, GATE-3 chưa được nghiệm thu; cổng nguồn live vẫn **NOT VERIFIED**. Không đổi lịch hay mở MP-10 từ lát cắt này.
+Đây chỉ là lát cắt API của MP-09/FR-06. Tại ngày 03/10, UI auth, UI watchlist và giá/thay đổi mới nhất còn chờ các bước serial có thiết kế Stitch; có thể compose API history hiện có và giữ đủ nhãn nguồn/as-of/freshness. MP-09 chưa hoàn tất, GATE-3 chưa được nghiệm thu; cổng nguồn live vẫn **NOT VERIFIED**. Không đổi lịch hay mở MP-10 từ lát cắt này.
+
+### Tiến độ ghi nhận · FR-01 web chuẩn bị MP-09 · 04/10/2026
+
+Trang tài khoản `/account` và `/account/` dùng thiết kế Stitch project `16706610509511522903`, screen `b706d5ecf27f434e9d0e08f012cb3710`, cùng design system của các trang trước. Trang đăng ký/đăng nhập/đăng xuất qua API local, giữ token/expiry trong sessionStorage theo tab, xác minh `/me` khi restore trước khi hiện identity và xử lý phiên hết hạn/lỗi/logout chưa xác nhận. Lint, typecheck, build, 101 unit tests (18 client/helper mới, 0 fail/skip), docs check/build và diff check đạt. Coordinator đã thử API thật và trạng thái lỗi/storage/expiry bằng Edge cùng Playwright tạm thời ở 1440/768/390/320px; không tràn ngang/page error. Chi tiết bằng chứng và giới hạn trong [bàn giao tài khoản](FR01_AUTH_DESIGN.md); đây không phải E2E framework đã commit.
+
+Coordinator build lại Docker web thành công; Compose có bốn service healthy. `/account` và `/account/` trên port 5173 trả 200; browser Docker web ở 390px/Asia_Ho_Chi_Minh kiểm tra register → reload/me restore → logout bằng API thật đạt, không tràn ngang/page error. Tài khoản QA được xóa theo đúng email/user ID; ảnh login cuối cùng được kiểm tra nhất quán với thiết kế Stitch. Review độc lập và GitHub CI của branch hiện tại còn chờ.
+
+Đây là một trang prerequisite serial, không mở UI watchlist hay giá/thay đổi mới nhất. FR-01 gốc và MP-09/FR-06 vẫn một phần, GATE-3 chưa đạt, nguồn live **NOT VERIFIED**. Task kế tiếp chỉ được bắt đầu sau khi hoàn tất kiểm tra và review trang hiện tại; không mở MP-10 trong lát cắt này.
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
