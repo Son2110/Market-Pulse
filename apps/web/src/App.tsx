@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import Watchlists, { isWatchlistsRoute } from "./Watchlists.js";
 import { errorMessage, fetchSearch, queryError, type SearchResponse, type SearchResult } from "./stock-search.js";
 import StockDetail from "./StockDetail.js";
 import { stockRoute } from "./stock-detail.js";
@@ -148,6 +149,7 @@ function SearchPage() {
 }
 
 export default function App() {
+  if (isWatchlistsRoute(window.location.pathname)) return <Watchlists />;
   if (window.location.pathname === "/account" || window.location.pathname === "/account/") return <Account />;
   if (isMarketRoute(window.location.pathname)) return <MarketOverview />;
   const route = stockRoute(window.location.pathname);

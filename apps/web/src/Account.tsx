@@ -92,10 +92,10 @@ export default function Account() {
     <main id="main" className="account-page">
       <section className="account-context" aria-labelledby="account-heading">
         <h1 id="account-heading">Tài khoản demo</h1>
-        <p className="intro">Đăng nhập hoặc tạo tài khoản để chuẩn bị sử dụng danh sách theo dõi.</p>
+        <p className="intro">Đăng nhập hoặc tạo tài khoản để sử dụng danh sách theo dõi.</p>
         <div className="account-context-panel">
           <div><span className="account-context-icon" aria-hidden="true">▤</span><div><h2>Phiên tài khoản</h2><p>Tài khoản được lưu trên máy chủ của bản demo. Phiên có hạn và có thể đăng xuất để vô hiệu hóa trên máy chủ.</p></div></div>
-          <div><span className="account-context-icon" aria-hidden="true">◇</span><div><h2>Tính năng thử nghiệm</h2><p>Trang tài khoản là bước chuẩn bị. Giao diện danh sách theo dõi và giá mới nhất vẫn đang phát triển.</p></div></div>
+          <div><span className="account-context-icon" aria-hidden="true">◇</span><div><h2>Tính năng thử nghiệm</h2><p>Tạo một danh sách theo dõi riêng, thêm hoặc bỏ cổ phiếu và xem giá đóng cửa từ dữ liệu minh họa.</p></div></div>
           <p className="account-scope-note">Tài khoản dùng cho bản demo cục bộ; dữ liệu thị trường là minh họa.</p>
         </div>
         <a className="account-back" href="/">← Tiếp tục tra cứu cổ phiếu</a>
@@ -120,6 +120,7 @@ export default function Account() {
           <p className="small muted">Phiên hết hạn lúc (Việt Nam · UTC+7)</p><p className="account-expiry">{sessionTime(state.session.expiresAt)}</p>
           <p className="small muted">Thời điểm tài khoản và phiên, không phải thời điểm dữ liệu thị trường. Phiên chỉ được lưu trong tab; tài khoản được lưu trên máy chủ demo.</p>
           {state.phase === "unverified" && <button className="primary-button" type="button" onClick={() => void sessionAction("verify")}>Kiểm tra phiên lại</button>}
+          {state.phase === "authenticated" && <a className="primary-button" href="/watchlists">Mở danh sách theo dõi</a>}
           <button className="secondary-button" type="button" disabled={busy} onClick={() => void sessionAction("logout")}>{state.phase === "logging-out" ? "Đang đăng xuất…" : "Đăng xuất"}</button>
         </div>}
         <a className="account-public-link" href="/">{state.session ? "Tiếp tục tra cứu cổ phiếu" : "Tiếp tục tra cứu mà không cần đăng nhập"}</a>

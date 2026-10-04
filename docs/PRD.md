@@ -7,6 +7,8 @@
 
 **Tiến độ FR-01 web · 04/10/2026:** đã có trang `/account` tiếng Việt theo thiết kế Stitch, kết nối API local để đăng ký/đăng nhập/đăng xuất, restore phiên qua `/me`, xử lý expiry và lỗi cùng lưu token/expiry theo tab. Đây là bước chuẩn bị cho MP-09; UI watchlist và giá/thay đổi mới nhất vẫn còn chờ. Không hoàn tất toàn bộ FR-01 gốc hoặc MP-09 và không thay trạng thái nguồn live **NOT VERIFIED**. Xem [bàn giao trang tài khoản](FR01_AUTH_DESIGN.md).
 
+**Tiến độ FR-06 web · 05/10/2026:** `/watchlists` và `/watchlists/` đã kết nối auth/watchlist/history API local theo thiết kế Stitch: một danh sách theo user, tạo/đổi tên/xóa, tìm/thêm/bỏ mười equity canonical, giá đóng cửa và thay đổi so với quan sát có sẵn trước đó. Trang xác minh `/me` trước khi đọc dữ liệu riêng, xử lý expiry/401/identity change và đối chiếu server sau write chưa xác nhận; market rows có nguồn, VND, UTC+7, as-of, freshness chưa xác định, lịch phiên chưa xác minh và adjustment basis. Code cùng QA fixture của lát cắt chức năng MP-09 đã có; review GPT-6 Astra độc lập ngày 05/10/2026 đã chấp thuận, không có finding cần sửa. GitHub CI còn chờ. FR-06 theo yêu cầu gốc vẫn **một phần**, GATE-3 chưa nghiệm thu, nguồn live **NOT VERIFIED**; không mở MP-10 từ task này. Các ghi nhận API/account ở trên mô tả trạng thái tại thời điểm trước đó. Xem [bàn giao watchlist](FR06_WATCHLIST_DESIGN.md).
+
 ## Mục tiêu sản phẩm
 
 Giúp người đọc hiểu thị trường Việt Nam đang diễn biến thế nào, tài sản nào vừa biến động và những sự kiện công khai nào xảy ra gần thời điểm đó. Đây là công cụ thông tin và nghiên cứu. Sản phẩm không khuyến nghị giao dịch, không thực hiện giao dịch và không khẳng định sự kiện gây ra biến động giá.

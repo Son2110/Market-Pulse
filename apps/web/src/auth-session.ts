@@ -51,10 +51,21 @@ export class AccountSession {
     if (session) this.timer = setTimeout(() => { if (!this.checkExpiry()) this.schedule(); }, Math.min(2_147_483_647, Math.max(0, Date.parse(session.expiresAt) - this.now())));
   }
   private clear(notice: string): void {
+    const token = this.state.session?.token;
     this.stop();
     let warning = "";
-    try { this.storage().removeItem(SESSION_KEY); } catch { warning = "Không thể xóa dữ liệu phiên trong tab; phiên này không còn được sử dụng trên trang."; }
+    try {
+      const raw = this.storage().getItem(SESSION_KEY);
+      if (raw !== null) {
+        let stored: unknown;
+        try { stored = JSON.parse(raw); } catch { stored = null; }
+        if (!stored || (typeof stored === "object" && "token" in stored && stored.token === token)) this.storage().removeItem(SESSION_KEY);
+      }
+    } catch { warning = "Không thể xóa dữ liệu phiên trong tab; phiên này không còn được sử dụng trên trang."; }
     this.update({ phase: "guest", session: null, user: null, notice, warning });
+  }
+  invalidate(expectedToken: string): void {
+    if (this.state.session?.token === expectedToken) this.clear("Phiên đã hết hạn hoặc không còn hiệu lực. Vui lòng đăng nhập lại.");
   }
   checkExpiry(): boolean {
     if (!this.state.session || Date.parse(this.state.session.expiresAt) > this.now()) return false;

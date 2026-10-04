@@ -18,6 +18,15 @@ function memory(): SessionStorage & { data: Map<string, string> } {
 function stored(storage: SessionStorage): void { storage.setItem(SESSION_KEY, JSON.stringify({ version: 1, ...session })); }
 function hasCode(code: string): (error: unknown) => boolean { return (error) => error instanceof AuthError && error.code === code; }
 
+test("guarded invalidation never deletes a replacement tab token or invalidates a different memory token", () => {
+  const storage = memory(); stored(storage); const manager = new AccountSession(() => storage, () => now);
+  manager.state = { phase: "authenticated", session, user, notice: "", warning: "" };
+  manager.invalidate("B".repeat(43)); assert.equal(manager.state.session?.token, session.token);
+  const replacement = { ...session, token: "B".repeat(43) };
+  storage.setItem(SESSION_KEY, JSON.stringify({ version: 1, ...replacement })); manager.invalidate(session.token);
+  assert.equal(manager.state.session, null); assert.deepEqual(readSession(storage, now), replacement); manager.stop();
+});
+
 test("email normalization follows backend bounds and password Unicode codepoints preserve spaces", () => {
   assert.equal(normalizedEmail(" Demo@EXAMPLE.COM "), "demo@example.com");
   for (const value of ["", "@example.com", "demo@example", "de mo@example.com", "a".repeat(250) + "@x.co"]) assert.equal(normalizedEmail(value), undefined);
