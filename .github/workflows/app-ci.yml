@@ -57,6 +57,8 @@ jobs:
             ["http://127.0.0.1:5173/stocks/FPT", '<div id="root"></div>'],
             ["http://127.0.0.1:5173/market", '<div id="root"></div>'],
             ["http://127.0.0.1:5173/account", '<div id="root"></div>'],
+            ["http://127.0.0.1:5173/watchlists", '<div id="root"></div>'],
+            ["http://127.0.0.1:5173/watchlists/", '<div id="root"></div>'],
           ];
           for (const [url, expected] of checks) {
             const response = await fetch(url);

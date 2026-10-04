@@ -123,13 +123,23 @@ Coordinator build lại Docker web thành công; Compose có bốn service healt
 
 Đây là một trang prerequisite serial, không mở UI watchlist hay giá/thay đổi mới nhất. FR-01 gốc và MP-09/FR-06 vẫn một phần, GATE-3 chưa đạt, nguồn live **NOT VERIFIED**. Task kế tiếp chỉ được bắt đầu sau khi hoàn tất kiểm tra và review trang hiện tại; không mở MP-10 trong lát cắt này.
 
+### Tiến độ ghi nhận · FR-06 web / MP-09 · 05/10/2026
+
+Trang `/watchlists` và `/watchlists/` dùng Stitch project `16706610509511522903`, screen `397463272a4642d7b9690e4df8bd6935` và shared design system `assets/18357777504117637773`. Một danh sách theo user đã có create/rename/delete, tìm/thêm/bỏ mười equity canonical và từng row giá đóng cửa/thay đổi từ API history fixture. Xác minh `/me` trước đọc dữ liệu riêng; input/response validation, khóa một write, reconciliation GET sau write chưa xác nhận và token/owner/generation guards bảo vệ expiry/logout/identity change/late callbacks. Thời điểm sửa danh sách được tách khỏi market as-of; mỗi row giữ nguồn, VND, UTC+7, unknown freshness, lịch phiên chưa xác minh và adjustment basis.
+
+Worker kiểm tra 127 unit tests (56 API + 71 web) và chín integration tests MongoDB/Redis, không fail/skip; build, fixture validator, 24 Python contract tests và hai collector tests đạt. Coordinator QA browser/API thật hai tài khoản và vòng create/rename/add/remove/reload/isolation/delete/recreate/logout; 1440/768/390/320px không overflow/page error. QA response mock riêng kiểm tra row error/retry, zero/single observation, ambiguous write/read failure, 401 và expiry. Browser Back thật đổi tài khoản và persisted pageshow mô phỏng được ghi tách trong [bàn giao watchlist](FR06_WATCHLIST_DESIGN.md), cùng keyboard/nav checks; không có E2E framework mới được commit.
+
+Review GPT-6 Astra độc lập ngày **05/10/2026** đã chấp thuận lát cắt frontend MP-09, không có finding cần sửa. Reviewer kiểm tra code/tests/docs, diff và hash yêu cầu gốc; không chạy lại full suite/browser. Bằng chứng runtime ở trên thuộc worker/coordinator; actual BFCache chưa được xác minh, tách khỏi browser Back thật và persisted pageshow mô phỏng.
+
+Lát cắt chức năng MP-09 đã có code, fixture QA và review độc lập; GitHub CI và GATE-3 còn chờ. FR-06 gốc vẫn **một phần**, nguồn live **NOT VERIFIED**. Những đoạn API/account trước đó là lịch sử tại ngày ghi nhận; không mở MP-10 trong task này.
+
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
 | D8 · Thứ Năm 01/10 | Build · 2,4 giờ | MP-06 tìm kiếm mã và tên công ty | Tìm trong tập mã đã seed/ingest, trả symbol ổn định và mở trang chi tiết. Phụ thuộc MP-02. |
 | D9 · Thứ Sáu 02/10 | Build · 2,4 giờ | MP-07 trang chi tiết và biểu đồ ngày | Hiện định danh, OHLCV ngày mới nhất và chart lịch sử cho một mã; thể hiện tiền tệ, stale và dữ liệu thiếu. |
 | D10 · Thứ Bảy 03/10 | Build · 2,4 giờ | MP-08 tổng quan VN-Index cơ bản | Hiện quan sát VN-Index mới nhất và thay đổi, kèm timestamp. Không đưa ra breadth hay thanh khoản tổng chưa hỗ trợ. |
 | D11 · Chủ Nhật 04/10 | Review / buffer · 1 giờ | Review UX và chất lượng dữ liệu | Thử search → detail → chart và overview bằng fixture; kiểm tra timezone, đơn vị, trạng thái trống/lỗi và layout hẹp. |
-| D12 · Thứ Hai 05/10 | Build · 2,4 giờ | MP-09 watchlist có xác thực | Tạo/đổi tên/xóa một danh sách; thêm/bỏ symbol theo user đăng nhập cục bộ. |
+| D12 · Thứ Hai 05/10 | Build · 2,4 giờ | MP-09 watchlist có xác thực | Tạo/đổi tên/xóa một danh sách; thêm/bỏ symbol theo user đăng nhập cục bộ; giá/thay đổi mới nhất có nhãn nguồn/thời điểm. Code và QA fixture đã có; Astra chấp thuận review độc lập 05/10/2026. GitHub CI/GATE-3 còn chờ. |
 | D13 · Thứ Ba 06/10 | Build · 2,4 giờ | MP-10 ranh giới ingestion và replay an toàn | Dùng Python collector → internal ingestion endpoint có xác thực → Node/BullMQ worker. Lưu raw và canonical đã chuẩn hóa; phát lại cùng một delivery không tạo canonical observation trùng. |
 | D14 · Thứ Tư 07/10 | Review / buffer · 1 giờ | GATE-3 review luồng chính | Search, detail/chart, VN-Index và watchlist hoạt động local với fixture. Nếu còn lỗi, bỏ hạng mục mở rộng. |
 
