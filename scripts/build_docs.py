@@ -30,6 +30,7 @@ DOCUMENTS = (
     "docs/FR01_AUTH_DESIGN.md",
     "docs/FR06_WATCHLIST_DESIGN.md",
     "docs/INGESTION.md",
+    "docs/GATE_3_REVIEW.md",
 )
 ASSETS = (
     "docs/assets/marketpulse-banner.svg",
