@@ -11,6 +11,14 @@ Chỉ triển khai một task tại một thời điểm với một worker. Ho�
 
 Với mỗi task frontend, thiết kế một trang trong Stitch trước khi triển khai; giữ nhất quán với design system dùng chung và ghi project/screen Stitch đã chọn trong bàn giao. Kiểm tra responsive cùng trạng thái loading, empty, error; hoàn tất triển khai, kiểm tra và review trang đó trước khi làm trang kế tiếp. Nếu Stitch không khả dụng, ghi rõ blocker và không giả định đã dùng công cụ thay thế.
 
+### GATE-3 review luồng chính · 06/10/2026 (thực hiện trước D14 · 07/10)
+
+**PASS cho luồng local bằng fixture:** search theo mã/tên → detail/chart, VN-Index và watchlist có xác thực. Baseline là `main` sau PR #19, [commit `b996e3e`](https://github.com/Son2110/Market-Pulse/commit/b996e3e3e70ffbacf13fb8d319a182303d05dfc9); [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/37275919994) và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/37275920075) thành công trên đúng commit đó. Log xác nhận 131 unit tests, 17 integration tests MongoDB/Redis, 24 Python contract tests và sáu collector tests; không skip check bắt buộc. Đây là bằng chứng CI đã có, không chạy lại full suite trong task tài liệu này.
+
+Worker rebuild Compose từ baseline, cả năm service healthy, health/route/proxy HTTP smoke đạt. Browser Edge/Playwright tạm dùng API thật kiểm tra đăng ký/đăng nhập/reload `/me`, search FPT theo mã/tên → chart → reload → quay lại giữ query, VNINDEX 1.308 điểm và −2 (−0,15%), create/add/link/reload/rename/remove/delete/recreate/logout watchlist và tài khoản B chỉ thấy dữ liệu riêng. Năm trang ở 1440/390/320px (15 view) không overflow trang hay pageerror. Mock response tạm kiểm tra loading/history empty/503/retry và lỗi một row không ảnh hưởng row còn lại; ghi tách khỏi API thật. Coordinator xem trực tiếp ảnh market 320px/detail 390px/watchlist 390px, không có finding về layout/nhãn. Tài khoản QA được xóa theo email/user ID chính xác và đọc lại xác nhận không còn record của chúng.
+
+Chi tiết baseline, API thật, mock, ảnh local và giới hạn ở [GATE_3_REVIEW.md](GATE_3_REVIEW.md). Không phát hiện bug cần sửa code trong phạm vi gate. Public reads vẫn dùng fixture đóng gói; nguồn live **NOT VERIFIED**, các FR gốc vẫn một phần, chưa có E2E được commit. MP-10 đã merge; **MP-11 chưa bắt đầu**, là task serial riêng kế tiếp sau review/merge bản ghi gate này. Các đoạn tiến độ bên dưới giữ lịch sử tại ngày ghi nhận; PASS này không hoàn tất MVP hay nghiệm thu production.
+
 ## Tuần 1 — dựng nền tảng cục bộ an toàn
 
 ### Tiến độ ghi nhận · MP-10 / FR-18 · 05/10/2026
@@ -19,7 +27,7 @@ Lát cắt fixture ingestion có internal API xác thực bearer trước parse,
 
 131 unit tests và 17 integration tests thật MongoDB/Redis (tám scenario ingestion mới) đạt, không fail/skip. Python/Node dùng chung negative corpus; fault harness kill worker sau write thứ 12 và sau Mongo success trước queue completion đều giữ canonical không trùng. Test API startup thật xác nhận ingestion initialization lỗi thì thoát mã 1 để restart, sửa database/relaunch thì ready, thiếu secret vẫn dùng public API và internal trả 503. Coordinator Docker QA thấy năm service healthy, hai lần submit cùng fixture trả success/cùng digest và totals 1 raw / 11 assets / 44 observations; dừng worker rồi submit ID riêng trả queued, restart phục hồi success, totals canonical vẫn 11/44. Hai raw demo receipts được giữ làm audit. Chi tiết và giới hạn ở [INGESTION.md](INGESTION.md).
 
-Review GPT-6 Astra độc lập cuối ngày **05/10/2026** đã chấp thuận push branch, không còn finding cần sửa sau khi P2 ingestion initialization được sửa và có regression API startup thật. Reviewer kiểm tra production code/collector/tests/CI/Compose/docs và diff check đạt; không chạy lại tests. Coordinator rebuild Docker API/worker/web sau sửa startup, xác nhận năm service healthy và collector replay success với counts 11/44. GitHub CI, GATE-3 và PR/merge do chủ dự án quản lý còn chờ; FR-18 gốc vẫn **một phần**, nguồn live **NOT VERIFIED**. Các đoạn lịch sử bên dưới mô tả thời điểm trước MP-10; không mở task tiếp theo từ lát cắt này.
+Review GPT-6 Astra độc lập cuối ngày **05/10/2026** đã chấp thuận push branch, không còn finding cần sửa sau khi P2 ingestion initialization được sửa và có regression API startup thật. Reviewer kiểm tra production code/collector/tests/CI/Compose/docs và diff check đạt; không chạy lại tests. Coordinator rebuild Docker API/worker/web sau sửa startup, xác nhận năm service healthy và collector replay success với counts 11/44. Ghi nhận cập nhật **06/10/2026:** MP-10 đã merge qua PR #19, CI trên `main` thành công và GATE-3 fixture PASS theo bản ghi ở trên; FR-18 gốc vẫn **một phần**, nguồn live **NOT VERIFIED**. Các đoạn lịch sử bên dưới mô tả thời điểm trước MP-10.
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
@@ -147,9 +155,9 @@ Lát cắt chức năng MP-09 đã có code, fixture QA và review độc lập;
 | D9 · Thứ Sáu 02/10 | Build · 2,4 giờ | MP-07 trang chi tiết và biểu đồ ngày | Hiện định danh, OHLCV ngày mới nhất và chart lịch sử cho một mã; thể hiện tiền tệ, stale và dữ liệu thiếu. |
 | D10 · Thứ Bảy 03/10 | Build · 2,4 giờ | MP-08 tổng quan VN-Index cơ bản | Hiện quan sát VN-Index mới nhất và thay đổi, kèm timestamp. Không đưa ra breadth hay thanh khoản tổng chưa hỗ trợ. |
 | D11 · Chủ Nhật 04/10 | Review / buffer · 1 giờ | Review UX và chất lượng dữ liệu | Thử search → detail → chart và overview bằng fixture; kiểm tra timezone, đơn vị, trạng thái trống/lỗi và layout hẹp. |
-| D12 · Thứ Hai 05/10 | Build · 2,4 giờ | MP-09 watchlist có xác thực | Tạo/đổi tên/xóa một danh sách; thêm/bỏ symbol theo user đăng nhập cục bộ; giá/thay đổi mới nhất có nhãn nguồn/thời điểm. Code và QA fixture đã có; Astra chấp thuận review độc lập 05/10/2026. GitHub CI/GATE-3 còn chờ. |
+| D12 · Thứ Hai 05/10 | Build · 2,4 giờ | MP-09 watchlist có xác thực | Tạo/đổi tên/xóa một danh sách; thêm/bỏ symbol theo user đăng nhập cục bộ; giá/thay đổi mới nhất có nhãn nguồn/thời điểm. Astra chấp thuận review độc lập 05/10/2026; CI trên baseline `main` đạt và GATE-3 fixture PASS ngày 06/10. FR-06 gốc vẫn một phần. |
 | D13 · Thứ Ba 06/10 | Build · 2,4 giờ | MP-10 ranh giới ingestion và replay an toàn | Dùng Python collector → internal ingestion endpoint có xác thực → Node/BullMQ worker. Lưu raw và canonical đã chuẩn hóa; phát lại cùng một delivery không tạo canonical observation trùng. |
-| D14 · Thứ Tư 07/10 | Review / buffer · 1 giờ | GATE-3 review luồng chính | Search, detail/chart, VN-Index và watchlist hoạt động local với fixture. Nếu còn lỗi, bỏ hạng mục mở rộng. |
+| D14 · Thứ Tư 07/10 | Review / buffer · 1 giờ | GATE-3 review luồng chính | **PASS sớm ngày 06/10:** search, detail/chart, VN-Index và watchlist hoạt động local với fixture. Xem [bằng chứng và giới hạn](GATE_3_REVIEW.md); không nghiệm thu nguồn live hay hoàn tất MVP. |
 
 ## Tuần 3 — làm demo cục bộ đáng tin cậy
 
