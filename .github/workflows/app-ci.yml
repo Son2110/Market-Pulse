@@ -28,6 +28,8 @@ jobs:
           python-version: "3.12"
       - name: Install Node workspaces
         run: npm ci
+      - name: Generate ephemeral internal ingestion secret
+        run: node --input-type=module -e "import { randomBytes } from 'node:crypto'; import { appendFileSync } from 'node:fs'; const secret = randomBytes(32).toString('hex'); console.log('::add-mask::' + secret); appendFileSync(process.env.GITHUB_ENV, 'INGESTION_SECRET=' + secret + '\n');"
       - name: Lint, typecheck, unit test and build
         run: |
           npm run lint
@@ -140,6 +142,11 @@ jobs:
           NODE
       - name: Run fixture collector container
         run: docker compose --profile collector run --rm collector
+      - name: Submit and replay fixture through API and worker
+        run: |
+          docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10
+          docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10
+          docker compose exec -T mongodb mongosh marketpulse --quiet --eval 'if (db.ingestion_deliveries.countDocuments() !== 1 || db.canonical_assets.countDocuments() !== 11 || db.canonical_observations.countDocuments() !== 44 || db.ingestion_deliveries.countDocuments({status:"success","counts.assets":11,"counts.observations":44}) !== 1) { throw new Error("Ingestion replay counts/status mismatch"); } print("OK durable fixture replay: 1 raw / 11 assets / 44 observations / success");'
       - name: Run real MongoDB and Redis integration test
         run: npm run test:integration
       - name: Show service logs after failure

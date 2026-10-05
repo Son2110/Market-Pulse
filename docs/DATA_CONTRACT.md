@@ -1,5 +1,9 @@
 # Hợp đồng dữ liệu thị trường v1
 
+## MP-10 persisted fixture boundary
+
+Authenticated internal delivery submission now stores the full bounded fixture raw payload and canonical assets/observations with immutable identity/digest confirmation. SHA-256 uses RFC 8785 canonical JSON; duplicate keys, unsafe integers and invalid encoding are rejected before storage. Same delivery ID/content replays safely; changed content returns 409. Canonical uniqueness is enforced by `_id` on ordinary collections. Individual writes are atomic; the batch is not atomic, so valid prior rows remain after conflict/crash. Public APIs still read the packaged fixture. See [the ingestion contract, indexes and recovery handoff](INGESTION.md) for limits, identity tuples, counts, source/time semantics and actual validation evidence. Live sources remain **NOT VERIFIED**.
+
 Hợp đồng JSON Schema tại [`packages/schemas/market-data-v1.schema.json`](../packages/schemas/market-data-v1.schema.json) định nghĩa envelope canonical dùng chung cho adapter Python, TypeScript hoặc ngôn ngữ khác. Schema dùng JSON Schema Draft 2020-12, phiên bản `1.0.0`, và chỉ tham chiếu `$defs` nội bộ nên kiểm tra được offline. Nó mô tả chế độ `observed` trong tương lai; validator hiện tại chỉ chấp nhận fixture tổng hợp, chưa có live adapter.
 
 Fixture nhỏ nằm tại [`fixtures/market/mp-02-synthetic.json`](../fixtures/market/mp-02-synthetic.json). Toàn bộ giá và volume do project tự tạo, issuer chỉ được ghi bằng symbol. Ba ngày `2026-09-21` đến `2026-09-23` là ngày phiên được chọn để thử nghiệm, chưa xác minh lịch giao dịch Việt Nam. Không dùng fixture làm giá thật, bằng chứng freshness hay kết quả provider.

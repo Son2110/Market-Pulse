@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readConfig } from "../src/config.js";
 
+test("internal ingestion secret is optional and requires 32 random bytes encoded as hex", () => {
+  assert.equal(readConfig({}).ingestionSecret, undefined);
+  assert.equal(readConfig({ INGESTION_SECRET: "" }).ingestionSecret, undefined);
+  assert.equal(readConfig({ INGESTION_SECRET: "a".repeat(64) }).ingestionSecret, "a".repeat(64));
+  for (const value of ["short", "g".repeat(64), "a".repeat(63), " a".repeat(32)]) assert.throws(() => readConfig({ INGESTION_SECRET: value }), /INGESTION_SECRET/);
+});
+
 test("API defaults use local MongoDB and Redis with bounded retries", () => {
   const config = readConfig({});
   assert.equal(config.port, 3001);

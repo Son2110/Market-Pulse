@@ -7,6 +7,9 @@ import { createApp } from "./health.js";
 import { createStockSearchRouter, StockSearchService } from "./stock-search.js";
 import { connectWithRetry, createStores } from "./stores.js";
 import { createWatchlistApi } from "./watchlists.js";
+import { createIngestionApi } from "./ingestion-api.js";
+import { IngestionStore } from "./ingestion-store.js";
+import { createIngestionQueue, DeliveryQueue } from "./ingestion-queue.js";
 
 const config = readConfig();
 const stores = createStores(config);
@@ -19,6 +22,11 @@ let stockSearchReady = false;
 let watchlistReady = false;
 let shuttingDown = false;
 let startupPromise: Promise<boolean> | undefined;
+let ingestionReady = false;
+const ingestionStore = new IngestionStore(stores.mongo.db());
+const ingestionQueue = config.ingestionSecret ? createIngestionQueue(config.redisUrl, undefined, true) : undefined;
+const deliveries = ingestionQueue ? new DeliveryQueue(ingestionStore, ingestionQueue.queue) : undefined;
+if (!config.ingestionSecret) console.info(JSON.stringify({ event: "ingestion_disabled" }));
 const shutdownController = new AbortController();
 const auth = createAuthApi({
   db: stores.mongo.db(),
@@ -45,11 +53,12 @@ stores.redis.on("end", () => {
 const server = createServer(createApp({
   checks: stores.checks,
   timeoutMs: config.dependencyTimeoutMs,
-  applicationReady: () => authReady && marketDataReady && stockSearchReady && watchlistReady,
+  applicationReady: () => authReady && marketDataReady && stockSearchReady && watchlistReady && (!config.ingestionSecret || ingestionReady),
   authRouter: auth.router,
   stockSearchRouter: createStockSearchRouter(stockSearch),
   dailyHistoryRouter: createDailyHistoryRouter(marketData),
   watchlistRouter: watchlists.router,
+  ingestionRouter: createIngestionApi({ store: ingestionStore, secret: config.ingestionSecret, isReady: () => ingestionReady, enqueue: async (id, digest) => { await deliveries?.enqueue(id, digest); } }),
 }));
 server.listen(config.port, config.host, () => {
   console.info(JSON.stringify({ event: "api_listening", port: config.port }));
@@ -66,6 +75,13 @@ async function connectStores(): Promise<boolean> {
   ]);
   connectedBefore = mongoReady && redisReady;
   if (!connectedBefore) return false;
+  if (config.ingestionSecret) {
+    try { await ingestionStore.initialize(); ingestionReady = true; }
+    catch {
+      console.warn(JSON.stringify({ event: "ingestion_initialization_failed" }));
+      return false;
+    }
+  }
   try {
     await auth.initialize();
     authReady = true;
@@ -111,6 +127,7 @@ async function shutdown(signal: string, exitCode = 0) {
       await startupPromise?.catch(() => false);
       await Promise.allSettled([
         stores.mongo.close(),
+        ingestionQueue?.close() ?? Promise.resolve(),
         stores.redis.isOpen ? stores.redis.quit() : Promise.resolve(),
       ]);
     })(),

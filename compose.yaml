@@ -39,6 +39,7 @@ services:
       CONNECT_ATTEMPTS: 5
       CONNECT_DELAY_MS: 500
       DEPENDENCY_TIMEOUT_MS: 1000
+      INGESTION_SECRET: ${INGESTION_SECRET:-}
     depends_on:
       mongodb:
         condition: service_healthy
@@ -49,6 +50,27 @@ services:
       - "127.0.0.1:${API_PORT:-3001}:3001"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["npm", "run", "worker", "--workspace=@marketpulse/api"]
+    environment:
+      MONGODB_URL: mongodb://mongodb:27017/marketpulse?serverSelectionTimeoutMS=1000
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: on-failure:5
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -76,6 +98,9 @@ services:
       context: .
       dockerfile: services/collector/Dockerfile
     command: ["fixtures/market/mp-02-synthetic.json"]
+    environment:
+      INGESTION_ENDPOINT: http://api:3001/internal/ingestion/deliveries
+      INGESTION_SECRET: ${INGESTION_SECRET:-}
 
 volumes:
   mongo-data:

@@ -9,6 +9,7 @@ export interface ApiConfig {
   authRateLimitMax: number;
   authRateLimitWindowMs: number;
   authKdfConcurrency: number;
+  ingestionSecret?: string;
 }
 
 function integerSetting(name: string, value: string | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -37,6 +38,7 @@ function hostSetting(value: string | undefined): string {
 }
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
+  if (env.INGESTION_SECRET && !/^[a-fA-F0-9]{64}$/.test(env.INGESTION_SECRET)) throw new Error("Invalid INGESTION_SECRET configuration.");
   return {
     port: integerSetting("PORT", env.PORT, 3001, 1, 65535),
     host: hostSetting(env.HOST),
@@ -48,5 +50,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     authRateLimitMax: integerSetting("AUTH_RATE_LIMIT_MAX", env.AUTH_RATE_LIMIT_MAX, 20, 1, 1000),
     authRateLimitWindowMs: integerSetting("AUTH_RATE_LIMIT_WINDOW_MS", env.AUTH_RATE_LIMIT_WINDOW_MS, 60_000, 1000, 3_600_000),
     authKdfConcurrency: integerSetting("AUTH_KDF_CONCURRENCY", env.AUTH_KDF_CONCURRENCY, 2, 1, 2),
+    ingestionSecret: env.INGESTION_SECRET || undefined,
   };
 }

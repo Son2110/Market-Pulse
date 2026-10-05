@@ -1,0 +1,59 @@
+# MP-10 — fixture ingestion and replay
+
+This FR-18 slice persists the contract-v1 synthetic fixture through Python collector → authenticated internal API → BullMQ → separate Node worker → ordinary MongoDB collections. Original FR-18 remains partial; live sources remain **NOT VERIFIED**. Final independent GPT-6 Astra review approved branch push on 05/10/2026; GitHub CI, GATE-3 and the user-managed pull request/merge remain pending. Public search/history and the web continue to read the packaged fixture; persisted ingestion does not migrate those reads.
+
+## Delivery boundary
+
+`POST /internal/ingestion/deliveries` accepts exactly `deliveryId`, `payloadDigest` and `payload`. `GET /internal/ingestion/deliveries/:id` returns only delivery ID/digest, status, provider, attempts, confirmed counts, server timestamps and a safe error code. Both require `Authorization: Bearer <INGESTION_SECRET>`, checked before parsing. Account session tokens do not authorize ingestion. The secret is 64 hexadecimal characters representing 32 random bytes. Empty/missing configuration disables the internal routes with 503 while the existing API remains usable; malformed nonempty configuration fails startup.
+
+The payload passes the full JSON Schema and independent Node cross-record checks. This slice supports exactly the existing fixture inventory (11 assets, 33 candles, 10 quotes, one index observation), synthetic provider/label, unknown freshness and unverified calendar. Limits: 1 MiB for the whole HTTP body, 32 assets, 1,000 records per observation group, depth 32, and delivery IDs of 1–100 ASCII letters/digits/underscore/hyphen. Unknown fields, duplicate JSON keys, invalid UTF-8, lone surrogates, non-finite numbers and integral numeric values outside ±9,007,199,254,740,991 are rejected. Only JSON with optional UTF-8 charset and identity content encoding is accepted. Dates reject year zero; timestamp comparison matches Python datetime precision by truncating fractional seconds beyond six places. Stored timestamps are preserved.
+
+`payloadDigest` is lowercase SHA-256 of RFC 8785 canonical JSON: keys sort by UTF-16, array order is retained, ECMAScript serialization makes `1` and `1.0` equivalent. Python uses pinned `rfc8785==0.1.4`; Node uses a small recursive serializer with native JSON primitives. A shared 41-case negative corpus checks both validators; golden tests compare fixture and numeric/Unicode representations across languages.
+
+An acknowledged raw insert (`w:1,j:true`) precedes HTTP 202. Same ID/digest returns its existing receipt; same ID with changed content returns 409 without replacement. 202 means durably accepted, and its receipt may already be queued/running/success/failure. Enqueue has a 1.5-second response bound; failure leaves an accepted receipt for reconciliation. MongoDB write failure returns 503. Polling success, rather than 202 alone, proves completion.
+
+## Storage and recovery
+
+| Collection | Unique identity | Stored content and access |
+|---|---|---|
+| `ingestion_deliveries` | Built-in `_id = deliveryId` | Bounded full parsed payload/digest, dataset/provider/schema, server received/updated/started/finished times, status, attempts, confirmed counts, bounded safe error code. `{status:1,updatedAt:1}` serves nonterminal reconciliation. |
+| `canonical_assets` | Built-in `_id = assetId` | Full immutable asset, dataset labels, content digest and first delivery ID. |
+| `canonical_observations` | Built-in `_id = SHA-256(typed identity tuple)` | Full immutable record, labels/digest/first delivery ID and readable kind/asset/provider/date (plus candle interval/adjustment basis). |
+
+Candle identity is `["candle", assetId, provider, interval, tradingDate, adjustmentBasis]`; quote/index identities are `[kind, assetId, provider, tradingDate]`. Row digests include the record and dataset labels, including fixture `ingestedAt`. `serverReceivedAt` is the separate server receipt time. Atomic insertion and duplicate-key digest confirmation enforce uniqueness concurrently. Same identity/content is a no-op; changed content fails permanently with `canonical_identity_conflict`, preserving the row. Strict MongoDB validators initialize before consumption. No TTL index or unbounded history array is used on raw/canonical data.
+
+Each document write is atomic; a delivery **is not batch-atomic** on standalone local MongoDB. Valid rows written before conflict/interruption remain. Receipt counts mean records confirmed in the latest attempt (inserted or identical already present), not newly inserted totals; progress may restart during replay. Success requires confirmation of all 11 assets and 44 observations.
+
+Raw nonterminal documents form a durable outbox. The worker scans up to 100 oldest nonterminal deliveries on startup and every five seconds. Jobs contain only ID/digest and use a deterministic hash ID without colons. Waiting/active/delayed jobs remain; missing jobs are recreated within the three-attempt budget, completed queue jobs for nonterminal raw receipts are replaced, and failed history becomes terminal failure. MongoDB success/failure takes precedence after queue removal or a crash before queue completion. Permanent failure/exhaustion is never automatically requeued. Processor progress/terminal updates are fenced by attempt. Retry backoff is exponential from 250 ms; stalled recovery handles killed workers. Queue history is bounded to 1,000 entries, success age one day and failure age seven days (BullMQ removal is lazy). Queue deduplication ends after removal, so MongoDB is the durable authority.
+
+BullMQ 6.3.11 uses the node-redis adapter and separate reconnecting worker connections; API health Redis stays separate. Worker readiness requires initialized collections, a running worker, connected clients, MongoDB ping and recent successful reconciliation. Its loopback port 3002 health listener has no published Compose port. SIGTERM stops reconciliation/new consumption, closes active work and clients, and has a five-second process fallback. Logs contain delivery/provider/status/attempt/duration/counts or safe error codes; no payloads, raw exceptions, secrets, headers or connection URLs.
+
+When an ingestion secret is configured, API readiness also requires successful ingestion collection initialization. Initialization failure logs a safe event and exits nonzero through the existing shutdown path, allowing Compose's bounded `on-failure:5` restart policy to retry startup. A persistent database/schema problem still needs repair after the restart budget is exhausted; restart the API after correcting it. With no secret, ingestion initialization is skipped, internal routes stay 503, and the public API can become ready.
+
+## Local commands
+
+Generate a secret with the command in `.env.example` and save it only in ignored `.env`. Compose passes it to API/collector; the worker does not need it. Preserve existing ports and volumes.
+
+```powershell
+docker compose up --build --detach --wait
+docker compose --profile collector run --rm collector
+docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10
+docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10
+docker compose logs --tail=100 api worker
+```
+
+Default collector behavior remains offline validation/summary. Explicit `--submit` reads `INGESTION_ENDPOINT` and `INGESTION_SECRET`; `--delivery-id` selects a bounded ID, otherwise `fixture-<digest>` is deterministic. Polling is bounded to 0–60 seconds, each HTTP operation to five seconds, responses to 64 KiB. Redirects and URL credentials/query/fragment are rejected. Remote endpoints require HTTPS; HTTP is limited to `127.0.0.1`, `localhost`, `::1` and Compose `api`. Accepted/queued output is incomplete; failure exits nonzero. No live provider is contacted.
+
+For recovery, restart only the worker (`docker compose restart worker`) and poll the same delivery. Re-submit the same file/ID after a lost response. This slice has no correction/versioning or arbitrary retry admin API. Do not delete volumes to replay. Host tests require the actual `MONGODB_URL`/`REDIS_URL`; Node does not automatically load `.env`.
+
+## Verification and limits
+
+Local checks passed: 131 unit tests, 17 real MongoDB/Redis integration tests (eight new ingestion scenarios), including Python HTTP submission and cross-language digest parity. Tests use unique databases/queues and remove only their own data; the API startup child opens the fixed-name producer but submits no jobs and removes no queue history. Child-process harnesses kill workers after their 12th confirmed write and after MongoDB success before queue completion, with no HTTP flags or production environment fault backdoors. The real API startup test uses an isolated MongoDB view to force ingestion initialization failure and confirms exit code 1, readiness after repair/relaunch, and public readiness/internal 503 with the secret absent. Coverage also includes concurrent same-ID submissions, distinct-ID replay, changed delivery 409, immutable canonical conflict, enqueue outage after durable acceptance, partial-write retry/exhaustion, history removal, completed/failed/missing reconciliation and stale-attempt fencing.
+
+Coordinator Docker QA built API/worker/collector and observed five healthy services. Two fixture submissions returned the same successful ID/digest; MongoDB held one raw delivery, 11 assets and 44 observations (33 candle / 10 quote / one index). Unauthorized malformed JSON returned 401 before parsing; public FPT close remained 102500 with fixture/unknown labels. With only the worker stopped, a distinct QA delivery returned queued/counts zero; restarting the worker recovered success/counts 11/44. Two raw receipts were retained deliberately, while canonical totals stayed 11/44. After the API startup fix, the coordinator rebuilt API/worker/web, confirmed all five services healthy and replayed the fixture collector successfully with counts 11/44.
+
+Final independent GPT-6 Astra review on **05/10/2026** approved branch push with no remaining actionable findings. The P2 ingestion initialization recovery finding was corrected and covered by the real API startup regression above. The reviewer inspected production code, collector, tests, CI, Compose and documentation and passed the diff check; it did not rerun tests. Runtime evidence belongs to the worker/coordinator. GitHub CI, GATE-3 and the user-managed pull request/merge remain pending.
+
+CI registers an ephemeral secret with GitHub Actions masking before saving it to the runner environment, runs collector submit/replay and asserts durable counts/status in addition to offline validation and the integration suite. Time-series projection, public-read migration, live providers, cache, scheduling, admin UI, production operation and deployment remain deferred. Fixture freshness is unknown, session dates remain unverified; the product does not provide investment advice.
+
+Primary references: [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), [BullMQ connections](https://docs.bullmq.io/guide/connections), [job IDs](https://docs.bullmq.io/guide/jobs/job-ids), [stalled jobs](https://docs.bullmq.io/guide/workers/stalled-jobs), [MongoDB atomicity](https://www.mongodb.com/docs/manual/core/write-operations-atomicity/), [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/).

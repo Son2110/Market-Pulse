@@ -1,5 +1,7 @@
 # CI/CD
 
+MP-10 extends Application CI with an ephemeral randomly generated internal ingestion secret, a separate worker health check, explicit collector HTTP submission/replay and MongoDB assertions for one raw delivery / 11 assets / 44 observations / success. Real BullMQ retry and child-worker interruption tests join the existing MongoDB/Redis suite. GitHub Actions masking is registered before the secret is saved to the runner environment, preventing later step environment displays from exposing it; no live provider credential is needed. See [ingestion evidence and limits](INGESTION.md). Local checks are recorded there; GitHub CI on this branch remains unconfirmed.
+
 ## Đang hoạt động
 
 `Documentation CI` chạy khi mở/cập nhật pull request và khi push vào `main`, `ci/**`, `feat/**` hoặc `docs/**`. Workflow cài dependency validation đã pin, kiểm tra link cục bộ, xác thực schema/fixture thị trường offline, chạy unit tests hợp đồng, build portal từ danh sách tài liệu cho phép và lưu `_site/` thành artifact trong 7 ngày. Link ngoài không được truy cập; fragment anchor không được kiểm tra. Thiếu file cục bộ hoặc lỗi validation/test sẽ làm job thất bại.

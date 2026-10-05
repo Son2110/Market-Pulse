@@ -11,6 +11,8 @@
 
 ## Mục tiêu sản phẩm
 
+**Tiến độ MP-10 / FR-18 · 05/10/2026:** lát cắt fixture Python → internal API có bearer riêng → BullMQ worker tách process → raw/canonical MongoDB đã có. HTTP 202 chỉ xác nhận receipt bền vững; replay cùng content không tạo canonical trùng, content khác tại cùng identity thất bại và không ghi đè. Mỗi record atomic, cả batch không atomic; raw outbox hỗ trợ recovery sau enqueue lỗi/crash. Public reads vẫn dùng fixture đóng gói, time-series projection/live provider/cache/admin UI còn hoãn. P2 về ingestion initialization đã sửa và có regression API startup thật; review GPT-6 Astra độc lập cuối ngày 05/10/2026 chấp thuận push branch, không còn finding cần sửa. Reviewer kiểm tra code/collector/tests/CI/Compose/docs và diff, không chạy lại tests. Kiểm tra local đạt; coordinator rebuild Docker API/worker/web sau sửa startup, xác nhận năm service healthy và collector replay success với counts 11/44. GitHub CI và PR/merge do chủ dự án quản lý còn chờ. FR-18 gốc vẫn **một phần**, GATE-3 chưa nghiệm thu và nguồn live **NOT VERIFIED**. Xem [bàn giao ingestion](INGESTION.md).
+
 Giúp người đọc hiểu thị trường Việt Nam đang diễn biến thế nào, tài sản nào vừa biến động và những sự kiện công khai nào xảy ra gần thời điểm đó. Đây là công cụ thông tin và nghiên cứu. Sản phẩm không khuyến nghị giao dịch, không thực hiện giao dịch và không khẳng định sự kiện gây ra biến động giá.
 
 ## Mục tiêu trong ba tuần
