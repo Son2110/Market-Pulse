@@ -7,6 +7,7 @@ COPY apps/web/package.json apps/web/package.json
 RUN npm ci
 
 COPY apps/api apps/api
+COPY packages/schemas packages/schemas
 COPY fixtures/market/mp-02-synthetic.json fixtures/market/mp-02-synthetic.json
 RUN npm run build --workspace=@marketpulse/api
 

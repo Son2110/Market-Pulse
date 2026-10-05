@@ -13,6 +13,14 @@ Với mỗi task frontend, thiết kế một trang trong Stitch trước khi tr
 
 ## Tuần 1 — dựng nền tảng cục bộ an toàn
 
+### Tiến độ ghi nhận · MP-10 / FR-18 · 05/10/2026
+
+Lát cắt fixture ingestion có internal API xác thực bearer trước parse, SHA-256/RFC 8785 và full schema/cross-record validation; raw receipt bền vững trước 202, BullMQ worker riêng và MongoDB uniqueness/digest confirmation bảo vệ replay/crash. Raw outbox reconcile sau enqueue lỗi hoặc restart; conflict không ghi đè và các row hợp lệ trước lỗi vẫn tồn tại vì batch không atomic. Public read adapter giữ fixture đóng gói; chưa có time-series projection, nguồn live, cache, admin UI hoặc deployment.
+
+131 unit tests và 17 integration tests thật MongoDB/Redis (tám scenario ingestion mới) đạt, không fail/skip. Python/Node dùng chung negative corpus; fault harness kill worker sau write thứ 12 và sau Mongo success trước queue completion đều giữ canonical không trùng. Test API startup thật xác nhận ingestion initialization lỗi thì thoát mã 1 để restart, sửa database/relaunch thì ready, thiếu secret vẫn dùng public API và internal trả 503. Coordinator Docker QA thấy năm service healthy, hai lần submit cùng fixture trả success/cùng digest và totals 1 raw / 11 assets / 44 observations; dừng worker rồi submit ID riêng trả queued, restart phục hồi success, totals canonical vẫn 11/44. Hai raw demo receipts được giữ làm audit. Chi tiết và giới hạn ở [INGESTION.md](INGESTION.md).
+
+Review GPT-6 Astra độc lập cuối ngày **05/10/2026** đã chấp thuận push branch, không còn finding cần sửa sau khi P2 ingestion initialization được sửa và có regression API startup thật. Reviewer kiểm tra production code/collector/tests/CI/Compose/docs và diff check đạt; không chạy lại tests. Coordinator rebuild Docker API/worker/web sau sửa startup, xác nhận năm service healthy và collector replay success với counts 11/44. GitHub CI, GATE-3 và PR/merge do chủ dự án quản lý còn chờ; FR-18 gốc vẫn **một phần**, nguồn live **NOT VERIFIED**. Các đoạn lịch sử bên dưới mô tả thời điểm trước MP-10; không mở task tiếp theo từ lát cắt này.
+
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
 | D1 · Thứ Năm 24/09 | Build · 2,4 giờ | MP-01 khảo sát provider và quyền dữ liệu | So sánh một nguồn cổ phiếu/index về quyền truy cập, điều khoản, EOD/delay, độ phủ VN-Index và 10–20 mã. Chỉ xem là xác minh sau khi thử truy cập thực tế. |
