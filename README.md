@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Event-driven market intelligence for Vietnam</strong></p>
 
-**Project status: MP-05 daily history API slice.** The API serves canonical daily candles from the committed synthetic fixture and supports demo account registration, login, logout and the authenticated user endpoint. The React/Vite app remains intentionally blank; search, watchlist, designed product screens, verified live data and production deployment are not present. This is only an API slice of FR-04. The roadmap describes a three-week, local-first portfolio demo; the broader product remains a longer-term plan.
+**Project status: fixture core flows pass GATE-3; MP-11 Vnstock integration has started.** The local web/API support stock search, detail/daily chart, VN-Index, demo accounts and one owned watchlist. Public market reads use the synthetic fixture. A separate opt-in Vnstock/KBS Python adapter now collects and validates FPT/VNINDEX observed candles in memory; it does not yet feed ingestion storage or the app. See [the adapter handoff](docs/VNSTOCK_ADAPTER.md) and [fixture gate evidence](docs/GATE_3_REVIEW.md). Freshness, source as-of, equity adjustment and upstream public redisplay/deployment rights remain unverified. MP-11 continues serially before MP-12; the broader product remains a longer-term plan.
 
 MarketPulse VN is designed to bring Vietnamese equities, market indices, gold, foreign exchange, macro data, financial news and public events into one research experience. The central idea is to show market movement alongside relevant events while making data source and freshness visible. A nearby event is context, not proof of cause.
 
@@ -54,6 +54,7 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 | [Market-data contract](docs/DATA_CONTRACT.md) | Versioned canonical schema, synthetic fixture semantics, units, provenance and offline checks. |
 | [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
 | [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison and limited probe, owner’s Vnstock direction, unresolved live-source gate and MP-02 fixture decision. |
+| [Vnstock adapter](docs/VNSTOCK_ADAPTER.md) | Optional local KBS candle adapter, v2 contract, bounded runtime evidence and next ingestion boundary. |
 | [Codex workflow](docs/CODEX_WORKFLOW.md) | Sequential planning, bounded implementation handoffs and independent review. |
 | [Skills by FR](docs/SKILLS_BY_FR.md) | Installed local skills, guarded use, and optional future skills by requirement. |
 | [CI/CD and documentation portal](docs/CI_CD.md) | Documentation checks, Pages deployment, and application lint, build, Compose and integration CI. |
@@ -65,7 +66,7 @@ The brief is the product context; the PRD and roadmap define the smaller demo bo
 
 ## Data research
 
-- [Vnstock](https://vnstocks.com/docs/vnstock) is the connector/integration direction selected on 2026-09-26. The upstream source, actual access, coverage, units/time semantics and data-use rights remain unverified; selecting the library does not verify a data source.
+- [Vnstock](https://vnstocks.com/docs/vnstock) is the connector/integration direction selected on 2026-09-26. The optional KBS adapter has now passed bounded local checks for FPT/VNINDEX, with explicit price units and provider calendar labels. Broader coverage, freshness, source as-of, equity adjustment and public upstream data-use rights remain unverified.
 - [SSI FastConnect](https://developers.ssi.com.vn/docs/getting-started/overview) is historical MP-01 comparison evidence and a rejected project alternative: the owner considers its registration impractical for this project. It is not a current integration option or a universal technical/legal conclusion.
 - [GDELT DOC API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) is a candidate for later news research; the project does not promise a particular archive or Vietnam coverage.
 - MongoDB’s [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) inform the replay and uniqueness design.

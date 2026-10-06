@@ -5,6 +5,8 @@
 
 Đây là kế hoạch cho một demo portfolio nhỏ, không phải hoàn tất MVP gốc. Xem giới hạn từng FR trong [PRD.md](PRD.md).
 
+**Ưu tiên MP-11 · 06/10/2026:** chủ dự án mở lại tích hợp Vnstock làm luồng chính trước MP-12. Lát cắt FR-18 đầu có adapter KBS opt-in cho FPT/VNINDEX, contract candle observed v2 riêng và hai probe cuối trả bảy candle đã kiểm tra mỗi mã. Public app vẫn dùng fixture; freshness/as-of/adjustment và quyền public redisplay/deployment còn chưa xác minh. Tiếp theo: ingestion observed có isolation/revision/replay → stored public reads → UI từng trang qua Stitch, serial và review từng lát cắt. Chưa bắt đầu MP-12. Xem [bàn giao adapter](VNSTOCK_ADAPTER.md); ghi nhận “MP-11 chưa bắt đầu” trong gate dưới đây là trạng thái lịch sử trước lát cắt này.
+
 ## Nhịp thực hiện
 
 Chỉ triển khai một task tại một thời điểm với một worker. Hoàn tất code, kiểm tra và review độc lập cho task hiện tại trước khi bắt đầu task kế tiếp. Không chạy song song các dòng trong bảng.
@@ -163,7 +165,7 @@ Lát cắt chức năng MP-09 đã có code, fixture QA và review độc lập;
 
 | Ngày / ngày tháng | Loại | Task và sản phẩm bàn giao | Nghiệm thu / phụ thuộc |
 |---|---|---|---|
-| D15 · Thứ Năm 08/10 | Build · 2,4 giờ | MP-11 tích hợp nguồn đã xác minh hoặc demo suy giảm | Thử hướng Vnstock cho lát cắt EOD/delay chỉ sau khi xác minh upstream, truy cập (và credential nếu đường đó yêu cầu), điều khoản/quyền sử dụng, coverage, đơn vị và ngữ nghĩa thời gian. Nếu chưa đạt, giữ fixture `marketpulse-fixture` và gắn nhãn demo suy giảm; không gọi là MVP có nguồn thật. |
+| D15 · Thứ Năm 08/10 | Build · 2,4 giờ | MP-11 tích hợp Vnstock serial, giữ fallback app | Đã mở lại ngày 06/10 với adapter observed v2 cục bộ FPT/VNINDEX. Tiếp tục isolation/revision/replay cho ingestion, stored reads rồi UI serial trước MP-12. Giữ fixture trong public app tới khi đường observed được kiểm tra/review; unknown adjustment/as-of phải có nhãn trung thực, quyền public redisplay/deployment upstream còn mở. Không gọi là MVP nguồn live đã xác minh. |
 | D16 · Thứ Sáu 09/10 | Build · 2,4 giờ | MP-12 freshness, retry và cache | Ghi provider/as-of/freshness/trạng thái ingestion. Chỉ thêm Redis cache nếu kiểm thử được invalidation và expiry; retry/replay không tạo bản ghi canonical trùng. |
 | D17 · Thứ Bảy 10/10 | Build · 2,4 giờ | MP-13 chọn tối đa một hạng mục mở rộng khi qua cổng | Ưu tiên một chuỗi vàng hoặc USD/VND đã xác minh nguồn, đơn vị và quyền. Nếu chưa đạt, thêm timeline thủ công ít sự kiện, có nguồn. Phân tích tác động cần đủ lịch sử ngày; không tuyên bố nhân quả. |
 | D18 · Chủ Nhật 11/10 | Review / buffer · 1 giờ | GATE-4 review bằng chứng và phạm vi | Kiểm tra bằng chứng nguồn, hạn chế, nhãn thời gian, replay và câu chữ sự kiện. Bỏ mọi khẳng định chưa có căn cứ. |

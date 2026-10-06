@@ -1,10 +1,14 @@
 # Hợp đồng dữ liệu thị trường v1
 
+## Observed candle subset v2 · 06/10/2026
+
+Adapter opt-in Vnstock/KBS đã có [schema candle riêng v2](../packages/schemas/observed-candles-v2.schema.json) và validator Python offline cho FPT/VNINDEX. Giá là decimal string VND/điểm chỉ số; equity adjustment `unknown`, `sourceAsOf: null`, `collectedAt` UTC thực tế và nguyên nhãn thời gian naive của provider cùng provenance. Freshness `unknown`, lịch phiên `unverified`, volume null. `barId`/`contentDigest` ổn định qua refetch, tách thời điểm lấy dữ liệu. Schema/validator fixture v1 bên dưới giữ nguyên, không được nới hay đổi nhãn để nhận v2. API ingestion/public read hiện tại không nhận contract này. Xem [ngữ nghĩa, kiểm tra, probe và giới hạn](VNSTOCK_ADAPTER.md).
+
 ## MP-10 persisted fixture boundary
 
 Authenticated internal delivery submission now stores the full bounded fixture raw payload and canonical assets/observations with immutable identity/digest confirmation. SHA-256 uses RFC 8785 canonical JSON; duplicate keys, unsafe integers and invalid encoding are rejected before storage. Same delivery ID/content replays safely; changed content returns 409. Canonical uniqueness is enforced by `_id` on ordinary collections. Individual writes are atomic; the batch is not atomic, so valid prior rows remain after conflict/crash. Public APIs still read the packaged fixture. See [the ingestion contract, indexes and recovery handoff](INGESTION.md) for limits, identity tuples, counts, source/time semantics and actual validation evidence. Live sources remain **NOT VERIFIED**.
 
-Hợp đồng JSON Schema tại [`packages/schemas/market-data-v1.schema.json`](../packages/schemas/market-data-v1.schema.json) định nghĩa envelope canonical dùng chung cho adapter Python, TypeScript hoặc ngôn ngữ khác. Schema dùng JSON Schema Draft 2020-12, phiên bản `1.0.0`, và chỉ tham chiếu `$defs` nội bộ nên kiểm tra được offline. Nó mô tả chế độ `observed` trong tương lai; validator hiện tại chỉ chấp nhận fixture tổng hợp, chưa có live adapter.
+Hợp đồng JSON Schema tại [`packages/schemas/market-data-v1.schema.json`](../packages/schemas/market-data-v1.schema.json) định nghĩa envelope canonical dùng chung cho adapter Python, TypeScript hoặc ngôn ngữ khác. Schema dùng JSON Schema Draft 2020-12, phiên bản `1.0.0`, và chỉ tham chiếu `$defs` nội bộ nên kiểm tra được offline. Validator v1 hiện chỉ chấp nhận fixture tổng hợp; adapter observed cục bộ dùng subset v2 riêng nêu trên.
 
 Fixture nhỏ nằm tại [`fixtures/market/mp-02-synthetic.json`](../fixtures/market/mp-02-synthetic.json). Toàn bộ giá và volume do project tự tạo, issuer chỉ được ghi bằng symbol. Ba ngày `2026-09-21` đến `2026-09-23` là ngày phiên được chọn để thử nghiệm, chưa xác minh lịch giao dịch Việt Nam. Không dùng fixture làm giá thật, bằng chứng freshness hay kết quả provider.
 
