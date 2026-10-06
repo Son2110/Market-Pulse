@@ -1,5 +1,7 @@
 # Báo cáo khảo sát provider — MP-01 (ảnh chụp lịch sử tại 25/09/2026)
 
+> **Cập nhật 06/10/2026:** đã có adapter Vnstock/KBS opt-in cục bộ, trả candle v2 trong bộ nhớ cho FPT và VNINDEX. Hai probe cuối trả bảy candle mỗi mã, 28/09–06/10, qua kiểm tra OHLC/ngày/đơn vị/provenance; giá không được ghi vào repo hay in ra. Raw equity được giữ VND với căn cứ changelog KBS và mã package 4.0.8; raw time là nhãn naive `yyyy-MM-dd HH:mm`, không suy as-of/giờ đóng cửa. Adjustment cổ phiếu, freshness và lịch phiên còn chưa xác minh; volume null. MP-11 mở lại theo ưu tiên Vnstock trước MP-12; quyền public redisplay/deployment upstream còn chưa xác minh. Xem [adapter, bằng chứng và bước serial kế tiếp](VNSTOCK_ADAPTER.md). Những ghi nhận dưới đây là lịch sử.
+
 > **Trạng thái mới nhất · 27/09/2026:** Probe cục bộ xác nhận khả năng đọc kỹ thuật qua Vnstock/KBS và nhận được dữ liệu cho cả 11/11 mã trong basket ở phạm vi truy vấn mẫu. Đây chưa phải cổng production/live đã đạt: freshness, cơ sở điều chỉnh giá, ngữ nghĩa timestamp/as-of và quyền sử dụng dữ liệu upstream vẫn chưa được xác minh. Fixture `marketpulse-fixture` tiếp tục là dữ liệu của ứng dụng. Chi tiết và giới hạn nằm trong [xác minh kỹ thuật ngày 27/09](#xác-minh-kỹ-thuật-ngày-27092026).
 
 **Ngày ghi nhận:** 25/09/2026 · **Phạm vi:** dữ liệu cổ phiếu Việt Nam và VN-Index, tần suất ngày cuối phiên hoặc trễ.  

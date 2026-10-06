@@ -31,10 +31,12 @@ DOCUMENTS = (
     "docs/FR06_WATCHLIST_DESIGN.md",
     "docs/INGESTION.md",
     "docs/GATE_3_REVIEW.md",
+    "docs/VNSTOCK_ADAPTER.md",
 )
 ASSETS = (
     "docs/assets/marketpulse-banner.svg",
     "packages/schemas/market-data-v1.schema.json",
+    "packages/schemas/observed-candles-v2.schema.json",
     "fixtures/market/mp-02-synthetic.json",
 )
 PORTAL = ROOT / "docs/assets/portal.html"

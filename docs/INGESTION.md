@@ -1,5 +1,7 @@
 # MP-10 — fixture ingestion and replay
 
+**MP-11 update · 06/10/2026:** an explicit optional [Vnstock/KBS local adapter](VNSTOCK_ADAPTER.md) now produces separate observed v2 candles in memory for FPT/VNINDEX. This delivery/storage boundary remains fixture-v1 only. Before the next observed ingestion slice, define dataset isolation and revision/refetch handling: `canonical_assets` hashes asset plus dataset under the same assetId, while observation digests include dataset/`ingestedAt`; fixture/observed coexistence or refetch can therefore cause immutable conflicts. Do not deliver v2 here or overwrite existing data. Stored public reads and serial Stitch web integration follow reviewed observed ingestion; MP-12 cache/retry stays later.
+
 This FR-18 slice persists the contract-v1 synthetic fixture through Python collector → authenticated internal API → BullMQ → separate Node worker → ordinary MongoDB collections. Original FR-18 remains partial; live sources remain **NOT VERIFIED**. Final independent GPT-6 Astra review approved branch push on 05/10/2026. Update on **06/10/2026:** user-managed PR #19 is merged in `main` at `b996e3e3e70ffbacf13fb8d319a182303d05dfc9`, both main CI runs passed, and the scoped fixture GATE-3 passed; see [the gate record](GATE_3_REVIEW.md). Public search/history and the web continue to read the packaged fixture; persisted ingestion does not migrate those reads.
 
 ## Delivery boundary
