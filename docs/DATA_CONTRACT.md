@@ -2,7 +2,7 @@
 
 ## Observed candle subset v2 · 06/10/2026
 
-Adapter opt-in Vnstock/KBS đã có [schema candle riêng v2](../packages/schemas/observed-candles-v2.schema.json) và validator Python offline cho FPT/VNINDEX. Giá là decimal string VND/điểm chỉ số; equity adjustment `unknown`, `sourceAsOf: null`, `collectedAt` UTC thực tế và nguyên nhãn thời gian naive của provider cùng provenance. Freshness `unknown`, lịch phiên `unverified`, volume null. `barId`/`contentDigest` ổn định qua refetch, tách thời điểm lấy dữ liệu. Schema/validator fixture v1 bên dưới giữ nguyên, không được nới hay đổi nhãn để nhận v2. API ingestion/public read hiện tại không nhận contract này. Xem [ngữ nghĩa, kiểm tra, probe và giới hạn](VNSTOCK_ADAPTER.md).
+Adapter opt-in Vnstock/KBS đã có [schema candle riêng v2](../packages/schemas/observed-candles-v2.schema.json) và validator Python offline cho FPT/VNINDEX. Giá là decimal string VND/điểm chỉ số; equity adjustment `unknown`, `sourceAsOf: null`, `collectedAt` UTC thực tế và nguyên nhãn thời gian naive của provider cùng provenance. Freshness `unknown`, lịch phiên `unverified`, volume null. `barId`/`contentDigest` ổn định qua refetch, tách thời điểm lấy dữ liệu. Schema/validator fixture v1 bên dưới giữ nguyên, không được nới hay đổi nhãn để nhận v2. Từ 07/10/2026 internal ingestion nhận v2 với validation riêng và collection observed cách ly; public read vẫn dùng fixture. collectedAt có tối đa sáu chữ số phần lẻ, chuẩn hóa UTC chính xác để chọn latest; content decimal string phải canonical. Revision không chứa collectedAt, raw delivery giữ normalized payload đầy đủ. Xem [ngữ nghĩa, kiểm tra, probe và giới hạn](VNSTOCK_ADAPTER.md).
 
 ## MP-10 persisted fixture boundary
 

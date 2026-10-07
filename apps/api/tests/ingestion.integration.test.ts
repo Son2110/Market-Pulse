@@ -8,14 +8,14 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import { MongoClient } from "mongodb";
 import { createIngestionApi } from "../src/ingestion-api.js";
-import { digest, strictJson, validatePayload, type Json } from "../src/ingestion-contract.js";
+import { digest, strictJson, validatePayload, type Json, type FixturePayload } from "../src/ingestion-contract.js";
 import { createApp } from "../src/health.js";
 import { createIngestionQueue, DeliveryQueue, jobId } from "../src/ingestion-queue.js";
 import { IngestionStore } from "../src/ingestion-store.js";
 import { startIngestionWorker } from "../src/ingestion-worker.js";
 
 const execute = promisify(execFile);
-const fixture = () => validatePayload(strictJson(readFileSync("fixtures/market/mp-02-synthetic.json", "utf8")));
+const fixture = () => validatePayload(strictJson(readFileSync("fixtures/market/mp-02-synthetic.json", "utf8"))) as FixturePayload;
 const mongoUrl = process.env.MONGODB_URL ?? "mongodb://127.0.0.1:27017/marketpulse";
 const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
 const pause = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));

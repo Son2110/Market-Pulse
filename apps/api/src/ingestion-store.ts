@@ -1,5 +1,6 @@
 import { MongoServerError, type Collection, type Db, type Document } from "mongodb";
 import { digest, type Json, type Payload } from "./ingestion-contract.js";
+import { ObservedStore, observedCollectionSchemas } from "./observed-store.js";
 
 export const ACTIVE_STATUSES: DeliveryStatus[] = ["accepted", "queued", "running"];
 export const MAX_ATTEMPTS = 3;
@@ -19,10 +20,12 @@ export class IngestionStore {
   readonly deliveries: Collection<Delivery>;
   readonly assets: Collection<Canonical>;
   readonly observations: Collection<Canonical>;
+  readonly observed: ObservedStore;
   constructor(readonly db: Db) {
     this.deliveries = db.collection<Delivery>("ingestion_deliveries");
     this.assets = db.collection<Canonical>("canonical_assets");
     this.observations = db.collection<Canonical>("canonical_observations");
+    this.observed = new ObservedStore(db);
   }
   async initialize(): Promise<void> {
     const definitions = [
@@ -34,6 +37,7 @@ export class IngestionStore {
           serverReceivedAt: { bsonType: "date" }, updatedAt: { bsonType: "date" }, counts: { bsonType: "object" }, errorCode: { bsonType: "string", maxLength: 64 } },
       }],
       ...["canonical_assets", "canonical_observations"].map(name => [name, { bsonType: "object", required: ["_id", "rowDigest", "record", "dataset", "firstDeliveryId"], properties: { _id: { bsonType: "string" }, rowDigest: { bsonType: "string", pattern: "^[a-f0-9]{64}$" }, record: { bsonType: "object" }, dataset: { bsonType: "object" }, firstDeliveryId: { bsonType: "string" } } }]),
+      ...observedCollectionSchemas,
     ] as const;
     for (const [name, schema] of definitions) {
       const validator = { $jsonSchema: schema };
@@ -41,10 +45,11 @@ export class IngestionStore {
       catch (error) { if (!(error instanceof MongoServerError) || error.code !== 48) throw error; await this.db.command({ collMod: name, validator, validationAction: "error", validationLevel: "strict" }); }
     }
     await this.deliveries.createIndex({ status: 1, updatedAt: 1 }, { name: "outbox_nonterminal" });
+    await this.observed.initialize();
   }
   async accept(id: string, payloadDigest: string, payload: Payload): Promise<Delivery> {
     const now = new Date();
-    const delivery: Delivery = { _id: id, payloadDigest, payload, provider: "marketpulse-fixture", schemaVersion: payload.schemaVersion,
+    const delivery: Delivery = { _id: id, payloadDigest, payload, provider: payload.schemaVersion === "2.0.0" ? "KBS" : "marketpulse-fixture", schemaVersion: payload.schemaVersion,
       dataset: payload.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 } };
     try { await this.deliveries.insertOne(delivery, { writeConcern: { w: 1, j: true } }); return delivery; }
     catch (error) {
@@ -57,7 +62,7 @@ export class IngestionStore {
   async terminal(id: string, status: "success" | "failure", counts: Counts, errorCode?: string, attempt?: number): Promise<void> {
     await this.deliveries.updateOne({ _id: id, status: { $in: ACTIVE_STATUSES }, ...(attempt === undefined ? {} : { attempts: attempt }) }, { $set: { status, counts, finishedAt: new Date(), updatedAt: new Date(), ...(errorCode ? { errorCode } : {}) }, ...(errorCode ? {} : { $unset: { errorCode: "" } }) });
   }
-  async persist(delivery: Delivery, afterWrite?: (count: number) => Promise<void>): Promise<Counts> {
+  async persist(delivery: Delivery, afterWrite?: (count: number) => Promise<void>, afterRevision?: () => Promise<void>): Promise<Counts> {
     const counts = { assets: 0, observations: 0 };
     const insert = async (collection: Collection<Canonical>, id: string, record: Json, natural: Document) => {
       const rowDigest = digest({ record, dataset: delivery.dataset });
@@ -69,6 +74,10 @@ export class IngestionStore {
       }
     };
     const progress = async () => { await this.deliveries.updateOne({ _id: delivery._id, status: "running", attempts: delivery.attempts }, { $set: { counts, updatedAt: new Date() } }); await afterWrite?.(counts.assets + counts.observations); };
+    if (delivery.payload.schemaVersion === "2.0.0") {
+      await this.observed.persist(delivery, delivery.payload, async kind => { counts[kind]++; await progress(); }, afterRevision);
+      return counts;
+    }
     for (const asset of delivery.payload.assets) { await insert(this.assets, asset.assetId, asset, { assetId: asset.assetId }); counts.assets++; await progress(); }
     for (const [kind, rows] of [["candle", delivery.payload.candles], ["quote", delivery.payload.quotes], ["index", delivery.payload.indexObservations]] as const) for (const row of rows) {
       const identity: Json[] = kind === "candle" ? [kind, row.assetId, row.source.provider, "1d", row.tradingDate, row.adjustmentBasis] : [kind, row.assetId, row.source.provider, row.tradingDate];

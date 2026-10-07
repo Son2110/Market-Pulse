@@ -32,7 +32,7 @@ export class DeliveryQueue {
       else if (state !== "unknown") return;
     }
     if (delivery.attempts >= MAX_ATTEMPTS) { await this.store.terminal(id, "failure", delivery.counts, "attempts_exhausted"); return; }
-    await this.queue.add("persist-fixture", { deliveryId: id, payloadDigest }, { jobId: jobId(id), attempts: MAX_ATTEMPTS - delivery.attempts });
+    await this.queue.add(delivery.schemaVersion === "2.0.0" ? "persist-observed" : "persist-fixture", { deliveryId: id, payloadDigest }, { jobId: jobId(id), attempts: MAX_ATTEMPTS - delivery.attempts });
     const updated = await this.store.deliveries.updateOne({ _id: id, status: "accepted" }, { $set: { status: "queued", updatedAt: new Date() } });
     if (updated.modifiedCount) console.info(JSON.stringify({ event: "ingestion_queued", deliveryId: id, provider: delivery.provider, status: "queued", attempt: delivery.attempts }));
   }
@@ -41,4 +41,4 @@ export class DeliveryQueue {
     for await (const delivery of cursor) await this.enqueue(delivery._id, delivery.payloadDigest);
   }
 }
-export function safeJob(job: Job<DeliveryJob> | undefined) { return { deliveryId: job?.data.deliveryId, provider: "marketpulse-fixture" }; }
+export function safeJob(job: Job<DeliveryJob> | undefined, provider?: string) { return { deliveryId: job?.data.deliveryId, ...(provider ? { provider } : {}) }; }

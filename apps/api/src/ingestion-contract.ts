@@ -6,7 +6,12 @@ import { Decimal } from "decimal.js";
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export interface Asset { [key: string]: Json; assetId: string; symbol: string; assetType: string; exchange: string; currency: Json; unit: string; timezone: string }
 export interface Observation { [key: string]: Json; assetId: string; tradingDate: string; adjustmentBasis: string; asOf: string; ingestedAt: string; source: { provider: string; mode: string; recordId: string } }
-export interface Payload { schemaVersion: string; dataset: { mode: string; label: string; freshness: string; sessionCalendar: string }; assets: Asset[]; candles: Observation[]; quotes: Observation[]; indexObservations: Observation[] }
+export interface Dataset { [key: string]: Json; mode: string; label: string; freshness: string; sessionCalendar: string }
+export interface FixturePayload { schemaVersion: "1.0.0"; dataset: Dataset; assets: Asset[]; candles: Observation[]; quotes: Observation[]; indexObservations: Observation[] }
+export interface ObservedAsset { [key: string]: Json; assetId: string; symbol: string; assetType: string; currency: Json; unit: string; timezone: string }
+export interface ObservedCandle { [key: string]: Json; assetId: string; tradingDate: string; interval: string; adjustmentBasis: string; collectedAt: string; barId: string; contentDigest: string; source: { provider: string; connector: string; connectorVersion: string; dependencyVersion: string; mode: string } }
+export interface ObservedPayload { schemaVersion: "2.0.0"; dataset: Dataset; request: { symbol: string; start: string; end: string; interval: string }; assets: ObservedAsset[]; candles: ObservedCandle[] }
+export type Payload = FixturePayload | ObservedPayload;
 export class ContractError extends Error { constructor() { super("invalid_contract"); } }
 function fail(): never { throw new ContractError(); }
 
@@ -79,6 +84,7 @@ function validTime(value: string): boolean {
 const ajv = new Ajv2020({ strict: true, allErrors: false });
 ajv.addFormat("date", validDate); ajv.addFormat("date-time", validTime);
 const validateSchema = ajv.compile(JSON.parse(readFileSync(new URL("../../../packages/schemas/market-data-v1.schema.json", import.meta.url), "utf8")));
+const validateObservedSchema = ajv.compile(JSON.parse(readFileSync(new URL("../../../packages/schemas/observed-candles-v2.schema.json", import.meta.url), "utf8")));
 const seriesKey = (row: Observation) => JSON.stringify([row.assetId, row.source.provider, "1d", row.adjustmentBasis]);
 const decimal = (value: Json | undefined): Decimal => typeof value === "number" ? new Decimal(value) : fail();
 function micros(value: string): bigint {
@@ -88,8 +94,9 @@ function micros(value: string): bigint {
 }
 
 export function validatePayload(input: Json): Payload {
+  if (input !== null && !Array.isArray(input) && typeof input === "object" && input.schemaVersion === "2.0.0") return validateObservedPayload(input);
   if (!validateSchema(input)) fail();
-  const payload = input as unknown as Payload;
+  const payload = input as unknown as FixturePayload;
   const { dataset, assets, candles, quotes, indexObservations } = payload;
   if (dataset.mode !== "fixture" || dataset.label !== "SYNTHETIC FIXTURE — NOT MARKET DATA" || dataset.freshness !== "fixture / unknown" || dataset.sessionCalendar !== "unverified") fail();
   if (assets.length > 32 || candles.length > 1000 || quotes.length > 1000 || indexObservations.length > 1000) fail();
@@ -135,6 +142,42 @@ export function validatePayload(input: Json): Payload {
       if (row.previousTradingDate !== prior.tradingDate || !decimal(row.previousClose).eq(previous) || !decimal(row.change).eq(change)
         || !decimal(row.changePercent).eq(change.div(previous).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP))) fail();
     }
+  }
+  return payload;
+}
+
+// Whole seconds are calendar-normalized; fractions retain exact microsecond precision.
+export function collectedOrder(value: string): string {
+  const parts = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!parts || !validTime(value)) return fail();
+  const utc = new Date(`${parts[1]}${parts[3]}`).toISOString();
+  if (!/^\d{4}-/.test(utc) || utc.startsWith("0000-")) return fail();
+  return `${utc.slice(0, 19)}.${(parts[2] ?? "").padEnd(6, "0")}Z`;
+}
+export function observedContent(row: ObservedCandle): { [key: string]: Json } {
+  return Object.fromEntries(Object.entries(row).filter(([key]) => !["collectedAt", "barId", "contentDigest"].includes(key)));
+}
+export function validateObservedPayload(input: Json): ObservedPayload {
+  if (!validateObservedSchema(input)) fail();
+  const payload = input as unknown as ObservedPayload;
+  const { request, candles } = payload;
+  const days = (Date.parse(request.end) - Date.parse(request.start)) / 86400_000;
+  if (days < 0 || days > 31) fail();
+  const equity = request.symbol === "FPT";
+  const expected = { assetId: `VN:${equity ? "HOSE" : "INDEX"}:${request.symbol}`, symbol: request.symbol, assetType: equity ? "equity" : "index", currency: equity ? "VND" : null, unit: equity ? "VND" : "index_point", timezone: "Asia/Ho_Chi_Minh" };
+  if (canonicalJson(payload.assets[0]!) !== canonicalJson(expected)) fail();
+  let previous = "";
+  for (const row of candles) {
+    collectedOrder(row.collectedAt);
+    if (row.tradingDate < request.start || row.tradingDate > request.end || row.tradingDate <= previous) fail();
+    previous = row.tradingDate;
+    const label = row.providerTimeLabel as string;
+    if (!validTime(`${label.replace(" ", "T")}${label.length === 16 ? ":00" : ""}Z`) || label.slice(0, 10) !== row.tradingDate) fail();
+    if (["assetId", "currency", "unit", "timezone"].some(key => row[key] !== expected[key as keyof typeof expected]) || row.adjustmentBasis !== (equity ? "unknown" : "not_applicable")) fail();
+    const values = ["open", "high", "low", "close"].map(key => new Decimal(row[key] as string));
+    const [open, high, low, close] = values as [Decimal, Decimal, Decimal, Decimal];
+    if (values.some(value => value.lte(0)) || low.gt(open) || low.gt(close) || high.lt(open) || high.lt(close)) fail();
+    if (row.barId !== digest(["KBS", row.assetId, row.interval, row.tradingDate, row.adjustmentBasis]) || row.contentDigest !== digest(observedContent(row))) fail();
   }
   return payload;
 }
