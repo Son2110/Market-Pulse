@@ -13,8 +13,8 @@
   "scripts": {
     "lint": "eslint apps/api/src apps/api/tests apps/web/src apps/web/tests apps/web/vite.config.ts --max-warnings=0",
     "typecheck": "npm run typecheck --workspace=@marketpulse/api && npm run typecheck --workspace=@marketpulse/web",
-    "test:unit": "node --import tsx --test apps/api/tests/ingestion.test.ts apps/api/tests/health.test.ts apps/api/tests/config.test.ts apps/api/tests/auth.test.ts apps/api/tests/market-data.test.ts apps/api/tests/daily-history.test.ts apps/api/tests/stock-search.test.ts apps/api/tests/watchlists.test.ts apps/web/tests/stock-search.test.ts apps/web/tests/stock-detail.test.ts apps/web/tests/market-overview.test.ts apps/web/tests/auth.test.ts apps/web/tests/watchlists.test.ts",
-    "test:integration": "node --import tsx --test apps/api/tests/health.integration.test.ts apps/api/tests/auth.integration.test.ts apps/api/tests/watchlists.integration.test.ts apps/api/tests/ingestion.integration.test.ts",
+    "test:unit": "node --import tsx --test apps/api/tests/observed-ingestion.test.ts apps/api/tests/ingestion.test.ts apps/api/tests/health.test.ts apps/api/tests/config.test.ts apps/api/tests/auth.test.ts apps/api/tests/market-data.test.ts apps/api/tests/daily-history.test.ts apps/api/tests/stock-search.test.ts apps/api/tests/watchlists.test.ts apps/web/tests/stock-search.test.ts apps/web/tests/stock-detail.test.ts apps/web/tests/market-overview.test.ts apps/web/tests/auth.test.ts apps/web/tests/watchlists.test.ts",
+    "test:integration": "node --import tsx --test apps/api/tests/health.integration.test.ts apps/api/tests/auth.integration.test.ts apps/api/tests/watchlists.integration.test.ts apps/api/tests/ingestion.integration.test.ts apps/api/tests/observed-ingestion.integration.test.ts",
     "build": "npm run build --workspace=@marketpulse/api && npm run build --workspace=@marketpulse/web",
     "dev:api": "npm run dev --workspace=@marketpulse/api",
     "dev:web": "npm run dev --workspace=@marketpulse/web"

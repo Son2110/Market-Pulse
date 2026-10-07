@@ -1,0 +1,1819 @@
+{
+  "baseline": {
+    "schemaVersion": "2.0.0",
+    "dataset": {
+      "mode": "observed",
+      "label": "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN",
+      "freshness": "unknown",
+      "sessionCalendar": "unverified"
+    },
+    "request": {
+      "symbol": "FPT",
+      "start": "2026-10-01",
+      "end": "2026-10-06",
+      "interval": "1d"
+    },
+    "assets": [
+      {
+        "assetId": "VN:HOSE:FPT",
+        "symbol": "FPT",
+        "assetType": "equity",
+        "currency": "VND",
+        "unit": "VND",
+        "timezone": "Asia/Ho_Chi_Minh"
+      }
+    ],
+    "candles": [
+      {
+        "assetId": "VN:HOSE:FPT",
+        "tradingDate": "2026-10-02",
+        "interval": "1d",
+        "currency": "VND",
+        "unit": "VND",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "adjustmentBasis": "unknown",
+        "open": "1200",
+        "high": "1500",
+        "low": "1000",
+        "close": "1300",
+        "volume": null,
+        "volumeUnit": "not_available",
+        "providerTimeLabel": "2026-10-02 07:00",
+        "timeProvenance": "provider_naive_calendar_label",
+        "sourceAsOf": null,
+        "collectedAt": "2026-10-06T07:00:00.123456Z",
+        "source": {
+          "provider": "KBS",
+          "connector": "vnstock",
+          "connectorVersion": "4.0.8",
+          "dependencyVersion": "2.6.2",
+          "mode": "observed"
+        },
+        "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+        "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+      }
+    ]
+  },
+  "index": {
+    "schemaVersion": "2.0.0",
+    "dataset": {
+      "mode": "observed",
+      "label": "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN",
+      "freshness": "unknown",
+      "sessionCalendar": "unverified"
+    },
+    "request": {
+      "symbol": "VNINDEX",
+      "start": "2026-10-01",
+      "end": "2026-10-06",
+      "interval": "1d"
+    },
+    "assets": [
+      {
+        "assetId": "VN:INDEX:VNINDEX",
+        "symbol": "VNINDEX",
+        "assetType": "index",
+        "currency": null,
+        "unit": "index_point",
+        "timezone": "Asia/Ho_Chi_Minh"
+      }
+    ],
+    "candles": [
+      {
+        "assetId": "VN:INDEX:VNINDEX",
+        "tradingDate": "2026-10-02",
+        "interval": "1d",
+        "currency": null,
+        "unit": "index_point",
+        "timezone": "Asia/Ho_Chi_Minh",
+        "adjustmentBasis": "not_applicable",
+        "open": "1200",
+        "high": "1500",
+        "low": "1000",
+        "close": "1300",
+        "volume": null,
+        "volumeUnit": "not_available",
+        "providerTimeLabel": "2026-10-02 07:00",
+        "timeProvenance": "provider_naive_calendar_label",
+        "sourceAsOf": null,
+        "collectedAt": "2026-10-06T14:00:00.123456+07:00",
+        "source": {
+          "provider": "KBS",
+          "connector": "vnstock",
+          "connectorVersion": "4.0.8",
+          "dependencyVersion": "2.6.2",
+          "mode": "observed"
+        },
+        "barId": "c7c1fd8f00536eb46e21acdbdfe66e85f17b96814865a8af03e35e6c9e82f11f",
+        "contentDigest": "05150423cc2c3d2b5453822c708ae369246bc1e0a079949aafdb39870768cd9e"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "timestamp 2026-10-06T14:00:00.123456+07:00",
+      "valid": true,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T14:00:00.123456+07:00"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "timestamp 2026-10-06T07:00:00Z",
+      "valid": true,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T07:00:00Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "timestamp 0001-01-01T00:00:00Z",
+      "valid": true,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "0001-01-01T00:00:00Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "timestamp 9999-12-31T23:59:59.999999Z",
+      "valid": true,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "9999-12-31T23:59:59.999999Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-10-06T07:00:00.1234567Z",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T07:00:00.1234567Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 0001-01-01T00:00:00+00:01",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "0001-01-01T00:00:00+00:01"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 9999-12-31T23:59:59-00:01",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "9999-12-31T23:59:59-00:01"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 0000-01-01T00:00:00Z",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "0000-01-01T00:00:00Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-02-30T07:00:00Z",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-02-30T07:00:00Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-10-06T07:00:00-00:00",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T07:00:00-00:00"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-10-06T07:00:00+24:00",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T07:00:00+24:00"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-10-06T07:00:00+07:60",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T07:00:00+07:60"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-10-06T24:00:00Z",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T24:00:00Z"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid timestamp 2026-10-06T07:00:00",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "collectedAt"
+          ],
+          "2026-10-06T07:00:00"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid decimal 1300.0",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "1300.0"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal 01300",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "01300"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal 1e3",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "1e3"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal +1300",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "+1300"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal 0",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "0"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal -1",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "-1"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal 11111111111111111111",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row unitindex_point",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "unit"
+          ],
+          "index_point"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row currencyNone",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "currency"
+          ],
+          null
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row adjustmentBasisnot_applicable",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "adjustmentBasis"
+          ],
+          "not_applicable"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row sourceAsOf2026-10-02T00:00:00Z",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "sourceAsOf"
+          ],
+          "2026-10-02T00:00:00Z"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row volume1",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "volume"
+          ],
+          1
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row timeProvenancesource_timestamp",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "timeProvenance"
+          ],
+          "source_timestamp"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row providerTimeLabel2026-10-01 07:00",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "providerTimeLabel"
+          ],
+          "2026-10-01 07:00"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row providerTimeLabel2026-10-02 25:00",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "providerTimeLabel"
+          ],
+          "2026-10-02 25:00"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "row barId0000000000000000000000000000000000000000000000000000000000000000",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "barId"
+          ],
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "row contentDigest0000000000000000000000000000000000000000000000000000000000000000",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "contentDigest"
+          ],
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "row extrax",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "extra"
+          ],
+          "x"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['schemaVersion']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "schemaVersion"
+          ],
+          "1.0.0"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['schemaVersion']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "schemaVersion"
+          ],
+          "3.0.0"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['dataset', 'mode']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "dataset",
+            "mode"
+          ],
+          "fixture"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['assets', 0, 'symbol']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "assets",
+            0,
+            "symbol"
+          ],
+          "VNINDEX"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['assets', 0, 'extra']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "assets",
+            0,
+            "extra"
+          ],
+          "x"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['request', 'end']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "request",
+            "end"
+          ],
+          "2026-11-06"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['request', 'start']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "request",
+            "start"
+          ],
+          "2026-10-07"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['request', 'symbol']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "request",
+            "symbol"
+          ],
+          "VCB"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['request', 'start']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "request",
+            "start"
+          ],
+          "2026-02-30"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['candles', 0, 'source', 'provider']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "source",
+            "provider"
+          ],
+          "other"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['candles', 0, 'source', 'connectorVersion']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "source",
+            "connectorVersion"
+          ],
+          "5.0.0"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid ['candles', 0, 'source', 'extra']",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "source",
+            "extra"
+          ],
+          "x"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "empty candles",
+      "valid": true,
+      "sets": [
+        [
+          [
+            "candles"
+          ],
+          []
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "duplicate candles",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles"
+          ],
+          [
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            }
+          ]
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "too many candles",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles"
+          ],
+          [
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            },
+            {
+              "assetId": "VN:HOSE:FPT",
+              "tradingDate": "2026-10-02",
+              "interval": "1d",
+              "currency": "VND",
+              "unit": "VND",
+              "timezone": "Asia/Ho_Chi_Minh",
+              "adjustmentBasis": "unknown",
+              "open": "1200",
+              "high": "1500",
+              "low": "1000",
+              "close": "1300",
+              "volume": null,
+              "volumeUnit": "not_available",
+              "providerTimeLabel": "2026-10-02 07:00",
+              "timeProvenance": "provider_naive_calendar_label",
+              "sourceAsOf": null,
+              "collectedAt": "2026-10-06T07:00:00.123456Z",
+              "source": {
+                "provider": "KBS",
+                "connector": "vnstock",
+                "connectorVersion": "4.0.8",
+                "dependencyVersion": "2.6.2",
+                "mode": "observed"
+              },
+              "barId": "189b7622dcafdc867151900bd4e19a41ce3d1f090c986463adcb47a682910692",
+              "contentDigest": "17361feb16341f930b161f4110d93adfcc0c2bcf0fe008e82116e9bc65ba3f03"
+            }
+          ]
+        ]
+      ],
+      "rehash": false
+    },
+    {
+      "name": "invalid decimal trailing LF",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "1300\n"
+        ]
+      ],
+      "rehash": true
+    },
+    {
+      "name": "invalid decimal trailing CRLF",
+      "valid": false,
+      "sets": [
+        [
+          [
+            "candles",
+            0,
+            "close"
+          ],
+          "1300\r\n"
+        ]
+      ],
+      "rehash": true
+    }
+  ]
+}

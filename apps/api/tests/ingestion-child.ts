@@ -9,7 +9,9 @@ await client.connect();
 const pause = async (stage: string) => { process.send?.({ stage }); await new Promise<void>(() => undefined); };
 const runtime = await startIngestionWorker(new IngestionStore(client.db(database)), redisUrl, {
   name, reconcileMs: 250, lockDuration: 1000, stalledInterval: 1000,
-  hooks: boundary === "success" ? { beforeComplete: async () => pause("success") } : { afterWrite: async count => { if (count === 12) await pause("write"); } },
+  hooks: boundary === "success" ? { beforeComplete: async () => pause("success") }
+    : boundary === "revision" ? { afterRevision: async () => pause("revision") }
+    : { afterWrite: async count => { if (count === (boundary === "observed-write" ? 2 : 12)) await pause("write"); } },
 });
 process.send?.({ stage: "ready" });
 process.on("SIGTERM", () => { void runtime.close().then(() => client.close()).then(() => process.exit(0)); });

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime
+import re
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -34,6 +35,10 @@ def validate_observed_candles(document: object) -> list[str]:
         result.append("asset does not match request")
     previous = None
     for row in document["candles"]:
+        try:
+            datetime.fromisoformat(row["collectedAt"].replace("Z", "+00:00")).astimezone(timezone.utc)
+        except (ValueError, OverflowError):
+            result.append("collected timestamp outside supported UTC calendar")
         day = date.fromisoformat(row["tradingDate"])
         if not first <= day <= last or (previous is not None and day <= previous):
             result.append("duplicate, unordered or out-of-range date")
@@ -48,6 +53,9 @@ def validate_observed_candles(document: object) -> list[str]:
             result.append("candle asset/unit mismatch")
         if row["adjustmentBasis"] != ("unknown" if equity else "not_applicable"):
             result.append("unsupported adjustment basis")
+        if any(not re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?", row[key]) for key in ("open", "high", "low", "close")):
+            result.append("noncanonical OHLC decimal")
+            continue
         values = {key: Decimal(row[key]) for key in ("open", "high", "low", "close")}
         if any(value <= 0 for value in values.values()) or not values["low"] <= min(values["open"], values["close"]) <= max(values["open"], values["close"]) <= values["high"]:
             result.append("invalid OHLC")
