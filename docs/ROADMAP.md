@@ -9,6 +9,8 @@
 
 ## Nhịp thực hiện
 
+**MP-11 / FR-04 stored reads · 08/10/2026:** đã có API local opt-in riêng cho FPT/VNINDEX từ `observed_assets`/`observed_candles_latest`, mặc định tắt bằng `OBSERVED_READS_ENABLED=false`. Query yêu cầu hai mốc ngày inclusive, chênh lệch tối đa 31 ngày; giữ decimal string/null/provenance, không gọi provider hay cần ingestion secret. Per-bar latest chỉ là collection tuple, có thể trộn delivery hoặc row partial/failure; completeness/source as-of/freshness vẫn unknown, calendar chưa xác minh. Existing fixture routes/web giữ nguyên. Hợp đồng và giới hạn ở [LOCAL_DEVELOPMENT](LOCAL_DEVELOPMENT.md#optional-stored-observed-history-api); review độc lập/push/CI là bằng chứng riêng. Kế tiếp là UI từng trang qua Stitch sau khi task này hoàn tất kiểm tra/review; MP-11 chưa hoàn tất, MP-12 chưa bắt đầu, quyền upstream public redisplay/deployment chưa xác minh.
+
 Chỉ triển khai một task tại một thời điểm với một worker. Hoàn tất code, kiểm tra và review độc lập cho task hiện tại trước khi bắt đầu task kế tiếp. Không chạy song song các dòng trong bảng.
 
 Với mỗi task frontend, thiết kế một trang trong Stitch trước khi triển khai; giữ nhất quán với design system dùng chung và ghi project/screen Stitch đã chọn trong bàn giao. Kiểm tra responsive cùng trạng thái loading, empty, error; hoàn tất triển khai, kiểm tra và review trang đó trước khi làm trang kế tiếp. Nếu Stitch không khả dụng, ghi rõ blocker và không giả định đã dùng công cụ thay thế.
