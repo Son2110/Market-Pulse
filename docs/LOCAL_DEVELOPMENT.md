@@ -115,6 +115,23 @@ The optional query parameters are `interval=1d` (the default), `from=YYYY-MM-DD`
 
 The canonical `data` envelope preserves the fixture dataset label, `fixture / unknown` freshness, `unverified` session calendar, original source fields, units, null index volume and candle timestamps. `meta.availableRange` covers the entire fixture series; `meta.asOf` is the timestamp of the latest candle actually returned. If the fixture cannot be loaded or its required shape is invalid, readiness remains 503 and the route returns a sanitized 503 response.
 
+## Optional stored observed history API
+
+Set `OBSERVED_READS_ENABLED=true` explicitly for authorized local use. The default is `false`; only literal `true` or `false` is accepted, and any other value fails startup. Compose passes this flag only to the API. Host Node processes require it in their environment; `.env` is not loaded automatically. Changing the Compose flag requires recreating the API, for example `docker compose up -d --build --force-recreate api`. This read-only route needs MongoDB and the API's normal dependencies, but does not require `INGESTION_SECRET`, start a collector, initialize ingestion collections or call KBS. Disabling submission does not disable already stored reads. With the flag absent/false the route is unregistered and returns 404.
+
+```powershell
+Invoke-RestMethod "http://127.0.0.1:3001/api/observed/assets/FPT/history?from=2026-09-28&to=2026-10-07"
+Invoke-RestMethod "http://127.0.0.1:3001/api/observed/assets/VNINDEX/history?from=2026-09-28&to=2026-10-07&interval=1d"
+```
+
+Both inclusive bounds are required valid `YYYY-MM-DD` calendar dates, spanning at most 31 days difference (32 calendar dates). Only optional `interval=1d` is accepted. There is no default window or pagination. Duplicate, nested, unknown, empty, reversed, invalid or overlong-range queries return 400 `invalid_query`. Symbols are case-normalized; malformed symbols return 400 `invalid_symbol`, unsupported symbols and absent stored assets return 404 `asset_not_found`. A stored asset without selected rows returns 200 `no_data`, empty candles and null returned range. A database failure or invalid selected stored data returns sanitized 503 `observed_history_unavailable`. Route responses, including these errors, use `Cache-Control: no-store`.
+
+The response is a read contract: `data` contains stored `dataset`, one `asset` and `candles`. It has no ingestion `request`, ingestion schema-version declaration, quote or index-summary arrays. `meta` contains `status`, `provider: KBS`, `interval: 1d`, `requestedRange`, `returnedRange` (first/last actually returned date, or null), `sourceAsOf: null`, `completeness: unknown` and `selectionSemantics: per_bar_max_collected_at_utc_microseconds_then_content_digest`. Each candle retains decimal-string OHLC, null volume/source as-of, currency/unit, timezone, adjustment basis, provider calendar label/time provenance, original collectedAt, full source versions, barId and contentDigest. Internal database IDs, delivery IDs and normalized collectedOrder are excluded. No numeric price conversion, quote/change synthesis, gap fill or latest market timestamp is performed.
+
+Reads query only `observed_assets` and `observed_candles_latest`, by asset plus exact KBS/daily/adjustment identity and date range, using the existing asset/date index shape. Each database operation has a 1,000 ms server execution bound by default (`DEPENDENCY_TIMEOUT_MS` in the actual API); the candle cursor fetches at most 33 rows and rejects results beyond 32. Stored shapes, labels, hashes, OHLC relationships, time consistency, date bounds, order and uniqueness are checked before a response is exposed.
+
+Selection is the latest collection tuple **per bar**, not verified provider chronology, correction precedence or freshness. Bars can come from different deliveries; successful reads can include rows retained after a partial or failed delivery. The route does not read receipts or verify a coherent batch snapshot, full-series coverage or exchange sessions. Missing days remain absent even between returned bounds, and `completeness` stays unknown. Equity adjustment, source as-of, calendar/freshness and upstream redisplay/deployment rights remain unresolved. This opt-in local API does not migrate the existing fixture history/search/watchlist routes or web pages; UI integration still requires serial Stitch page work. MP-11 remains partial and MP-12 has not begun.
+
 ## Stock search API
 
 `GET /api/assets/search?q=...` searches symbol, company name and curated aliases for exactly the ten equity assets in the bundled fixture. For example:

@@ -1,5 +1,7 @@
 # Optional Vnstock/KBS adapter — FR-18
 
+**08/10/2026 stored reads:** opt-in `OBSERVED_READS_ENABLED=true` now registers a separate local FPT/VNINDEX history endpoint backed by stored observed assets/latest candles, with required bounded dates. It preserves all OHLC decimal strings, nulls, labels, hashes, collectedAt and source versions; it does not call the adapter or need the ingestion secret. Per-bar collection selection can mix deliveries and retain partial/failed-batch rows, so source as-of/freshness and completeness stay unknown. Existing fixture routes/web remain unchanged. See [read contract and local instructions](LOCAL_DEVELOPMENT.md#optional-stored-observed-history-api). UI work is next, one Stitch-designed page at a time after review; MP-11 is partial and MP-12 remains later. This update does not verify upstream public redisplay or deployment rights.
+
 **07/10/2026:** explicit observed submission now reaches the internal API/outbox/worker and isolated MongoDB revision/latest storage. Public reads and web still use the fixture. The first-slice record below is historical; this slice does not complete MP-11 or verify upstream freshness or deployment rights.
 
 **06/10/2026:** MP-11 is reopened for the owner's chosen Vnstock main flow before MP-12. This first local integration collects only `FPT` and `VNINDEX` daily candles in memory. The normal fixture collector, ingestion API/worker, persisted collections, public reads and web still use their existing fixture boundary. It does not complete MP-11 or verify a deployable live product.
