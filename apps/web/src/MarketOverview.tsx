@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import ObservedMarketOverview, { OverviewSourceLinks } from "./ObservedMarketOverview.js";
+import { overviewMode } from "./observed-market-overview.js";
 import SiteHeader from "./SiteHeader.js";
 import { fetchIndexHistory, indexClosingSummary, indexErrorMessage, type IndexHistoryResponse } from "./market-overview.js";
 
@@ -54,7 +56,7 @@ function IndexObservations({ response }: { response: IndexHistoryResponse }) {
 
 type OverviewState = { status: "loading" } | { status: "loaded"; response: IndexHistoryResponse } | { status: "error"; message: string };
 
-export default function MarketOverview() {
+function FixtureMarketOverview() {
   const [state, setState] = useState<OverviewState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const requestId = useRef(0);
@@ -78,7 +80,7 @@ export default function MarketOverview() {
   return <>
     <a className="skip-link" href="#main">Đến nội dung tổng quan</a><SiteHeader active="market" />
     <main id="main" className="page overview-page">
-      <div className="overview-heading"><div><h1>Tổng quan thị trường</h1><p className="intro">VN-Index · Dữ liệu ngày minh họa</p></div><p className="small muted">Ký hiệu: <strong>VNINDEX</strong></p></div>
+      <div className="overview-heading"><div><h1>Tổng quan thị trường</h1><p className="intro">VN-Index · Dữ liệu ngày minh họa</p></div><OverviewSourceLinks selected="fixture" /></div>
       <div className="demo-notice overview-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu minh họa — không phải dữ liệu thị trường</strong><p>Fixture tổng hợp dùng cho bản demo. Độ mới chưa xác định; không phải mức chỉ số hiện tại.</p></div></div>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{statusText}</p>
       <div aria-busy={state.status === "loading"}>
@@ -90,4 +92,9 @@ export default function MarketOverview() {
     </main>
     <footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ minh họa và nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>
   </>;
+}
+
+export default function MarketOverview() {
+  const mode = overviewMode(window.location.search);
+  return mode.kind === "fixture" ? <FixtureMarketOverview /> : <ObservedMarketOverview key={window.location.search} mode={mode} />;
 }
