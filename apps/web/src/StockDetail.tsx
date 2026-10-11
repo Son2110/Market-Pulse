@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { fetchSearch, queryError, type SearchResult } from "./stock-search.js";
 import { closingChart, closingSummary, DetailError, detailErrorMessage, fetchHistory, type DailyCandle, type HistoryResponse } from "./stock-detail.js";
 import SiteHeader from "./SiteHeader.js";
+import ObservedStockDetail, { DetailSourceLinks } from "./ObservedStockDetail.js";
+import { detailMode, validatedSearch } from "./observed-detail.js";
 
 const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 const signed = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2, minimumFractionDigits: 2, signDisplay: "exceptZero" });
@@ -79,6 +81,11 @@ function SourcePanel({ response, company }: { response: HistoryResponse; company
 type DetailState = { status: "loading" } | { status: "loaded"; response: HistoryResponse } | { status: "error"; message: string; retry: boolean };
 
 export default function StockDetail({ symbol }: { symbol: string | null }) {
+  const mode = detailMode(window.location.search, symbol);
+  return mode.kind === "fixture" ? <FixtureStockDetail symbol={symbol} /> : <ObservedStockDetail symbol={symbol} mode={mode} />;
+}
+
+function FixtureStockDetail({ symbol }: { symbol: string | null }) {
   const [state, setState] = useState<DetailState>({ status: "loading" });
   const [company, setCompany] = useState<SearchResult | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -116,6 +123,7 @@ export default function StockDetail({ symbol }: { symbol: string | null }) {
     <SiteHeader searchHref={backHref} />
     <main id="main" className="page detail-page">
       <a className="back-link" href={backHref}>← Quay lại tìm kiếm</a>
+      {symbol === "FPT" && <DetailSourceLinks symbol={symbol} selected="fixture" search={validatedSearch(window.location.search)} />}
       <div className="demo-notice detail-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu minh họa — không phải dữ liệu thị trường</strong><p>Fixture tổng hợp dùng cho bản demo. Độ mới chưa xác định; không phải giá hiện tại.</p></div></div>
       <div aria-busy={!!symbol && state.status === "loading"}>
         {!symbol || state.status === "error" ? <section className="state-panel error-panel detail-state" role="alert"><h1>Chưa thể mở chi tiết</h1><p>{!symbol ? detailErrorMessage(new DetailError("invalid")) : state.status === "error" ? state.message : ""}</p>{symbol && state.status === "error" && state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt((value) => value + 1)}>Thử lại</button>}</section>

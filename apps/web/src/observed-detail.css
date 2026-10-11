@@ -1,0 +1,24 @@
+.observed-source-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.observed-source-tabs a { padding: 10px 14px; border: 1px solid var(--border); border-radius: 6px; background: white; font-size: 12px; text-decoration: none; }
+.observed-source-tabs a[aria-current="page"] { background: var(--green); border-color: var(--green); color: white; }
+.observed-detail .detail-card { margin-top: 20px; }
+.observed-detail .observed-heading { padding-bottom: 4px; }
+.observed-detail h2 { font-size: 17px; line-height: 1.5; }
+.observed-range-form { display: flex; gap: 16px; align-items: end; margin: 16px 0 10px; }
+.observed-range-form label { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); }
+.observed-range-form input[type="date"] { display: block; margin-top: 7px; padding: 0 12px; min-width: 0; max-width: 100%; }
+.observed-range-form .primary-button { font-size: 13px; }
+.observed-detail .observed-exact-price { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.observed-detail .price-value { margin: 12px 0; font-size: clamp(24px, 4vw, 36px); }
+.observed-detail .ohlcv-grid dd { font-size: 16px; }
+.observed-chart-container { width: 100%; min-width: 0; }
+.observed-detail .observed-chart { stroke-width: 1; }
+.observed-table { min-width: 1260px; }
+.observed-table td, .observed-table tbody th { white-space: nowrap; overflow-wrap: normal; }
+.observed-table thead th { min-width: 120px; max-width: 230px; white-space: normal; }
+.observed-detail .observed-table .observed-exact-price { white-space: nowrap; overflow-wrap: normal; }
+.observed-table td:nth-last-child(-n+2) { min-width: 215px; font-size: 11px; }
+.observed-detail .reference-note { overflow-wrap: anywhere; }
+.observed-paragraph { margin-top: 12px; }
+@media (max-width: 700px) { .observed-range-form { flex-wrap: wrap; } .observed-range-form label { flex-basis: calc(50% - 8px); } .observed-range-form .primary-button { width: 100%; } }
+@media (max-width: 420px) { .observed-range-form { flex-direction: column; align-items: stretch; } .observed-range-form label { flex-basis: auto; } .observed-source-tabs a { flex: 1; text-align: center; padding: 10px 8px; } }
