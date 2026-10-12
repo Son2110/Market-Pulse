@@ -71,7 +71,7 @@ The brief is the product context; the PRD and roadmap define the smaller demo bo
 - [GDELT DOC API](https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/) is a candidate for later news research; the project does not promise a particular archive or Vietnam coverage.
 - MongoDB’s [time-series limitations](https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/) inform the replay and uniqueness design.
 
-The canonical market-data schema, public fixture-backed history route at `/api/assets/:symbol/history`, and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). The API also offers `/health/live`, `/health/ready` and the local auth routes described in the [local development guide](docs/LOCAL_DEVELOPMENT.md); the web root intentionally renders nothing until its first Stitch-designed page. Run the local checks with:
+The canonical market-data schema, public fixture-backed history route at `/api/assets/:symbol/history`, and synthetic-only fixture are described in the [data contract](docs/DATA_CONTRACT.md). The API also offers `/health/live`, `/health/ready` and the local auth routes described in the [local development guide](docs/LOCAL_DEVELOPMENT.md); the web root is the existing Vietnamese stock-search page. Frontend pages are created or adjusted using the existing app design, one page at a time, under the [Codex workflow](docs/CODEX_WORKFLOW.md). Run the local checks with:
 
 ```sh
 python -m pip install -r requirements-dev.txt

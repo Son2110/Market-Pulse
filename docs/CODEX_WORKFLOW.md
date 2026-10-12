@@ -20,10 +20,10 @@ Quy trình này tách riêng bước lập kế hoạch, triển khai và đánh
 
 ## Quy trình thiết kế frontend theo từng trang
 
-- Khi vào giai đoạn frontend, dùng Stitch để thiết kế từng trang trước khi triển khai trang đó; giữ các trang nhất quán với design system dùng chung.
-- Ghi project Stitch và tham chiếu screen đã chọn trong bàn giao task. Xem trang ở các kích thước responsive và kiểm tra trạng thái loading, empty, error.
+- Từ 12/10/2026, tạo hoặc điều chỉnh từng trang theo thiết kế app hiện có. Trước khi triển khai, xem route liên quan, component dùng chung, styles và các bàn giao trang trước; giữ nhất quán với design system dùng chung. Không tạo thiết kế Stitch mới; các tham chiếu Stitch cũ được giữ làm bằng chứng lịch sử.
+- Ghi tham chiếu UI, component, styles hiện có và thay đổi dự kiến trong bàn giao task. Xem trang ở các kích thước responsive; kiểm tra loading, empty, error, retry, điều hướng bàn phím, focus và nhãn truy cập.
 - Hoàn tất triển khai, kiểm tra và review trang hiện tại trước khi sang trang tiếp theo. Làm tuần tự với một worker, không chạy song song các trang hoặc task. Review của coordinator có thể chốt trang mà không cần yêu cầu user duyệt riêng từng trang.
-- Nếu Stitch không khả dụng, báo blocker cụ thể; không âm thầm thay bằng công cụ thiết kế khác hoặc nói rằng đã tạo thiết kế Stitch.
+- Các skill frontend trong [SKILLS_BY_FR.md](SKILLS_BY_FR.md) chỉ là hỗ trợ tùy chọn; không cần cài skill trước khi làm frontend.
 
 ## Mẫu bàn giao triển khai
 
@@ -40,10 +40,15 @@ Phạm vi được phép sửa:
 Không sửa:
 - [file người dùng sở hữu hoặc nội dung ngoài phạm vi]
 
+Với task frontend:
+- [route/UI hiện có, component dùng chung, styles và bàn giao trang liên quan]
+- [thay đổi dự kiến để tạo hoặc điều chỉnh trang theo design system hiện có]
+
 Tiêu chí nghiệm thu:
 - [hành vi có thể quan sát]
 - [nguồn dữ liệu, tiền tệ, múi giờ, thời điểm dữ liệu và độ mới]
 - [hành vi khi lỗi, retry hoặc replay nếu liên quan]
+- [responsive, loading/empty/error/retry, bàn phím, focus và nhãn truy cập nếu frontend]
 
 Kiểm tra bắt buộc:
 - [lệnh hoặc bước kiểm tra cụ thể]
