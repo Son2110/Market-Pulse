@@ -17,7 +17,7 @@
 
 Chỉ triển khai một task tại một thời điểm với một worker. Hoàn tất code, kiểm tra và review độc lập cho task hiện tại trước khi bắt đầu task kế tiếp. Không chạy song song các dòng trong bảng.
 
-Với mỗi task frontend, thiết kế một trang trong Stitch trước khi triển khai; giữ nhất quán với design system dùng chung và ghi project/screen Stitch đã chọn trong bàn giao. Kiểm tra responsive cùng trạng thái loading, empty, error; hoàn tất triển khai, kiểm tra và review trang đó trước khi làm trang kế tiếp. Nếu Stitch không khả dụng, ghi rõ blocker và không giả định đã dùng công cụ thay thế.
+**Quy trình frontend · 12/10/2026:** từ ngày này, tạo hoặc điều chỉnh từng trang theo thiết kế app hiện có; không tạo thiết kế Stitch mới. Trước triển khai, xem route, component dùng chung, styles và các bàn giao trang trước; bàn giao task ghi các tham chiếu hiện có cùng thay đổi dự kiến để giữ nhất quán với design system. Kiểm tra responsive, loading, empty, error, retry, điều hướng bàn phím, focus và nhãn truy cập. Hoàn tất triển khai, kiểm tra và review một trang với một worker rồi mới làm trang kế tiếp, theo [CODEX_WORKFLOW.md](CODEX_WORKFLOW.md). Skill frontend chỉ là hỗ trợ tùy chọn, không phải điều kiện bắt đầu. Quy trình này thay yêu cầu Stitch cho công việc tiếp theo; các project/screen và bằng chứng Stitch ghi trước ngày này giữ nguyên như lịch sử, không thay tiến độ MP hay các cổng nghiệm thu.
 
 ### GATE-3 review luồng chính · 06/10/2026 (thực hiện trước D14 · 07/10)
 

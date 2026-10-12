@@ -25,9 +25,9 @@ MarketPulse VN is a planning-stage market intelligence project for Vietnam. Read
 
 ## Frontend page workflow
 
-- During frontend work, use Stitch to design one page at a time before implementing that page. Keep the page consistent with the shared design system.
-- Include the chosen Stitch project and screen reference in the task handoff. Inspect the page at responsive sizes and review its loading, empty, and error states.
+- From 12/10/2026, create or adjust frontend pages using the existing app design. Before implementation, inspect the relevant routes, shared components, styles and prior page handoffs; keep each page consistent with the shared design system. Do not create new Stitch designs. Existing Stitch references remain historical evidence.
+- Include the existing UI, component and style references, plus the intended changes, in the task handoff. Inspect the page at responsive sizes and review loading, empty, error and retry states, keyboard navigation, focus and accessible labels.
 - Implement, check, and review the current page before moving to the next page. Work serially with one worker; do not run frontend pages or tasks concurrently. The coordinator's review can finalize each page without requiring separate user approval.
-- If Stitch is unavailable, report the concrete blocker. Do not silently substitute another design tool or claim a Stitch design was made.
+- Frontend skills listed in [docs/SKILLS_BY_FR.md](docs/SKILLS_BY_FR.md) are optional aids. Installing a skill is not a prerequisite for frontend work.
 
 Model names in this file express the project workflow requested by the owner. They do not change the active model or runtime settings.
