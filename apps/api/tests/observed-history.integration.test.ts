@@ -99,6 +99,14 @@ test("actual API registers observed reads only when enabled and runs with no ing
     const response = await fetch(`${base}/api/observed/assets/fpt/history?from=2026-10-01&to=2026-10-06`);
     assert.equal(response.status, flag === "true" ? 200 : 404);
     if (flag === "true") assert.deepEqual((await response.json()).data.candles, observed().candles);
+    const statusResponse = await fetch(`${base}/api/observed/assets/fpt/collection-status?from=2026-10-01&to=2026-10-06`);
+    assert.equal(statusResponse.status, flag === "true" ? 200 : 404);
+    if (flag === "true") {
+      const status = await statusResponse.json();
+      assert.equal(status.meta.selectedCandleCount, 1);
+      assert.equal(status.meta.candleCountsByDeliveryStatus.unknown, 1);
+      assert.equal(status.meta.candleCountsByDeliveryStatus.success, 0);
+    }
     assert.equal((await fetch(`${base}/api/assets/FPT/history`)).status, 200);
     assert.equal((await fetch(`${base}/internal/ingestion/deliveries/missing`)).status, 503);
     assert.equal(await c.store.observed.latest.countDocuments(), 1);
