@@ -1,4 +1,31 @@
-# Yêu cầu sản phẩm và giới hạn ba tuần
+# Yêu cầu sản phẩm — scope hiện hành và baseline lịch sử
+
+## Bổ sung phạm vi theo yêu cầu chủ dự án · 13/10/2026
+
+Phạm vi hiện hành bổ sung news tiếng Việt, AI phân tích thị trường có nguồn, vàng Việt Nam **SJC và nhẫn trơn 9999**, cùng nghiên cứu dự báo xác suất vàng nội địa. Đây là kế hoạch phát triển sau đóng core local, không là tuyên bố đã triển khai. Thứ tự, công sức và cổng nằm trong [ROADMAP.md](ROADMAP.md); nguồn, hạn chế và thiết kế đánh giá ở [PRODUCT_EXPANSION_RESEARCH.md](PRODUCT_EXPANSION_RESEARCH.md).
+
+**Sửa đổi scope có ngày:** [yêu cầu gốc](../MarketPulse_VN_Project_Documentation.md) chỉ dùng AI cho phân loại/tóm tắt và loại AI dự đoán giá khỏi MVP. Theo yêu cầu mới của chủ dự án ngày 13/10/2026, scope sau demo cho phép **nghiên cứu dự báo xác suất đã kiểm định** cho từng sản phẩm vàng nội địa; không mở rộng thành dự báo bằng LLM, khuyến nghị mua/bán, tư vấn cá nhân hay đặt lệnh. Giữ nguyên tài liệu gốc; bổ sung này thay giới hạn dự báo trong PRD hiện hành, không sửa lịch sử MVP cũ.
+
+### Yêu cầu bổ sung và nghiệm thu
+
+| Lát cắt / FR liên quan | Yêu cầu hiện hành | Cổng nghiệm thu |
+|---|---|---|
+| Gold data / FR-02, FR-17/18 | Một nhà niêm yết ban đầu có SJC và nhẫn trơn 9999; provider, brand, product, purity, region, quote side mua/bán; giá decimal, VND/chỉ hoặc VND/lượng, quy đổi tường minh; source as-of tách collectedAt, timezone/freshness/coverage/revision | Quyền truy cập/lưu/redisplay/lịch sử/training được ghi theo mục đích; mẫu thực và replay/revision/ordering qua kiểm tra. Timestamp thiếu giữ unknown, không mượn collectedAt. Fixture không nghiệm thu nguồn thật. |
+| News / FR-07 | Một RSS/feed tiếng Việt có quyền cùng liên kết nguồn chính thức tuyển chọn; title, canonical URL, publisher, publishedAt, collectedAt, language; dedup và revision; lọc vàng/FX/cổ phiếu | Giữ nguồn/ngày, bài cập nhật không bị coi là bài mới vô điều kiện; không tự fetch/lưu toàn văn ngoài quyền. Có loading/empty/error/retry và giới hạn coverage rõ. |
+| AI analysis / FR-08 | Entity/category, ánh xạ symbol có mức tin cậy, summary ngắn và market brief có citation từng factual claim; tách sourced fact, measured data và interpretation | Số liệu/returns/spread do code tính; không suy diễn causation. Human review cho event đề xuất. Không đủ nguồn/conflict/lỗi/hết budget thì abstain và hiện tin gốc. Cache theo model/prompt/input revision, log version và budget. |
+| Gold dashboard + events / FR-02, FR-09/10/11 | Mua/bán/spread/history cho SJC và nhẫn riêng; tin/sự kiện liên quan có nguồn; chart thể hiện gap/stale/unknown | Không nối giá giữa brand/region/product, không nội suy giá thiếu. FR-11 chỉ khi đủ lịch sử với cửa sổ, benchmark và số quan sát; wording là biến động quanh sự kiện. |
+| Forecast research / bổ sung gold research | Target là **giá niêm yết bán** của một provider/product/region, nghiên cứu riêng SJC và nhẫn; xác suất tăng/đi ngang/giảm với horizon khóa trước | Baseline, walk-forward, holdout chưa dùng và shadow đạt gate trong nghiên cứu mới có xác suất trong app. Báo cáo cả trường hợp không có edge; không đưa target quốc tế XAU thành dự báo vàng trong nước. |
+| Local v2 / MP-14, MP-15 mở rộng | Demo gold/news/AI và báo cáo forecast có thể tái tạo, E2E/citation/budget checks, limitations rõ | Không yêu cầu mô hình thành công để nghiệm thu dashboard mô tả. Production/pilot có cổng quyền/secrets/chi phí/backup riêng. |
+
+**AI quality gate đề xuất của project:** ít nhất 50 case tiếng Việt held-out do người đánh giá, gồm entity mơ hồ, tin cũ/sửa, thiếu nguồn và nội dung cố chèn lệnh. 100% factual claims phải liên kết evidence; ít nhất 95% claims được người đánh giá xác nhận evidence hỗ trợ, báo cáo tử số/mẫu số và abstention coverage riêng. Không có lỗi nghiêm trọng về nguồn bịa, số liệu bịa/sai, sai symbol hoặc khuyến nghị giao dịch. Link hiện diện không tự chứng minh claim đúng. Khóa bộ tiêu chí trước test; không điều chỉnh ngưỡng theo kết quả để tuyên bố pass. Đây là gate đề xuất, chưa có bằng chứng model đạt và không là tiêu chuẩn NIST.
+
+**Forecast gate:** khóa cutoff/timezone, horizon, endpoint tolerance và ngưỡng tăng/đi ngang/giảm trước đánh giá. Bản đầu ưu tiên horizon **7 ngày lịch**; 1 ngày chỉ xem xét khi mật độ nguồn đủ. Thiếu endpoint không thành đi ngang. Features chỉ dùng dữ liệu đã biết trước cutoff, kể cả published/collected timestamps và macro vintage. Chọn minimum sample/coverage, mức cải thiện có ý nghĩa và phương pháp confidence interval trước holdout sau audit dữ liệu; không tự đặt “hai năm là đủ”. Báo cáo balanced accuracy/macro-F1/confusion matrix, Brier/log loss, reliability, coverage và uncertainty, so baseline đơn giản; shadow 8–12 tuần **và đủ target đã trưởng thành**. Không đủ quyền/lịch sử, leakage, không có edge hoặc calibration yếu thì kết luận insufficient evidence, giữ descriptive mode và điều kiện mở lại.
+
+Ưu tiên source-quality xuyên pha, sau đó alert ngưỡng/spread trong app, lịch sự kiện/related news, chênh lệch tham chiếu vàng thế giới có điều kiện và trợ lý nghiên cứu có citation. Compare/correlation, anomaly nâng cao, portfolio, heatmap và realtime làm sau theo độ phủ; chưa cam kết toàn bộ FR gốc trong local v2.
+
+## Baseline ba tuần và tiến độ lịch sử
+
+Những ghi nhận và bảng FR dưới đây giữ phạm vi demo ban đầu cùng trạng thái tại ngày nêu. “Hoãn” nghĩa là ngoài baseline ba tuần, không loại news/AI/gold khỏi roadmap hiện hành. Các yêu cầu frontend qua Stitch trước 12/10 chỉ là lịch sử; công việc mới dùng design system app hiện có. Không ghi đè tiến độ hoặc gọi một pha mở rộng là hoàn tất FR gốc.
 
 **MP-12 / FR-04 FPT collection-status UI · 13/10/2026:** trang FPT observed có card trạng thái độc lập sau range selector, sáu bucket đếm theo quan sát và thông báo lần đọc có thể khác history. Loading/empty/error/retry riêng; retry chỉ đọc status, không gọi provider/ingestion. Counts/ranges/raw collected timestamps thuộc lần đọc status; source as-of/freshness/completeness vẫn unknown, calendar unverified. Chỉ FPT hợp lệ có request, không mở VNINDEX status UI hoặc cache/scheduler. Dùng UI hiện có, không tạo Stitch. [Bàn giao FR-04](FR04_DETAIL_DESIGN.md#mp-12--fr-04--trạng-thái-thu-thập-fpt--13102026) ghi checks/QA; review/push/CI là bằng chứng riêng. Lát cắt API-only dưới đây là lịch sử trước UI này; FR-04/MP-12 vẫn một phần.
 
@@ -30,7 +57,7 @@
 
 Giúp người đọc hiểu thị trường Việt Nam đang diễn biến thế nào, tài sản nào vừa biến động và những sự kiện công khai nào xảy ra gần thời điểm đó. Đây là công cụ thông tin và nghiên cứu. Sản phẩm không khuyến nghị giao dịch, không thực hiện giao dịch và không khẳng định sự kiện gây ra biến động giá.
 
-## Mục tiêu trong ba tuần
+## Mục tiêu trong ba tuần — baseline lịch sử
 
 Xây dựng demo chạy cục bộ với tài khoản cơ bản, tìm kiếm cổ phiếu, trang chi tiết một mã có biểu đồ dữ liệu ngày, tổng quan VN-Index và watchlist của người dùng. Mục tiêu dữ liệu là 10–20 mã cổ phiếu Việt Nam cùng VN-Index ở tần suất cuối ngày hoặc trễ, chỉ khi nguồn đã được xác minh về quyền truy cập, điều khoản và độ phủ. Mọi màn hình dữ liệu cần ghi rõ thời điểm theo phiên/múi giờ Việt Nam, tiền tệ, provider, thời điểm quan sát và độ mới.
 
@@ -44,7 +71,7 @@ Nếu thiếu credential, quyền sử dụng hoặc độ phủ phù hợp, dù
 
 Không FR nào được xem là hoàn tất theo toàn bộ mô tả gốc. Trạng thái FR dưới đây vẫn là mục tiêu ba tuần; tiến độ scaffold và bằng chứng kiểm tra được ghi riêng trong [roadmap](ROADMAP.md).
 
-## Đối chiếu yêu cầu chức năng
+## Đối chiếu yêu cầu chức năng — baseline ba tuần
 
 | Yêu cầu | Trạng thái ba tuần | Tiêu chí mục tiêu | Phần hoãn rõ ràng |
 |---|---|---|---|
@@ -83,4 +110,4 @@ Demo cục bộ có hướng dẫn khởi động lặp lại được, fixture 
 
 ## Không phải lời khuyên đầu tư
 
-MarketPulse VN phục vụ minh họa và nghiên cứu. Sản phẩm không đưa ra tư vấn đầu tư cá nhân, khuyến nghị mua/bán, dự đoán giá hoặc thực hiện lệnh môi giới. Trang sự kiện không được hàm ý quan hệ nhân quả.
+MarketPulse VN phục vụ minh họa và nghiên cứu. Sản phẩm không đưa ra tư vấn đầu tư cá nhân, khuyến nghị mua/bán hoặc thực hiện lệnh môi giới. Baseline ba tuần không có dự báo giá; bổ sung ngày 13/10 cho phép nghiên cứu xác suất vàng nội địa và chỉ hiển thị sau các cổng trên, kèm target/horizon/as-of/uncertainty/coverage và phiên bản mô hình. Giá bán niêm yết tăng không đồng nghĩa lợi nhuận sau spread/chi phí. Trang sự kiện không được hàm ý quan hệ nhân quả.

@@ -19,6 +19,7 @@ DOCUMENTS = (
     "docs/DATA_CONTRACT.md",
     "docs/ROADMAP.md",
     "docs/PROVIDER_RESEARCH.md",
+    "docs/PRODUCT_EXPANSION_RESEARCH.md",
     "docs/CODEX_WORKFLOW.md",
     "docs/SKILLS_BY_FR.md",
     "docs/CI_CD.md",
