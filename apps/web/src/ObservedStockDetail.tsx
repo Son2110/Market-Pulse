@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import SiteHeader from "./SiteHeader.js";
+import ObservedCollectionStatus from "./ObservedCollectionStatus.js";
 import "./observed-detail.css";
 import { detailHref, fetchObservedHistory, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, type DetailMode, type ObservedCandle, type ObservedHistory } from "./observed-detail.js";
 
@@ -103,6 +104,7 @@ export default function ObservedStockDetail({ symbol, mode }: { symbol: string |
           <label htmlFor="observed-to">Đến ngày<input id="observed-to" type="date" name="to" required defaultValue={to} aria-describedby="observed-range-help" /></label><button className="primary-button" type="submit">Xem dữ liệu</button>
         </form><p id="observed-range-help" className="small muted">Bao gồm hai ngày đầu/cuối; chênh lệch tối đa 31 ngày (32 ngày lịch). <a href={detailHref("FPT", "observed", search)}>Khoảng mẫu 28/09–07/10/2026</a> · Không phải khoảng mới nhất.</p>
       </section>}
+      {valid && symbol === "FPT" && <ObservedCollectionStatus key={`FPT:${from}:${to}`} range={{ from, to }} />}
       <div aria-busy={valid && state.status === "loading"}>
         {mode.kind === "invalid" || state.status === "error" ? <section className="state-panel error-panel detail-state" role="alert"><h2>Chưa thể đọc dữ liệu đã lưu</h2><p>{mode.kind === "invalid" ? mode.message : state.status === "error" ? state.message : ""}</p>{mode.kind !== "invalid" && state.status === "error" && state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Thử lại</button>}</section>
           : state.status === "loading" ? <section className="state-panel detail-state" role="status"><span className="state-icon loading-icon" aria-hidden="true">↗</span><h2>Đang tải dữ liệu đã lưu…</h2><p>Đang đọc các quan sát trong khoảng ngày đã chọn.</p></section>

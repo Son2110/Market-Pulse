@@ -1,5 +1,27 @@
 # MP-07 — bàn giao trang chi tiết cổ phiếu
 
+## MP-12 / FR-04 — trạng thái thu thập FPT · 13/10/2026
+
+Nhánh `feat/fr-04-collection-status-3` thêm card toàn chiều rộng **Trạng thái thu thập trong khoảng đã chọn**, sau form range và ngoài state history. Tham chiếu UI trước triển khai: `ObservedStockDetail.tsx`, `observed-detail.ts`, `observed-detail.css`, `styles.css`, `SiteHeader.tsx` và bàn giao observed FPT bên dưới; API contract là `observed-collection-status-contract.ts`. Dùng design system app hiện có; không tạo Stitch mới.
+
+Chỉ FPT/observed/range hợp lệ mount card, key theo mã/range. Request status riêng cùng origin, Accept JSON, no-store, timeout mười giây, abort và request identity. Loading/error/empty/retry độc lập; **Thử lại trạng thái thu thập** không đọc lại history. 404 không suy đoán flag. Không polling, cache, ingestion retry hay gọi provider. Backend, VNINDEX UI, search, watchlist, fixture, schema, dependency và `.env` không đổi.
+
+Số quan sát/khoảng yêu cầu/khoảng trả về ghi rõ thuộc lần đọc trạng thái. Sáu bucket kể cả zero đếm theo quan sát, không phải số đợt xử lý; notice nổi bật giải thích dữ liệu và trạng thái không được đọc cùng thời điểm, có thể khác bảng giá. Không so sánh counts hay gắn trạng thái từng row. Unknown không thành failure; success không xác nhận giá hiện tại, freshness, coverage hay tình trạng nguồn. Empty chỉ là không có bar đã lưu được chọn, không phải provider no-data. Collected range giữ raw timestamp/offset, không phải source as-of; FPT/KBS/VND/asset timezone Việt Nam cùng freshness/completeness/source as-of chưa xác định và calendar chưa xác minh hiện rõ.
+
+Guard riêng kiểm tra exact keys/identity/literals/metadata, requested range khớp request, sáu safe integer bucket 0–32 có tổng bằng selected count/không vượt sức chứa ngày inclusive; available cần returned range hợp lệ nằm trong request/đủ sức chứa và collected range có thứ tự UTC microsecond. Empty count zero/hai ranges null. BigInt giữ microsecond/chuẩn hóa offset, từ chối timestamp lỗi calendar/clock/offset/precision. Không yêu cầu count/ranges khớp history.
+
+Bảy unit tests mới phủ mixed/unknown/success/failure/empty; keys/identity/literals/null/count/range lỗi; microsecond đảo trong cùng millisecond/offset; URL/no-store/Accept; HTTP 400/404/503, JSON/contract/network/timeout/caller abort. Lint/typecheck, full 172 unit tests (0 fail/skip) và build đạt. Full unit lần đầu bị sandbox chặn loopback; cùng lệnh chạy lại với quyền local đạt. Không chạy lại integration MongoDB/Redis hoặc Python contract/collector trong UI slice này.
+
+Browser QA bằng Edge qua cua UI tools với Docker API/web rebuild và flag tạm true, không sửa `.env` hoặc gọi provider: mẫu 28/09–07/10 có tám selected/success, tám history row/close `59700`, collected range `2026-10-07T13:12:46.484758+00:00`. Form 01–02/01/2026 trả empty thực/sáu zero/null ranges/không chart. Responsive 1440/768/390/320px có page scrollWidth=clientWidth 1425/753/375/305px; timestamp 320px có width=scrollWidth 231px. Screenshot local ignore tại `.venv/collection-status-qa/fpt-desktop.jpg`, `fpt-320.jpg`, `fpt-mixed-desktop.jpg`.
+
+Proxy tạm ignore port 5181 kiểm tra delay status/history loaded, 503 status/history giữ giá, retry phục hồi chỉ thêm request status, 404 generic; history 503/status mixed còn sáu buckets, history-only retry phục hồi tám row/status vẫn sáu; unknown6/failure0; malformed consistency không có count/history vẫn tám row. Tab tới retry có outline; Enter retry hoạt động. Đây là QA tạm, không phải E2E suite commit. Independent coordinator review/push/remote CI là bước riêng; user tạo/merge PR. FR-04/MP-12 vẫn một phần; cache/scheduler/freshness/provider health và quyền upstream redisplay/deployment còn mở.
+
+QA bổ sung đổi range sau một giây khi status cũ đang delay tám giây: range 01–02/01 giữ count zero/empty sau callback cũ, không phục hồi count tám. FPT fixture, VCB fixture, market và FPT range invalid không mount card/không có status request; proxy log chỉ có fixture history/search trong các mode này. Docs check đạt 115 local targets/build 19 source documents, diff check đạt và SHA-256 tài liệu gốc giữ `21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`.
+
+Sau QA đã rebuild web cuối, khôi phục Compose API với `OBSERVED_READS_ENABLED=false`, xác nhận cả history/status FPT trả 404 và card báo chưa khả dụng; `.env`/volumes giữ nguyên, proxy dừng/viewport reset. Bốn service local được dùng (MongoDB/Redis/API/web) healthy; không khởi động collector hay worker mới. Browser error log cuối rỗng. Build cuối trong sandbox gặp Vite realpath `EPERM`; chạy lại cùng lệnh với quyền local đạt.
+
+Review GPT-6 Astra độc lập ngày **13/10/2026** chấp thuận cả mười file, không có finding. Reviewer chạy lại bảy test client mới và diff check, xem screenshot mobile và log full 172 tests đạt; không chạy lại full build hoặc browser QA. Push/remote CI vẫn là bước riêng; user tạo và merge PR.
+
 ## Phạm vi và tham chiếu Stitch
 
 Thiết kế đã chọn trước triển khai: project `16706610509511522903` — **MarketPulse VN — Local Demo**; design system `assets/18357777504117637773`; screen `45d9188f44ef4f9e8b289e73c14a8b64` — **MarketPulse VN - Chi tiết mã FPT**. Ảnh và HTML tham khảo đã được xem cục bộ; HTML sinh tự động chỉ dùng làm tham khảo bố cục. Trang giữ nền ấm, panel trắng, viền mảnh, chữ tối và xanh rừng cùng font hệ thống như [trang search](FR03_SEARCH_DESIGN.md). Bỏ các footer link giả và copyright sinh tự động.

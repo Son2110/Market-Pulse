@@ -1,5 +1,7 @@
 # Lộ trình local-first trong ba tuần
 
+**MP-12 / FR-04 FPT collection-status UI · 13/10/2026:** đã thêm card FPT observed riêng theo UI hiện có, không tạo Stitch. Đọc collection-status no-store/timeout/abort; loading/empty/error/retry độc lập history, retry chỉ status. Sáu bucket đếm quan sát cùng ranges/collected timestamp thuộc lần đọc status; non-atomic/read riêng có thể khác history, unknown không failure và success không xác nhận freshness/provider health/coverage. Không backend/VNINDEX status UI/cache/scheduler/provider call. [Bàn giao FR-04](FR04_DETAIL_DESIGN.md#mp-12--fr-04--trạng-thái-thu-thập-fpt--13102026) ghi checks/QA; coordinator review/push/CI riêng, user tạo/merge PR. Ghi nhận API-only bên dưới là lịch sử; MP-12 vẫn một phần và quyền upstream redisplay/deployment còn mở.
+
 **Khoảng thời gian:** 24/09–14/10/2026, đúng 21 ngày lịch (D1–D21).  
 **Năng lực:** một người, mỗi ngày triển khai 2–3 giờ và mỗi ngày review/buffer 1 giờ. Ước lượng cơ sở: 15 × 2,4 giờ + 6 × 1 giờ = **42 giờ**. Có thể dời ngày; nếu lịch thay đổi, giữ thứ tự ngày và các cổng nghiệm thu.
 

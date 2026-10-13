@@ -20,5 +20,21 @@
 .observed-table td:nth-last-child(-n+2) { min-width: 215px; font-size: 11px; }
 .observed-detail .reference-note { overflow-wrap: anywhere; }
 .observed-paragraph { margin-top: 12px; }
+.collection-status-card { min-width: 0; }
+.collection-status-card .detail-section-heading p { margin-top: 6px; }
+.collection-status-notice { margin: 16px 0; line-height: 1.7; }
+.collection-status-state { margin: 16px 0; font-size: 14px; line-height: 1.7; }
+.collection-status-state button { margin-top: 12px; max-width: 100%; white-space: normal; }
+.collection-status-summary, .collection-status-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
+.collection-status-summary > div, .collection-status-counts > div { display: block; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 6px; }
+.collection-status-card dt { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.collection-status-card dd { margin: 6px 0 0; text-align: left; overflow-wrap: anywhere; font-size: 14px; font-variant-numeric: tabular-nums; }
+.collection-status-counts dd { font-size: 22px; font-weight: 600; }
+.collection-status-explanation { line-height: 1.7; }
+.collection-status-times { margin: 18px 0 10px; }
+.collection-status-times > div { display: block; }
+.collection-status-times dd { display: grid; gap: 4px; }
+@media (max-width: 700px) { .collection-status-summary { grid-template-columns: 1fr; } .collection-status-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 350px) { .collection-status-counts { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .observed-range-form { flex-wrap: wrap; } .observed-range-form label { flex-basis: calc(50% - 8px); } .observed-range-form .primary-button { width: 100%; } }
 @media (max-width: 420px) { .observed-range-form { flex-direction: column; align-items: stretch; } .observed-range-form label { flex-basis: auto; } .observed-source-tabs a { flex: 1; text-align: center; padding: 10px 8px; } }
