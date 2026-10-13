@@ -1,4 +1,49 @@
-# Lộ trình local-first trong ba tuần
+# Lộ trình MarketPulse VN — cập nhật 13/10/2026
+
+## Kế hoạch mở rộng hiện hành
+
+Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba tuần cho công việc tiếp theo. Bản kế hoạch **24/09–14/10/2026, 21 ngày / 42 giờ** và mọi bằng chứng tiến độ bên dưới được giữ làm baseline lịch sử; ngày cũ không phải cam kết hoàn thành phạm vi mới. Xem [PRD mở rộng](PRD.md) và [nghiên cứu nguồn, AI và dự báo](PRODUCT_EXPANSION_RESEARCH.md). Đây là thay đổi tài liệu; không đánh dấu tính năng mở rộng nào đã triển khai.
+
+**Baseline đã xác minh 13/10:** `origin/main` tại `1fc81a3b2e5e0c663cec8b8985c0435aefd8e3ee`; [PR #28](https://github.com/Son2110/Market-Pulse/pull/28) đã merge lúc 08:05:12 UTC. FR-04 FPT collection-status UI đã nằm trên main, nhưng MP-11/MP-12 và các FR gốc vẫn một phần; source as-of/freshness/completeness và quyền upstream public redisplay/deployment chưa được xác minh. MP-14 còn cần E2E được commit; MP-15 demo tái tạo vẫn cần nghiệm thu. Không suy ra hoàn tất core từ merge một lát cắt.
+
+**Nhịp và ước lượng:** giả định một người làm **5 ngày/tuần × 2–3 giờ = 10–15 giờ/tuần**, một worker, các task nối tiếp. Giờ pha dưới đây là công sức còn lại gồm triển khai và kiểm tra thông thường; cộng **25% buffer** cho review độc lập, sửa finding và dao động nhỏ. Tổng **198–302 giờ**, sau buffer khoảng **248–378 giờ**, tương đương khoảng **17–38 tuần công sức**. Đây là khoảng hoạch định, không là deadline. Chờ quyền dữ liệu, mua/thu thập lịch sử, credential và shadow observation không nằm trong phép tính; shadow 8–12 tuần có thể kéo dài thời gian lịch. Đo lại sau mỗi cổng, không dùng 42 giờ cũ cho phạm vi mới.
+
+| Pha / ưu tiên | Công sức | Các task nhỏ làm serial | Cổng bàn giao và phụ thuộc |
+|---|---|---|---|
+| P0 · Bắt buộc — đóng core local | 24–36 giờ | P0.1 rà MP-12 còn thiếu và chọn lát cắt status/chất lượng có giới hạn; P0.2 MP-14 E2E fixture và CI; P0.3 MP-15 startup/demo, GATE-5 | Search → chart → watchlist có auth, replay/ownership checks và demo tái tạo đạt. Ghi rõ nguồn live còn mở. Không bắt buộc cache nếu chưa có nhu cầu và kiểm tra invalidation/expiry. |
+| P1 · Bắt buộc — dữ liệu vàng Việt Nam | 32–48 giờ | P1.1 audit một nhà niêm yết có cả SJC và nhẫn trơn 9999; P1.2 contract + fixture; P1.3 collector có revision/replay và lưu lịch sử; P1.4 đọc dữ liệu thực + chất lượng nguồn | Sau P0. Quyền truy cập/lưu/hiển thị, API hoặc cách truy cập được phép, lịch sử, đơn vị, source as-of và phạm vi mẫu phải có bằng chứng. Fixture chỉ kiểm tra plumbing, không vượt cổng nguồn thật. Định danh provider/brand/product/purity/region, mua/bán VND/chỉ hoặc VND/lượng tách biệt. |
+| P2 · Bắt buộc — news FR-07 | 24–36 giờ | P2.1 quyền một RSS/feed tiếng Việt và link chính thức tuyển chọn; P2.2 ingest/dedup/revision; P2.3 danh sách + lọc vàng/FX/cổ phiếu | Sau P1. Có title, canonical URL, publisher, publishedAt, collectedAt, language; lỗi/thiếu tin/stale minh bạch. Không giả định RSS cho phép toàn văn hoặc AI processing. |
+| P3 · Bắt buộc — AI FR-08 và market brief | 32–48 giờ | P3.1 entity/category; P3.2 summary có citation; P3.3 brief ghép dữ liệu đo được với tin; P3.4 đánh giá held-out, budget/fallback | Sau P2 và dữ liệu định danh P1. Phân tách sự thật có nguồn, số liệu tính bằng code và diễn giải. Gate AI theo PRD/nghiên cứu; event do AI đề xuất phải duyệt. Fallback về tin gốc khi thiếu bằng chứng/lỗi model/hết budget. |
+| P4 · Bắt buộc — dashboard vàng và events | 28–44 giờ | P4.1 giá mua/bán/spread/history; P4.2 FR-09/10 timeline/detail có nguồn; P4.3 FR-11 chỉ khi đủ lịch sử | Sau P3. SJC và nhẫn là hai sản phẩm riêng; gap/stale/unknown không bị che. Phản ứng quanh event có cửa sổ và số quan sát; không tuyên bố nhân quả. Thiếu lịch sử thì chỉ hiển thị event và dữ liệu mô tả. |
+| P5 · Bắt buộc nghiên cứu — dự báo vàng | 40–60 giờ | P5.1 khóa target/horizon/ngưỡng và audit quyền/lịch sử; P5.2 baseline + walk-forward; P5.3 holdout/calibration; P5.4 shadow + báo cáo go/no-go | Sau P4, lịch sử đủ điều kiện và quyền training. Luôn bàn giao báo cáo, kể cả không có edge. Xác suất trong app chỉ mở sau gate nghiên cứu; chưa đạt thì duy trì descriptive dashboard. Không dùng LLM làm oracle giá. |
+| P6 · Bắt buộc — local v2; pilot tùy chọn | 18–30 giờ | P6.1 E2E news/gold/AI citation và kiểm tra budget; P6.2 tài liệu/demo local v2; P6.3 audit khả năng pilot | Sau P5 có quyết định và P0–P4 đạt. Local v2 có thể hoàn tất với kết luận dự báo chưa đủ bằng chứng. Pilot/production cần cổng riêng về quyền public, secrets, chi phí, backup/restore, network và vận hành; không mặc nhiên deploy. |
+
+P1 bắt đầu lưu quan sát thực sớm sau khi cổng quyền và contract đạt; collector đã nghiệm thu có thể tự tích lũy dữ liệu khi người phát triển làm các pha sau. Đây là vận hành thu thập tự động, không là triển khai song song hoặc cho phép bỏ qua review. Không đảm bảo lịch sử thu mới sẽ đủ cho P5; thử khả năng mua/nhận lịch sử có quyền ngay ở P1.
+
+### Phạm vi cam kết và tiêu chí dừng
+
+News tiếng Việt, AI phân tích có nguồn và vàng **SJC + nhẫn trơn 9999** là các pha tương lai đã đưa vào kế hoạch, không còn là hạng mục hoãn vô thời hạn. “Bắt buộc” là cam kết bàn giao lát cắt và bằng chứng của pha, không cam kết nguồn sẽ cấp quyền hoặc mô hình sẽ dự báo tốt. Mỗi pha có thể tách thành PR nhỏ serial theo FR hiện có; P0–P6 là nhãn kế hoạch, không là FR mới hoặc tuyên bố hoàn tất FR gốc. Giữ quy trình branch/review/push và PR/merge do user quản lý trong [CODEX_WORKFLOW.md](CODEX_WORKFLOW.md).
+
+- Nếu quyền/nguồn vàng chưa đạt: bàn giao audit + fixture có nhãn, chặn dữ liệu public và forecast; có thể chuyển sang P2 bằng task serial riêng, không gọi P1 đạt nguồn thật.
+- Nếu news chỉ cho phép metadata: hiển thị metadata/link trong quyền cho phép; chỉ chạy AI trên nội dung được phép. Chặn summary/brief không có bằng chứng thay vì bịa nội dung.
+- Nếu AI gate chưa đạt: giữ tin gốc và dữ liệu deterministic, sửa lỗi rồi đánh giá lại trên tập độc lập; event chưa duyệt không public.
+- Nếu lịch sử/coverage/quyền training, chống leakage hoặc edge/calibration chưa đạt: P5 trả **insufficient evidence** và điều kiện mở lại; không đưa xác suất vào app. Thời gian shadow một mình không đủ.
+
+### Mở rộng kế tiếp — xếp theo giá trị và phụ thuộc
+
+| Thứ tự | Mức | Hạng mục | Điều kiện mở task |
+|---|---|---|---|
+| 1 | Bắt buộc xuyên pha | Source-quality FR-17/18: nguồn, lần thành công, gap/revision/freshness | Đưa phần cần thiết vào P1–P4; dashboard admin rộng vẫn tách task. Receipt success không chứng minh nguồn fresh. |
+| 2 | Kế tiếp | FR-14 alert ngưỡng giá/spread trong app | Sau P4; dedup/cooldown, chặn alert stale/unknown, không tự gửi email/Telegram. |
+| 3 | Kế tiếp | Lịch sự kiện và related news FR-09/10 phong phú hơn | Sau lát cắt P4; nguồn/ngày/timezone và human review rõ. |
+| 4 | Kế tiếp | Chênh lệch vàng nội địa với tham chiếu thế giới | Chỉ sau xác minh quyền XAU/FX, timestamp, đơn vị và độ tinh khiết tương thích; không gọi là arbitrage. |
+| 5 | Kế tiếp | Trợ lý nghiên cứu có citation | Sau AI gate; truy xuất nguồn được phép, abstain và không tư vấn giao dịch. |
+| 6 | Sau đó | Compare/correlation FR-16/12 | Dùng returns, overlap/timezone/số quan sát; không đồng nhất tương quan với nhân quả. |
+| 7 | Sau đó | Rule anomaly FR-13; portfolio FR-15, heatmap và realtime | Anomaly sau coverage/threshold validation; các mục còn lại sau quyền và độ phủ phù hợp. Không mở cùng lúc để tránh phình scope. |
+
+## Baseline lịch sử — demo local trong ba tuần
+
+Các đoạn dưới đây giữ mục tiêu, lịch và trạng thái tại ngày ghi nhận. Những câu “hoãn”, “chỉ MP-13” hoặc “kế tiếp qua Stitch” mô tả baseline cũ; công việc mới theo phần hiện hành ở trên và quy trình frontend 12/10. Không xóa hoặc suy diễn lại bằng chứng cũ.
 
 **MP-12 / FR-04 FPT collection-status UI · 13/10/2026:** đã thêm card FPT observed riêng theo UI hiện có, không tạo Stitch. Đọc collection-status no-store/timeout/abort; loading/empty/error/retry độc lập history, retry chỉ status. Sáu bucket đếm quan sát cùng ranges/collected timestamp thuộc lần đọc status; non-atomic/read riêng có thể khác history, unknown không failure và success không xác nhận freshness/provider health/coverage. Không backend/VNINDEX status UI/cache/scheduler/provider call. [Bàn giao FR-04](FR04_DETAIL_DESIGN.md#mp-12--fr-04--trạng-thái-thu-thập-fpt--13102026) ghi checks/QA; coordinator review/push/CI riêng, user tạo/merge PR. Ghi nhận API-only bên dưới là lịch sử; MP-12 vẫn một phần và quyền upstream redisplay/deployment còn mở.
 
