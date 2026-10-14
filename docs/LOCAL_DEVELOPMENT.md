@@ -1,28 +1,51 @@
 # Local development
 
-MP-10 adds authenticated fixture submission and a separate Compose `worker`. Generate a local secret as described in `.env.example`, then use `docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10`; repeat to verify replay. Offline collector invocation remains the default. Public history/search continue to read the packaged fixture, while the new delivery path stores raw/canonical data separately. See [ingestion setup, status/count semantics and recovery](INGESTION.md). Existing local volumes and other `.env` settings should be preserved.
+**Current local demo · 14/10/2026:** Docker Compose runs the fixture web/API plus worker, MongoDB and Redis. No provider credential, ingestion secret, host Node/Python installation or pre-existing account is required for the core tour. [GATE-5](GATE_5_REVIEW.md) records fresh startup, real browser QA and restart persistence; it does not approve upstream rights or production use.
+
+Authenticated fixture submission is optional and separate from public fixture reads. Generate a local secret as described in `.env.example`, then use `docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10`; repeat to verify replay. Offline collector invocation remains the default. The delivery path stores raw/canonical data separately. See [ingestion setup, status/count semantics and recovery](INGESTION.md). Existing local volumes and other `.env` settings should be preserved.
 
 With an ingestion secret configured, ingestion collection initialization is required for API readiness. A startup failure exits nonzero so Compose can retry with its bounded restart policy. If retries are exhausted, correct the database/schema problem and restart the API. With the secret absent, the public API can be ready while internal ingestion routes remain disabled with 503.
 
-The local API supports demo account registration, login, logout, the authenticated user endpoint, one authenticated watchlist per user, public fixture-backed daily history, and public stock search over ten fixture equities. `/account` provides Vietnamese registration, login and session management; `/watchlists` provides one private list, membership management and fixture closing prices after account verification. The web root is a Vietnamese search page designed in Stitch; it shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. `/market` shows the latest fixture VN-Index level, its change against the previous available observation and a daily closing-level table. The collector validates and summarizes the committed synthetic fixture; it does not contact Vnstock or ingest live data.
+The local API supports demo account registration, login, logout, the authenticated user endpoint, one authenticated watchlist per user, public fixture-backed daily history, and public stock search over ten fixture equities. `/account` provides Vietnamese registration, login and session management; `/watchlists` provides one private list, membership management and fixture closing prices after account verification. The web root shows company reference information and a link to `/stocks/:symbol`. The detail page shows the latest fixture close, OHLCV, change against the previous available observation, a closing-price line chart and a daily table. `/market` shows the latest fixture VN-Index level, its change against the previous available observation and a daily closing-level table. Existing page handoffs retain historical Stitch references; new work uses the existing app design. Default collector mode validates the synthetic fixture without calling a provider; optional observed ingestion/reads have separate prerequisites below.
 
 ## Requirements
 
 - Docker Desktop with Docker Compose v2 or newer; start it and wait until the engine is running before using Compose.
-- Node.js 22.15 or newer in the Node 22 line, with npm 10.9 or newer.
-- Python 3.10 for host-side fixture checks. The collector container and CI use Python 3.12.
+- First-run network access for container images and build dependencies. No market-data provider call is part of core startup.
+- For optional host development/checks only: Node.js 22.15 or newer in the Node 22 line, npm 10.9 or newer, and Python 3.10 with `requirements-dev.txt`. The collector container and CI use Python 3.12.
+
+## Ports and existing local settings
 
 Copy `.env.example` to `.env` if you want to change the published host ports. The example contains no secrets. Compose publishes app and database ports on `127.0.0.1`; do not bind local development services to a public interface. If host port 27017 is occupied, set `MONGODB_PORT=27018` in `.env`; if port 6379 is occupied, set `REDIS_PORT=6380`. The MongoDB and Redis container ports stay 27017 and 6379.
+
+Defaults are web 5173, API 3001, MongoDB 27017 and Redis 6379. `WEB_PORT`, `API_PORT`, `MONGODB_PORT` and `REDIS_PORT` change only the host side. Update browser/health URLs when changing their ports. Use the same env file, project name and overrides for startup, status, stop and restart. Shell variables override env-file values. For a fresh fixture-default check, remove inherited `INGESTION_SECRET` and `OBSERVED_READS_ENABLED` (and unintended port overrides) from that PowerShell session; `.env.example` supplies an empty secret and `false`. Do not overwrite an existing `.env` or remove another project's containers/volumes to fix a collision.
 
 ## Start the Compose stack
 
 From the repository root in PowerShell:
 
 ```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-docker compose config --quiet
-docker compose up --build --wait
+docker compose --env-file .env.example config --quiet
+docker compose --env-file .env.example up --build --detach --wait
+docker compose --env-file .env.example ps
 ```
+
+This explicit env file uses committed fixture defaults without reading an existing `.env`. For your customized `.env`, replace `--env-file .env.example` with `--env-file .env` consistently. Successful startup has five healthy services: `web`, `api`, `worker`, `mongodb` and `redis`. On failure, inspect `docker compose --env-file .env.example ps` and `docker compose --env-file .env.example logs --tail 80`; correct the reported Docker/port/dependency issue and rerun startup.
+
+### First launch and reusable login
+
+Search and market views work without login. For a first private list, open **Tài khoản → Đăng ký**, enter your own local demo email and a password of 15–128 characters, repeat the password and select **Tạo tài khoản**. Registration signs you in. Open **Theo dõi**, create a named list, search FPT and choose **Thêm FPT**. Reload verifies the saved list. Log out via **Tài khoản**, then use **Đăng nhập** with the same credentials to return to it. The [README tour](../README.md#run-the-local-demo) covers the public pages.
+
+**Dated clarification · 14/10/2026:** the historical MP-15 plan mentioned a seed account. No seed account, seeding command or shared credentials exist in this implementation. First-run UI registration followed by reusable login is the accepted local-demo path; no account helper was added for this documentation task. Password reset is unavailable, so use disposable demo credentials and remember them locally.
+
+### Stop and restart with saved data
+
+```powershell
+docker compose --env-file .env.example stop
+docker compose --env-file .env.example up --detach --wait
+```
+
+Keep the same Compose project/env file/ports. Named MongoDB and Redis volumes remain in place, so accounts and watchlists survive stop/start or ordinary container recreation. `docker compose down` removes containers/network while retaining named volumes; `down --volumes` deletes those volumes and is not a normal restart. Login handles live only in the current browser tab, expire after eight hours and are revoked by logout. If a tab is closed or the session expires, log in again; that is separate from losing the account/list. [Gate 5](GATE_5_REVIEW.md) verified a fresh owned project and stop/start without volume removal.
 
 Open `http://127.0.0.1:5173` and submit `FPT`, `Vietcombank`, `Hòa Phát`, or `vin`. The page makes a same-origin request through Vite's `/api` proxy; Compose sets the server-only `API_PROXY_TARGET` to `http://api:3001`. Search `vin` returns VHM, VIC, VNM in that order. Select a result to inspect reference information and HTTPS source links, then follow “Xem chi tiết & biểu đồ ngày”. Check API liveness at `http://127.0.0.1:3001/health/live` and readiness at `http://127.0.0.1:3001/health/ready`. Readiness is 200 only while MongoDB and Redis answer their health checks, auth indexes initialize, the fixture plus its ten-entry company-reference catalog validate, and the watchlist equity catalog and unique owner index initialize; its response does not include internal errors.
 
@@ -118,6 +141,8 @@ The canonical `data` envelope preserves the fixture dataset label, `fixture / un
 ## Optional stored observed history API
 
 Set `OBSERVED_READS_ENABLED=true` explicitly for authorized local use. The default is `false`; only literal `true` or `false` is accepted, and any other value fails startup. Compose passes this flag only to the API. Host Node processes require it in their environment; `.env` is not loaded automatically. Changing the Compose flag requires recreating the API, for example `docker compose up -d --build --force-recreate api`. This read-only route needs MongoDB and the API's normal dependencies, but does not require `INGESTION_SECRET`, start a collector, initialize ingestion collections or call KBS. Disabling submission does not disable already stored reads. With the flag absent/false the route is unregistered and returns 404.
+
+A fresh clone/new MongoDB volume has no observed assets or candles. Enabling the flag alone does not populate them. The **Dữ liệu đã lưu · KBS** choices on FPT and VN-Index read only previously stored data; they do not fetch KBS, and an error/empty response does not fall back to fixture. Use the separately authorized [adapter](VNSTOCK_ADAPTER.md) and [ingestion procedure](INGESTION.md) only after reviewing their source/rights limits. The FPT collection-status card is also optional and does not measure actual provider freshness. MP-11/MP-12 remain partial.
 
 ```powershell
 Invoke-RestMethod "http://127.0.0.1:3001/api/observed/assets/FPT/history?from=2026-09-28&to=2026-10-07"
@@ -243,6 +268,8 @@ Cleanup was also exercised with unavailable Redis during startup and a deliberat
 
 Independent GPT-6 Astra re-review approved the corrected implementation on 14/10/2026 with no remaining blockers. The reviewer independently ran the four Windows harness regressions and reviewed the worker's six passing Linux regression results; the full local suite, browser journeys and cleanup audit above are worker evidence. Full Linux browser/stack execution and remote CI remain pending.
 
+**Remote acceptance update · 14/10/2026:** the preceding pending statements describe the earlier worker/review handoff. On merged `main` commit [`dd1ae64e509e67cead2a1c93a607372e1346e62c`](https://github.com/Son2110/Market-Pulse/commit/dd1ae64e509e67cead2a1c93a607372e1346e62c), [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/38507379609) and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/38507379712) succeeded. Actual logs confirm 172 unit, 27 integration, six Linux harness regressions, two Linux Chromium journeys, 27 Python contract and 29 collector tests, plus Compose/HTTP smoke and durable replay. MP-14 is accepted on that baseline. [Gate 5](GATE_5_REVIEW.md) adds fresh isolated Compose/browser/restart evidence; its documentation branch review and CI are separate.
+
 ```powershell
 npm run lint
 npm run typecheck
@@ -258,6 +285,6 @@ python scripts/build_docs.py
 
 Run `npm run test:integration` with local MongoDB and Redis available. It fails with a clear message if either dependency cannot be reached; it does not skip.
 
-The merged baseline's [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/37275919994) confirms **131 unit tests**, **17 real MongoDB/Redis integration tests**, **24 Python contract tests** and **six collector tests**, with no required checks skipped. The unit suite includes ingestion validation/digest checks and the existing search/detail/overview/auth/watchlist validation, bounded requests, write locks, reconciliation, 401/token guards and late replies after identity changes, expiry, logout or membership changes. Integration covers auth/watchlist ownership and concurrency plus eight ingestion scenarios, including replay, partial-write/crash recovery, outbox reconciliation, canonical conflicts and API startup recovery. See [ingestion evidence and limitations](INGESTION.md). These are CI counts from commit `b996e3e3e70ffbacf13fb8d319a182303d05dfc9`; the full suite was not repeated during the gate documentation task.
+The historical GATE-3 baseline's [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/37275919994) confirms **131 unit tests**, **17 real MongoDB/Redis integration tests**, **24 Python contract tests** and **six collector tests**, with no required checks skipped. The unit suite includes ingestion validation/digest checks and the existing search/detail/overview/auth/watchlist validation, bounded requests, write locks, reconciliation, 401/token guards and late replies after identity changes, expiry, logout or membership changes. Integration covers auth/watchlist ownership and concurrency plus eight ingestion scenarios, including replay, partial-write/crash recovery, outbox reconciliation, canonical conflicts and API startup recovery. See [ingestion evidence and limitations](INGESTION.md). These are historical CI counts from commit `b996e3e3e70ffbacf13fb8d319a182303d05dfc9`; current MP-14 counts are above. The full suite was not repeated during the Gate 5 documentation task.
 
-Application CI also checks `/stocks/FPT`, `/market`, `/account`, `/watchlists` and `/watchlists/` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. It now includes the committed isolated browser suite described above, with Chromium installation as an ordinary required step. [GATE-3 on 06/10/2026](GATE_3_REVIEW.md) records earlier five-service Compose startup and browser checks of the real core flows at 1440/390/320px, with mocked loading/empty/error/retry evidence recorded separately. Earlier browser state evidence remains in [the MP-07 handoff](FR04_DETAIL_DESIGN.md), [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md), [the account handoff](FR01_AUTH_DESIGN.md) and [the watchlist handoff](FR06_WATCHLIST_DESIGN.md). Those temporary scripts were historical QA; the committed MP-14 framework passed independent review on 14/10/2026 and awaits remote CI acceptance.
+Application CI also checks `/stocks/FPT`, `/market`, `/account`, `/watchlists` and `/watchlists/` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. It now includes the committed isolated browser suite described above, with Chromium installation as an ordinary required step. [GATE-3 on 06/10/2026](GATE_3_REVIEW.md) records earlier five-service Compose startup and browser checks of the real core flows at 1440/390/320px, with mocked loading/empty/error/retry evidence recorded separately. Earlier browser state evidence remains in [the MP-07 handoff](FR04_DETAIL_DESIGN.md), [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md), [the account handoff](FR01_AUTH_DESIGN.md) and [the watchlist handoff](FR06_WATCHLIST_DESIGN.md). Those temporary scripts were historical QA; the committed MP-14 framework passed independent review and exact-baseline remote CI on 14/10/2026.
