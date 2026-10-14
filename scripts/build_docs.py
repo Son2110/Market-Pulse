@@ -32,6 +32,7 @@ DOCUMENTS = (
     "docs/FR06_WATCHLIST_DESIGN.md",
     "docs/INGESTION.md",
     "docs/GATE_3_REVIEW.md",
+    "docs/GATE_5_REVIEW.md",
     "docs/VNSTOCK_ADAPTER.md",
 )
 ASSETS = (
