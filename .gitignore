@@ -23,3 +23,7 @@ node_modules/
 apps/*/dist/
 apps/*/coverage/
 .npm-cache/
+
+# Browser test output (may contain temporary demo identity)
+test-results/
+playwright-report/

@@ -208,6 +208,41 @@ After Redis disconnects, the API exits and Compose attempts up to five restarts.
 
 ## Checks
 
+### Committed core-flow browser tests (MP-14)
+
+Install Node dependencies and the pinned Chromium browser, then start only the database dependencies. The browser suite starts its own API entry point and Vite server on dynamically allocated loopback ports; existing Compose API/web services may stay running and are never reused.
+
+```powershell
+npm ci
+npx playwright install chromium
+docker compose up --detach --wait mongodb redis
+npm run test:e2e
+```
+
+On Linux CI, install browser system dependencies with `npx playwright install --with-deps chromium`. Node 22 and working local MongoDB/Redis are required. The runner does not load `.env`; its defaults are MongoDB port 27017 and Redis port 6379. For this repository's alternate MongoDB host port:
+
+```powershell
+$env:E2E_MONGODB_URL="mongodb://127.0.0.1:27018"
+$env:E2E_REDIS_URL="redis://127.0.0.1:6379"
+npm run test:e2e
+```
+
+Only single loopback dependency URLs are accepted. The MongoDB URL's database path is always replaced by a random `marketpulse_e2e_<32 hex characters>` database. Registration and watchlist writes go through the UI into that database; no test user or account state is seeded through an API or database write. A separate ownership marker guards database cleanup. Cleanup verifies the exact generated name and marker before dropping that database, on success, startup failure and test failure. Other databases and Compose volumes are preserved. The API uses Redis only for readiness because ingestion is explicitly disabled; the harness never starts a worker, clears queues or flushes Redis. Observed reads are also explicitly disabled, and no upstream provider is contacted.
+
+`playwright.config.ts` runs Chromium with one worker and no retries: independent desktop (1440px) and narrow mobile (320px) journeys search FPT, select the result, open the visible three-point SVG chart and daily table, assert exact fixture closes/source/as-of/VND/timezone/unknown freshness/calendar labels, register through the UI, create a watchlist, add FPT, reload to verify the persisted session/list, and log out before checking that private content is unavailable. A second isolated browser context registers another account and sees an empty private list. The existing API integration suite separately proves that user B cannot read or mutate user A's list. Both journeys assert no uncaught page errors and no page-level horizontal overflow; table scrolling remains allowed. There are no successful-response intercepts.
+
+The harness waits for each owned child's listening signal and HTTP readiness and uses strict web ports, so it cannot reuse an arbitrary existing server. It stops only its own process trees (Windows child PID tree; Linux dedicated process groups). Startup waits, actions, navigation, tests and the entire browser suite are bounded. Missing dependencies or Chromium cause a nonzero failure, never a skip. Run through `npm run test:e2e`; invoking Playwright directly has no managed stack and is rejected by configuration. Standard Playwright filters can be forwarded, for example `npm run test:e2e -- --project=desktop`.
+
+Failure screenshots mask all input fields. CI retains only these PNGs for three days; traces, video, session storage, auth request/response bodies, connection URLs and environment files are not uploaded. Child application output is withheld and generated credentials are not logged. The pinned runner disables Playwright's automatic page snapshot prompt; error text and code locations remain visible. Browser failures do not imply live-source readiness or complete UI state/accessibility coverage. Loading/empty/error/retry and broader browser-state evidence remain in the existing page handoffs; this suite covers the real fixture success journey and private-content boundaries.
+
+Local verification on 14/10/2026: two browser journeys, 172 unit tests, 27 real MongoDB/Redis integration tests, 27 Python contract tests and 29 collector tests passed without skips; lint/typecheck/build and documentation checks also passed. The initial restricted Windows sandbox blocked loopback unit requests and Vite realpath access; those checks passed when rerun with scoped local access. Review and remote CI are separate acceptance evidence, not implied by these local results.
+
+Cleanup was also exercised with unavailable Redis during startup and a deliberately short browser-test timeout. Both runs exited 1, each removed its exact generated database, and all observed owned descendants stopped (three for startup failure; twelve including browser/worker/esbuild for the test failure). The database-name set returned to its baseline and the existing `marketpulse` database's content hash was unchanged. This was a temporary read-only audit around the committed runner on Windows. An externally forced termination of the harness itself, machine shutdown or unreachable MongoDB during cleanup cannot guarantee database removal; the runner reports cleanup failure rather than broadening deletion scope.
+
+`npm run test:e2e:harness` runs the committed harness regressions before the browser suite in CI. Four checks passed on Windows: malformed MongoDB URL, malformed Redis URL and MongoDB constructor failures return only a fixed error without a synthetic credential sentinel, and an unowned process is refused and remains alive. A disposable Linux container with init, no network, a read-only test-source mount and no app volumes passed all six checks: the same four plus an owned descendant remaining after its parent exits, and a descendant ignoring SIGTERM after its parent stops. The supervisor waits on the tracked process group independently of parent exit, escalates after a bounded grace period and verifies that the whole group is gone. Full Linux browser/stack execution remains pending remote CI.
+
+Independent GPT-6 Astra re-review approved the corrected implementation on 14/10/2026 with no remaining blockers. The reviewer independently ran the four Windows harness regressions and reviewed the worker's six passing Linux regression results; the full local suite, browser journeys and cleanup audit above are worker evidence. Full Linux browser/stack execution and remote CI remain pending.
+
 ```powershell
 npm run lint
 npm run typecheck
@@ -225,4 +260,4 @@ Run `npm run test:integration` with local MongoDB and Redis available. It fails 
 
 The merged baseline's [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/37275919994) confirms **131 unit tests**, **17 real MongoDB/Redis integration tests**, **24 Python contract tests** and **six collector tests**, with no required checks skipped. The unit suite includes ingestion validation/digest checks and the existing search/detail/overview/auth/watchlist validation, bounded requests, write locks, reconciliation, 401/token guards and late replies after identity changes, expiry, logout or membership changes. Integration covers auth/watchlist ownership and concurrency plus eight ingestion scenarios, including replay, partial-write/crash recovery, outbox reconciliation, canonical conflicts and API startup recovery. See [ingestion evidence and limitations](INGESTION.md). These are CI counts from commit `b996e3e3e70ffbacf13fb8d319a182303d05dfc9`; the full suite was not repeated during the gate documentation task.
 
-Application CI also checks `/stocks/FPT`, `/market`, `/account`, `/watchlists` and `/watchlists/` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. [GATE-3 on 06/10/2026](GATE_3_REVIEW.md) adds fresh five-service Compose startup and browser checks of the real core flows at 1440/390/320px, with mocked loading/empty/error/retry evidence recorded separately. Earlier browser state evidence remains in [the MP-07 handoff](FR04_DETAIL_DESIGN.md), [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md), [the account handoff](FR01_AUTH_DESIGN.md) and [the watchlist handoff](FR06_WATCHLIST_DESIGN.md). The temporary browser scripts are not a committed E2E suite; MP-14 still requires that deliverable.
+Application CI also checks `/stocks/FPT`, `/market`, `/account`, `/watchlists` and `/watchlists/` serve the web entry, and the same-origin FPT/VNINDEX history proxies preserve the fixture candles, units, as-of and freshness. It now includes the committed isolated browser suite described above, with Chromium installation as an ordinary required step. [GATE-3 on 06/10/2026](GATE_3_REVIEW.md) records earlier five-service Compose startup and browser checks of the real core flows at 1440/390/320px, with mocked loading/empty/error/retry evidence recorded separately. Earlier browser state evidence remains in [the MP-07 handoff](FR04_DETAIL_DESIGN.md), [the MP-08 handoff](FR02_OVERVIEW_DESIGN.md), [the account handoff](FR01_AUTH_DESIGN.md) and [the watchlist handoff](FR06_WATCHLIST_DESIGN.md). Those temporary scripts were historical QA; the committed MP-14 framework passed independent review on 14/10/2026 and awaits remote CI acceptance.
