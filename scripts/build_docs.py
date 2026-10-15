@@ -33,6 +33,8 @@ DOCUMENTS = (
     "docs/INGESTION.md",
     "docs/GATE_3_REVIEW.md",
     "docs/GATE_5_REVIEW.md",
+    "docs/GOLD_SOURCE_AUDIT.md",
+    "docs/GOLD_DATA_DESIGN_P1.md",
     "docs/VNSTOCK_ADAPTER.md",
 )
 ASSETS = (
