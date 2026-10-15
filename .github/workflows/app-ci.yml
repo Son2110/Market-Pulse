@@ -38,6 +38,8 @@ jobs:
           npm run build
       - name: Install fixture validation dependency
         run: python -m pip install -r requirements-dev.txt
+      - name: Validate synthetic gold contract offline
+        run: python scripts/validate_gold_quotes.py
       - name: Validate fixture and run Python tests
         run: |
           python scripts/validate_market_data.py

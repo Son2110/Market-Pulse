@@ -1,5 +1,14 @@
 # Local development
 
+**P1.2 gold contract · 16/10/2026:** [synthetic gold fixture](../fixtures/gold/README.md)
+and [schema](../packages/schemas/gold-quotes-v1.schema.json) are standalone offline
+artifacts. With `requirements-dev.txt` installed, run
+`python scripts/validate_gold_quotes.py`; Python contract discovery and
+`npm run test:unit` include gold arithmetic/identity checks. Both CI workflows
+explicitly validate gold offline. Local implementation awaits independent review
+and remote CI. The fixture is not consumed by the collector, storage, API or UI;
+P1.3A/P1.4 remain separate tasks and the live-source gate remains closed.
+
 **Current local demo · 14/10/2026:** Docker Compose runs the fixture web/API plus worker, MongoDB and Redis. No provider credential, ingestion secret, host Node/Python installation or pre-existing account is required for the core tour. [GATE-5](GATE_5_REVIEW.md) records fresh startup, real browser QA and restart persistence; it does not approve upstream rights or production use.
 
 Authenticated fixture submission is optional and separate from public fixture reads. Generate a local secret as described in `.env.example`, then use `docker compose --profile collector run --rm collector fixtures/market/mp-02-synthetic.json --submit --poll-seconds 10`; repeat to verify replay. Offline collector invocation remains the default. The delivery path stores raw/canonical data separately. See [ingestion setup, status/count semantics and recovery](INGESTION.md). Existing local volumes and other `.env` settings should be preserved.
