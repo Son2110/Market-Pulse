@@ -1,10 +1,33 @@
 # Thiết kế kỹ thuật tổng hợp dữ liệu vàng Việt Nam — Phase P1
 
 **Ngày lập tài liệu:** 15/10/2026<br>
-**Trạng thái thiết kế:** Hoàn thành nghiên cứu và thiết kế kỹ thuật P1.1–P1.4 (chưa triển khai code implementation; cổng live source chưa mở)<br>
+**Trạng thái thiết kế ngày 15/10:** Hoàn thành nghiên cứu và thiết kế kỹ thuật P1.1–P1.4; cập nhật implementation P1.2 ngày 16/10 ở dưới. Cổng live source chưa mở.<br>
 **Phạm vi:** Đặc tả kiến trúc, data contract, fixture, mô hình lưu trữ MongoDB, quy tắc collector, API đọc dữ liệu và kế hoạch triển khai từng bước cho luồng dữ liệu vàng Việt Nam (vàng miếng SJC và nhẫn trơn 9999) theo [PRD](PRD.md), [ROADMAP](ROADMAP.md) và kết quả khảo sát nguồn tại [GOLD_SOURCE_AUDIT.md](GOLD_SOURCE_AUDIT.md).
 
 ---
+
+## P1.2 contract implementation · 16/10/2026
+
+Đã triển khai riêng [schema gold-quotes-v1](../packages/schemas/gold-quotes-v1.schema.json),
+[fixture synthetic](../fixtures/gold/README.md), validator Python offline và golden
+tests Python/Node dùng RFC 8785/SHA-256. Chờ review độc lập và CI remote; các phần
+collector, storage, worker, API và UI bên dưới vẫn là thiết kế tương lai.
+
+P1.2 dùng envelope đóng `schemaVersion`, `dataset`, `observations`; provider và
+provenance là `marketpulse-fixture`, URL thuộc `marketpulse.invalid`, SJC/PNJ là
+brand sản phẩm riêng. Freshness luôn `fixture / unknown`. Timestamps trong `time`
+bắt buộc UTC sáu chữ số phần giây; `qualityFlags.sourceTimestampStatus` và
+`regionStatus` mô tả tình huống giả lập, không xác minh nguồn thật. `requestedRegion`
+không chứng minh `region`; ngày tham chiếu dùng UTC+7 từ source time, hoặc collection
+khi source unknown. Decimal string tối đa 128 ký tự, số học chính xác trong giới hạn
+này, phép đổi đơn vị và null sides được kiểm tra. Hash content chỉ chứa projection
+kinh tế ở mục D; URL/adapter/quality/collection metadata không tham gia.
+
+Quy tắc identity hiện hành tại mục A dùng JSON null và snapshot key có prefix;
+unknown fetch mới tạo snapshot mới, replay giữ collection time gốc. Validator chỉ
+kiểm tra cấu trúc, số học và identity trong payload; không thể chứng minh upstream
+đã công bố đồng thời hai phía. Future adapter phải xác minh pairing, giữ riêng
+snapshot của các phía lệch thời điểm. Không mở cổng nguồn thật hoặc public/training.
 
 ## 1. Tổng quan kiến trúc dữ liệu vàng P1
 
@@ -53,7 +76,8 @@ Hợp đồng dữ liệu vàng (`gold-quotes-v1`) được thiết kế riêng 
 
 1. **Chuỗi sản phẩm (Series / Asset Identity — `assetId`):**
    Định danh bất biến cho một cặp sản phẩm - nhà niêm yết - khu vực cụ thể:
-   $$\text{assetId} = \text{SHA-256}([\text{"gold_asset"}, \text{provider}, \text{brand}, \text{product}, \text{purity}, \text{region // "null"}])$$
+   $$\text{assetId} = \text{SHA-256}(\text{JCS}([\text{"gold_asset"}, \text{provider}, \text{brand}, \text{product}, \text{purity}, \text{region}]))$$
+   Khu vực chưa xác minh dùng JSON `null`, không dùng chuỗi `"null"`.
    Trong đó:
    - `provider` (string): Mã nhà niêm yết công bố giá (ví dụ: `"PNJ"`, `"SJC"`, `"DOJI"`).
    - `brand` (string): Thương hiệu sản phẩm thực tế (ví dụ: vàng miếng do PNJ niêm yết thì `provider: "PNJ"`, nhưng `brand: "SJC"`; nhẫn trơn PNJ thì `brand: "PNJ"`).
@@ -65,10 +89,10 @@ Hợp đồng dữ liệu vàng (`gold-quotes-v1`) được thiết kế riêng 
 
 2. **Bản ghi Quan sát Snapshot (Observation Snapshot Identity — `snapshotId`):**
    Mỗi lần nhà niêm yết phát hành biểu giá mới cho một chuỗi sản phẩm sẽ tạo ra một snapshot có định danh duy nhất:
-   $$\text{snapshotId} = \text{SHA-256}([\text{assetId}, \text{snapshotKey}])$$
+   $$\text{snapshotId} = \text{SHA-256}(\text{JCS}([\text{assetId}, \text{snapshotKey}]))$$
    Trong đó `snapshotKey` được xác định theo nguyên tắc:
-   - Nếu nguồn có `sourceAsOf` hợp lệ: `snapshotKey` là chuỗi thời gian công bố ISO 8601 UTC chuẩn hóa (ví dụ `"2026-10-15T06:50:00Z"`).
-   - Nếu `sourceAsOf: null`: `snapshotKey` là chuỗi `collectedOrder` (ISO 8601 UTC microsecond) của lần đầu tiên hệ thống ghi nhận snapshot quan sát thô đó.
+   - Nếu nguồn có `sourceAsOf` hợp lệ: `snapshotKey` là `source:<sourceAsOf>` với UTC sáu chữ số phần giây (ví dụ `source:2026-10-15T06:50:00.000000Z`).
+   - Nếu `sourceAsOf: null`: `snapshotKey` là `observation:<collectedAt>` với cùng định dạng UTC sáu chữ số. Mỗi fetch mới tạo snapshot riêng dù giá không đổi; replay giữ nguyên `collectedAt` ban đầu. Không suy luận nhóm quan sát theo giá hoặc thêm trường first-observed. Prefix tách hai miền thời gian để tránh va chạm khi source và collection có cùng timestamp.
 
 3. **Cấu trúc dữ liệu Giá trong Snapshot (`gold_quote_snapshot`):**
    - `buy` (string canonical decimal | null): Giá mua vào của nhà niêm yết tính theo đơn vị canonical `VND/lượng`. Bắt buộc là số dương (`> 0`) hoặc `null`. Nhận `null` nếu nhà niêm yết tạm ngừng mua.
@@ -84,7 +108,7 @@ Hợp đồng dữ liệu vàng (`gold-quotes-v1`) được thiết kế riêng 
      - **Tiếp tục từ chối nghiêm ngặt:** `"-0"`, `"-0.0"`, số mũ (scientific notation), dấu cộng `+`, khoảng trắng, số 0 thừa phía trước (như `"01"`), và số 0 thừa cuối phần thập phân (như `"1.50"`).
      - **Ví dụ kiểm chứng số học:**
        - `buy = "100000000"`, `sell = "100000000.5"` $\implies$ `spread = "0.5"`.
-       - Đảo hai giá: `buy = "100000000.5"`, `sell = "100000000"` $\implies$ `spread = "-0.5"` kèm cờ `spread_inverted: true`.
+       - Đảo hai giá: `buy = "100000000.5"`, `sell = "100000000"` $\implies$ `spread = "-0.5"` kèm `qualityFlags.priceIntegrity: "spread_inverted"`.
      - `spread` **chỉ được phép tính toán khi cả `buy` và `sell` cùng xuất hiện đồng thời trong cùng một snapshot phát hành**. Nếu một trong hai phía là `null`, `spread` bắt buộc phải là `null`.
      - Khi `sell >= buy`: `spread` là chuỗi số không âm (ví dụ `"3000000"`, `"0.5"`, `"0"`).
      - Khi `sell < buy` (dị thường thị trường hoặc lỗi nguồn): Hệ thống giữ nguyên giá trị gốc trung thực của `buy` và `sell`, tính toán `spread` ra giá trị âm (ví dụ `"-2000000"`, `"-0.5"`), và gán cờ chất lượng `priceIntegrity: "spread_inverted"`. Validator chấp nhận lưu trữ bản ghi này để phục vụ audit/giám sát, không tự động sửa hay loại bỏ.
@@ -125,7 +149,7 @@ Hợp đồng dữ liệu vàng (`gold-quotes-v1`) được thiết kế riêng 
 - `qualityFlags`:
   - `sourceTimestampStatus`: `"verified"` | `"unknown"`.
   - `regionStatus`: `"verified"` | `"unverified"` | `"not_applicable"`.
-  - `priceIntegrity`: `"valid"` | `"negative"` | `"spread_inverted"` (bán thấp hơn mua).
+  - `priceIntegrity`: `"valid"` | `"spread_inverted"` (bán thấp hơn mua). Giá mua/bán âm bị từ chối; không có cờ boolean trùng nghĩa.
 - `provenance`:
   - `provider`: Tên nguồn (ví dụ `"PNJ"`, `"SJC"`, `"marketpulse-fixture"`).
   - `sourceUrl`: URL cụ thể đã thu thập.
@@ -152,7 +176,7 @@ Nhằm bảo toàn tính toàn vẹn kinh tế và khả năng khử trùng lặ
 3. **Vai trò Kỹ thuật của `collectedAt` và `collectedOrder`:**
    - `collectedAt` là dấu thời gian ISO 8601 UTC microsecond ghi nhận thời điểm collector cào được dữ liệu.
    - `collectedOrder` là chuỗi chuẩn hóa từ `collectedAt` dùng để so sánh thứ tự từ điển (lexicographical comparison) thời gian quan sát.
-   - Vai trò duy nhất của `collectedOrder` là **xác định thứ tự quan sát (observation order)** giữa các lần thu thập, được lưu vào trường `latestObservationOrder` của các projection (`gold_quote_snapshots` và `gold_quotes_latest`). Nó là thuộc tính trạng thái (state tracking metadata), hoàn toàn không tham gia vào identity hay hash nội dung của revision.
+   - `collectedOrder` xác định thứ tự quan sát giữa các lần thu thập, dự kiến lưu vào `latestObservationOrder` của projection. Với source time unknown, giá trị UTC chuẩn hóa của `collectedAt` còn tham gia snapshot key có prefix `observation:`; nó luôn bị loại khỏi `contentDigest`.
 
 ### 2.2. Danh mục Tình huống Synthetic Fixture và Tiêu chí Validation
 
@@ -176,8 +200,8 @@ Nhằm bảo toàn tính toàn vẹn kinh tế và khả năng khử trùng lặ
    - Giá `buy` hoặc `sell` bằng 0 hoặc số âm: **Validator từ chối ngay tại biên**.
    - Biểu diễn số 0 của spread sai quy cách (như `"-0"` hoặc `"-0.0"`): **Validator từ chối (Reject)**.
    - Giá có phần nguyên bằng 0 và spread nhỏ: `buy = "100000000"`, `sell = "100000000.5"` $\implies$ `spread = "0.5"`: **Validator chấp nhận**.
-   - Đảo hai giá: `buy = "100000000.5"`, `sell = "100000000"` $\implies$ `spread = "-0.5"`: **Validator chấp nhận**, ghi nhận cờ `spread_inverted: true`.
-   - Giá mua lớn hơn giá bán (Spread đảo ngược, ví dụ Buy 142.000.000, Sell 140.000.000): **Validator chấp nhận**, ghi nhận `spread: "-2000000"`, phát hiện cờ `spread_inverted`, không tự động hoán đổi giá trị.
+   - Đảo hai giá: `buy = "100000000.5"`, `sell = "100000000"` $\implies$ `spread = "-0.5"`: **Validator chấp nhận**, ghi nhận cờ `qualityFlags.priceIntegrity: "spread_inverted"`.
+   - Giá mua lớn hơn giá bán (Spread đảo ngược, ví dụ Buy 142.000.000, Sell 140.000.000): **Validator chấp nhận**, ghi nhận `spread: "-2000000"`, phát hiện `qualityFlags.priceIntegrity: "spread_inverted"`, không tự động hoán đổi giá trị.
 6. **Kịch bản sửa đổi, Replay và Đính chính (Revisions, Deduplication & Updates):**
    - *Lần 1 (09:00 phát hành lần đầu):* Nguồn phát hành biểu giá sáng `sourceAsOf: "09:00"` (Buy 138.500.000, Sell 141.500.000) -> Ghi nhận **Snapshot 1** (Revision 1 của Snapshot 1).
    - *Lần 2 (09:00 replay):* Cùng payload lúc 09:00 được submit lại -> Idempotent replay, không tạo revision mới, giữ nguyên Snapshot 1.
@@ -557,7 +581,7 @@ Kế thừa trực tiếp nguyên tắc xử lý của `ObservedStore.persist` t
   - **Không có dữ liệu trong khoảng ngày (No Data / Empty):** Trả về HTTP 200 với mảng `data: []` và metadata `count: 0`. Không tự nội suy hoặc bịa đặt giá các ngày nghỉ/ngày thiếu.
   - **Dị thường Spread Âm và Khuyết Phía:**
     - `spread` chỉ được tính toán khi cả `buy` và `sell` cùng tồn tại tại cùng một snapshot cập nhật đồng thời. Nếu thiếu một chiều giá: `spread: null`.
-    - Nếu giá bán thấp hơn giá mua (`sell < buy`): Giữ nguyên số liệu gốc của `buy` và `sell`, tính ra `spread` âm (ví dụ `"-2000000"`), và gán cờ `spread_inverted: true` trong quality flags.
+    - Nếu giá bán thấp hơn giá mua (`sell < buy`): Giữ nguyên số liệu gốc của `buy` và `sell`, tính ra `spread` âm (ví dụ `"-2000000"`), và gán cờ `qualityFlags.priceIntegrity: "spread_inverted"` trong quality flags.
     - Giá trị số 0 của spread luôn được chuẩn hóa duy nhất là `"0"`, tuyệt đối không chấp nhận `"-0"`.
   - **Tách bạch Ingestion Success khỏi Source Freshness:** Một HTTP delivery được worker ghi nhận thành công chỉ chứng minh rằng bản ghi đã được nạp an toàn vào DB nội bộ; **không đồng nghĩa** dữ liệu ngoài thị trường là fresh. Trường `freshness` luôn phản ánh trung thực trạng thái của nguồn.
   - **Lỗi truy vấn / Hệ thống:** Query sai tham số hoặc vượt giới hạn 31 ngày / 500 records trả về HTTP 400 (`invalid_query`); không tìm thấy sản phẩm trả về HTTP 404 (`product_not_found`); mất kết nối database hoặc quá thời gian timeout (1.000 ms) trả về HTTP 503 (`gold_history_unavailable`).
@@ -573,9 +597,9 @@ Kế thừa toàn diện hạ tầng kiểm thử sẵn có của dự án:
    - Kiểm tra định dạng `spread`: Pattern `^(?:0|-?(?:0\.[0-9]*[1-9]|[1-9][0-9]*(?:\.[0-9]*[1-9])?))$` hoặc `null`. Cho phép `"0"`, số dương hoặc âm có phần nguyên bằng 0 (như `"0.5"`, `"-0.5"`, `"0.001"`), số nguyên hoặc thập phân canonical khác (như `"3000000"`, `"-2000000"`).
    - Kiểm tra các test case kiểm chứng số học:
      - `buy = "100000000"`, `sell = "100000000.5"` $\implies$ `spread = "0.5"`.
-     - `buy = "100000000.5"`, `sell = "100000000"` $\implies$ `spread = "-0.5"` kèm cờ `spread_inverted: true`.
+     - `buy = "100000000.5"`, `sell = "100000000"` $\implies$ `spread = "-0.5"` kèm cờ `qualityFlags.priceIntegrity: "spread_inverted"`.
      - Từ chối nghiêm ngặt `"-0"`, `"-0.0"`, `"+0.5"`, `"01"`, `"1.50"`, số mũ scientific.
-   - Kiểm tra ràng buộc snapshot hai chiều: `spread = sell - buy` khi có đủ 2 phía; `spread = null` khi thiếu một phía; bắt buộc từ chối ghép hai thời điểm khác nhau.
+   - Contract kiểm tra `spread = sell - buy` khi có đủ 2 phía; `spread = null` khi thiếu một phía. Future adapter tests phải từ chối ghép hai thời điểm nguồn khác nhau; validator payload không chứng minh upstream pairing.
 2. **Unit Tests (API & Store):**
    - Kiểm tra hàm chuyển đổi đơn vị presentation (`vnd_per_tael` chia 10 thành `vnd_per_chi` trên chuỗi số thập phân).
    - Kiểm tra logic phân xử ordering hai chế độ (verified sourceAsOf vs. unknown sourceAsOf; quote cũ đến muộn không đè quote mới; bản ghi unknown không đè bản ghi verified).

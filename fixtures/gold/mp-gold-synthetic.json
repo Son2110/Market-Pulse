@@ -1,0 +1,451 @@
+{
+  "schemaVersion": "1.0.0",
+  "dataset": {
+    "mode": "fixture",
+    "label": "SYNTHETIC FIXTURE — NOT MARKET DATA",
+    "freshness": "fixture / unknown",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "observations": [
+    {
+      "assetId": "2904f49d38ee84fe6e091f593fad4fbc24712573280be3a603ddbed0f49b65f8",
+      "snapshotId": "a5142ae6f8869ebdddcb7bd03b417c186e5d9508047cbf80761bcb54920c2b40",
+      "contentDigest": "f9886eda80332388a22daebe2bd65f826b118fdd67206a000b2a2340314c3861",
+      "provider": "marketpulse-fixture",
+      "brand": "SJC",
+      "product": "gold_bar_sjc",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "140300000",
+        "sell": "143300000",
+        "spread": "3000000",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-15T02:00:00.000000Z",
+        "collectedAt": "2026-10-15T02:00:01.123456Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "14030",
+        "originalSell": "14330",
+        "originalUnit": "thousand_vnd_per_chi",
+        "conversionFactor": "10000",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "2904f49d38ee84fe6e091f593fad4fbc24712573280be3a603ddbed0f49b65f8",
+      "snapshotId": "a5142ae6f8869ebdddcb7bd03b417c186e5d9508047cbf80761bcb54920c2b40",
+      "contentDigest": "9b6c576421b72048e8be0ff2398db14cebd5151521d6dc125350d9c249c9a8b0",
+      "provider": "marketpulse-fixture",
+      "brand": "SJC",
+      "product": "gold_bar_sjc",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "140310000",
+        "sell": "143300000",
+        "spread": "2990000",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-15T02:00:00.000000Z",
+        "collectedAt": "2026-10-15T03:00:00.000001Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "14031",
+        "originalSell": "14330",
+        "originalUnit": "thousand_vnd_per_chi",
+        "conversionFactor": "10000",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "2904f49d38ee84fe6e091f593fad4fbc24712573280be3a603ddbed0f49b65f8",
+      "snapshotId": "a5142ae6f8869ebdddcb7bd03b417c186e5d9508047cbf80761bcb54920c2b40",
+      "contentDigest": "f9886eda80332388a22daebe2bd65f826b118fdd67206a000b2a2340314c3861",
+      "provider": "marketpulse-fixture",
+      "brand": "SJC",
+      "product": "gold_bar_sjc",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "140300000",
+        "sell": "143300000",
+        "spread": "3000000",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-15T02:00:00.000000Z",
+        "collectedAt": "2026-10-15T04:00:00.000002Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "14030",
+        "originalSell": "14330",
+        "originalUnit": "thousand_vnd_per_chi",
+        "conversionFactor": "10000",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "2904f49d38ee84fe6e091f593fad4fbc24712573280be3a603ddbed0f49b65f8",
+      "snapshotId": "4a0f58534a2156c0ff4c8521335cbe0cbe552b67ff0061e72c44fcb285279910",
+      "contentDigest": "d8069027c014c8a34dd5b19297445b27d7c8efe308e67a1570d34117795dddbf",
+      "provider": "marketpulse-fixture",
+      "brand": "SJC",
+      "product": "gold_bar_sjc",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "140300000",
+        "sell": "143300000",
+        "spread": "3000000",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-15T05:00:00.000000Z",
+        "collectedAt": "2026-10-15T05:00:01.000003Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "14030",
+        "originalSell": "14330",
+        "originalUnit": "thousand_vnd_per_chi",
+        "conversionFactor": "10000",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "32a69725e899e7748125038fca77994078773470148493565dde32d42bd31d67",
+      "snapshotId": "2a0b41046a4b5da144be609ebfe84ded7f5972b3ace1f531cc3f6c0199d03699",
+      "contentDigest": "613f33d3d298e77d6255fbd4388fbb0800b31da4e0e3c37a99cd70ed98b74524",
+      "provider": "marketpulse-fixture",
+      "brand": "PNJ",
+      "product": "plain_ring_9999",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "130000000",
+        "sell": "133000000",
+        "spread": "3000000",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-15T02:00:00.000000Z",
+        "collectedAt": "2026-10-15T02:00:01.123456Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "130000",
+        "originalSell": "133000",
+        "originalUnit": "thousand_vnd_per_tael",
+        "conversionFactor": "1000",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "d66325620744c0beac32eb188518bd13fe1fcf366844135454639ba125f50702",
+      "snapshotId": "769e0fd28989fe809c46bb7f9020f8ad99d3c655b79e749d874570590829ebcd",
+      "contentDigest": "1f283876f292abaf4772658c59a30f19b75bb7c5bc32273c88683913c5271ad8",
+      "provider": "marketpulse-fixture",
+      "brand": "PNJ",
+      "product": "plain_ring_9999",
+      "purity": "999.9",
+      "region": null,
+      "requestedRegion": "11",
+      "quotes": {
+        "buy": null,
+        "sell": "100000000.5",
+        "spread": null,
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": null,
+        "collectedAt": "2026-10-15T02:00:01.123456Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "collected_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "unknown",
+        "regionStatus": "unverified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": null,
+        "originalSell": "100000000.5",
+        "originalUnit": "vnd_per_tael",
+        "conversionFactor": "1",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "d66325620744c0beac32eb188518bd13fe1fcf366844135454639ba125f50702",
+      "snapshotId": "38eb5f6755881cd93b8b42624cbbb6d6b53e94ca0cdc23f6a6cdf1360677aae4",
+      "contentDigest": "2a2542c2d56cf5c0560a6f2c1399fac65ee087bbe2885195ffe001b45d46a8bc",
+      "provider": "marketpulse-fixture",
+      "brand": "PNJ",
+      "product": "plain_ring_9999",
+      "purity": "999.9",
+      "region": null,
+      "requestedRegion": "11",
+      "quotes": {
+        "buy": "100000000",
+        "sell": null,
+        "spread": null,
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": null,
+        "collectedAt": "2026-10-15T02:01:00.000001Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "collected_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "unknown",
+        "regionStatus": "unverified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "100000000",
+        "originalSell": null,
+        "originalUnit": "vnd_per_tael",
+        "conversionFactor": "1",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "2904f49d38ee84fe6e091f593fad4fbc24712573280be3a603ddbed0f49b65f8",
+      "snapshotId": "70c07c404e2fea4b92feb4f8a4afbe9a34b38f35580be7393baa3fdfbdbb18fb",
+      "contentDigest": "81570a8ad0dff17ae5ef8493b04ddf6ae0e35f50beff076382c420236f5f51b4",
+      "provider": "marketpulse-fixture",
+      "brand": "SJC",
+      "product": "gold_bar_sjc",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "100000000",
+        "sell": "100000000.5",
+        "spread": "0.5",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-14T17:00:00.000000Z",
+        "collectedAt": "2026-10-15T02:00:01.123456Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "100000000",
+        "originalSell": "100000000.5",
+        "originalUnit": "vnd_per_tael",
+        "conversionFactor": "1",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "2904f49d38ee84fe6e091f593fad4fbc24712573280be3a603ddbed0f49b65f8",
+      "snapshotId": "f6fec2514ce1524da7c86df59c52b293200955723e6585aee6ad3b3c0ac59a93",
+      "contentDigest": "7399ec209b01ce1850c28213b4953771384136560ec447075c98147c6440e05b",
+      "provider": "marketpulse-fixture",
+      "brand": "SJC",
+      "product": "gold_bar_sjc",
+      "purity": "999.9",
+      "region": "Hồ Chí Minh",
+      "requestedRegion": "01",
+      "quotes": {
+        "buy": "100000000.5",
+        "sell": "100000000",
+        "spread": "-0.5",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": "2026-10-14T16:59:59.999999Z",
+        "collectedAt": "2026-10-15T02:00:01.123456Z",
+        "referenceDate": "2026-10-14",
+        "referenceDateType": "source_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "verified",
+        "regionStatus": "verified",
+        "priceIntegrity": "spread_inverted"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "100000000.5",
+        "originalSell": "100000000",
+        "originalUnit": "vnd_per_tael",
+        "conversionFactor": "1",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "d66325620744c0beac32eb188518bd13fe1fcf366844135454639ba125f50702",
+      "snapshotId": "34aa53fc13dd2a9f017777d54e27e0647128a29c47984d1e644c28b52c48ba2b",
+      "contentDigest": "bf79d1d51872c2534b902c8fbaba7cbdc2ec424c59e0d15b3845b9d52798b3fb",
+      "provider": "marketpulse-fixture",
+      "brand": "PNJ",
+      "product": "plain_ring_9999",
+      "purity": "999.9",
+      "region": null,
+      "requestedRegion": null,
+      "quotes": {
+        "buy": "0.5",
+        "sell": "0.5",
+        "spread": "0",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": null,
+        "collectedAt": "2026-10-14T17:00:00.000000Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "collected_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "unknown",
+        "regionStatus": "not_applicable",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "0.5",
+        "originalSell": "0.5",
+        "originalUnit": "vnd_per_tael",
+        "conversionFactor": "1",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    },
+    {
+      "assetId": "d66325620744c0beac32eb188518bd13fe1fcf366844135454639ba125f50702",
+      "snapshotId": "a8df21dbc2a8f1e1197e54e6608ee01d9551f90036dac1b40623eef53e2caaa3",
+      "contentDigest": "bf79d1d51872c2534b902c8fbaba7cbdc2ec424c59e0d15b3845b9d52798b3fb",
+      "provider": "marketpulse-fixture",
+      "brand": "PNJ",
+      "product": "plain_ring_9999",
+      "purity": "999.9",
+      "region": null,
+      "requestedRegion": null,
+      "quotes": {
+        "buy": "0.5",
+        "sell": "0.5",
+        "spread": "0",
+        "currency": "VND",
+        "unit": "vnd_per_tael"
+      },
+      "time": {
+        "sourceAsOf": null,
+        "collectedAt": "2026-10-14T17:00:00.000001Z",
+        "referenceDate": "2026-10-15",
+        "referenceDateType": "collected_date",
+        "timezone": "Asia/Ho_Chi_Minh"
+      },
+      "qualityFlags": {
+        "sourceTimestampStatus": "unknown",
+        "regionStatus": "not_applicable",
+        "priceIntegrity": "valid"
+      },
+      "provenance": {
+        "provider": "marketpulse-fixture",
+        "originalBuy": "0.5",
+        "originalSell": "0.5",
+        "originalUnit": "vnd_per_tael",
+        "conversionFactor": "1",
+        "sourceUrl": "https://marketpulse.invalid/gold/synthetic",
+        "adapterVersion": "1.0.0",
+        "schemaVersion": "1.0.0"
+      }
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marketpulse.invalid/schemas/gold-quotes-v1.schema.json",
+  "title": "MarketPulse synthetic gold quotes v1",
+  "description": "Offline synthetic contract only. A valid payload does not establish upstream pairing, rights or freshness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "dataset", "observations"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "label", "freshness", "timezone"],
+      "properties": {
+        "mode": { "const": "fixture" },
+        "label": { "const": "SYNTHETIC FIXTURE — NOT MARKET DATA" },
+        "freshness": { "const": "fixture / unknown" },
+        "timezone": { "const": "Asia/Ho_Chi_Minh" }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/observation" }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+    "positive": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "pattern": "^(?:0\\.[0-9]*[1-9]|[1-9][0-9]*(?:\\.[0-9]*[1-9])?)$(?![\\s\\S])"
+    },
+    "spread": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "pattern": "^(?:0|-?(?:0\\.[0-9]*[1-9]|[1-9][0-9]*(?:\\.[0-9]*[1-9])?))$(?![\\s\\S])"
+    },
+    "region": { "type": ["string", "null"], "minLength": 1, "maxLength": 128, "pattern": "^\\S(?:[^\\r\\n]*\\S)?$(?![\\s\\S])" },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$(?![\\s\\S])"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "snapshotId", "contentDigest", "provider", "brand", "product", "purity", "region", "requestedRegion", "quotes", "time", "qualityFlags", "provenance"],
+      "properties": {
+        "assetId": { "$ref": "#/$defs/hash" },
+        "snapshotId": { "$ref": "#/$defs/hash" },
+        "contentDigest": { "$ref": "#/$defs/hash" },
+        "provider": { "const": "marketpulse-fixture" },
+        "brand": { "enum": ["SJC", "PNJ"] },
+        "product": { "enum": ["gold_bar_sjc", "plain_ring_9999"] },
+        "purity": { "const": "999.9" },
+        "region": { "$ref": "#/$defs/region" },
+        "requestedRegion": { "$ref": "#/$defs/region" },
+        "quotes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["buy", "sell", "spread", "currency", "unit"],
+          "properties": {
+            "buy": { "$ref": "#/$defs/positive" },
+            "sell": { "$ref": "#/$defs/positive" },
+            "spread": { "$ref": "#/$defs/spread" },
+            "currency": { "const": "VND" },
+            "unit": { "const": "vnd_per_tael" }
+          }
+        },
+        "time": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceAsOf", "collectedAt", "referenceDate", "referenceDateType", "timezone"],
+          "properties": {
+            "sourceAsOf": { "anyOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+            "collectedAt": { "$ref": "#/$defs/timestamp" },
+            "referenceDate": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$(?![\\s\\S])" },
+            "referenceDateType": { "enum": ["source_date", "collected_date"] },
+            "timezone": { "const": "Asia/Ho_Chi_Minh" }
+          }
+        },
+        "qualityFlags": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceTimestampStatus", "regionStatus", "priceIntegrity"],
+          "properties": {
+            "sourceTimestampStatus": { "enum": ["verified", "unknown"] },
+            "regionStatus": { "enum": ["verified", "unverified", "not_applicable"] },
+            "priceIntegrity": { "enum": ["valid", "spread_inverted"] }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["provider", "originalBuy", "originalSell", "originalUnit", "conversionFactor", "sourceUrl", "adapterVersion", "schemaVersion"],
+          "properties": {
+            "provider": { "const": "marketpulse-fixture" },
+            "originalBuy": { "$ref": "#/$defs/positive" },
+            "originalSell": { "$ref": "#/$defs/positive" },
+            "originalUnit": { "enum": ["thousand_vnd_per_chi", "thousand_vnd_per_tael", "vnd_per_tael"] },
+            "conversionFactor": { "enum": ["10000", "1000", "1"] },
+            "sourceUrl": { "type": "string", "maxLength": 256, "pattern": "^https://marketpulse\\.invalid/gold/[a-z0-9/-]+$(?![\\s\\S])" },
+            "adapterVersion": { "type": "string", "maxLength": 32, "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$(?![\\s\\S])" },
+            "schemaVersion": { "const": "1.0.0" }
+          }
+        }
+      },
+      "allOf": [
+        { "if": { "properties": { "product": { "const": "gold_bar_sjc" } } }, "then": { "properties": { "brand": { "const": "SJC" } } }, "else": { "properties": { "brand": { "const": "PNJ" } } } }
+      ]
+    }
+  }
+}
