@@ -1,5 +1,77 @@
 # Local development
 
+## Optional stored synthetic gold read API
+
+**P1.4 · 16/10/2026:** built on P1.3A merged in PR #34. Set
+`GOLD_READS_ENABLED=true` explicitly to register `GET /api/gold/quotes/latest`
+and `GET /api/gold/quotes/history`; missing/`false` returns 404. Only literal
+`true`/`false` is accepted. Restart/recreate the API after changing configuration.
+Reads need MongoDB and normal API startup dependencies, but no ingestion secret
+or ingestion initialization. The integration suite seeds synthetic data through
+the existing store; no source collector or web page is added.
+
+History requires `provider=marketpulse-fixture`, `product=gold_bar_sjc` or
+`plain_ring_9999`, and real `from`/`to` dates (`YYYY-MM-DD`, years 0001–9999).
+Both endpoints are inclusive, with at most 31 days difference. Optional `brand`
+defaults to SJC for bars/PNJ for rings and must match; `purity` defaults to and
+must equal `999.9`. Omitted `region` selects the exact JSON-null region series;
+the literal text `region=null` selects a different string identity. Supplied region
+uses the gold contract's exact string rules, without trim, case-folding or Unicode
+normalization. Unknown series returns 404 `product_not_found`; an existing series
+with no matching snapshots returns 200 with an empty array.
+
+Latest accepts optional `provider` (only `marketpulse-fixture`, also the default),
+`product` and `region`; omitted region includes all stored regions. It reads only
+the stored latest projection, sorted by asset ID. Both routes accept
+`unit=vnd_per_tael` (default) or `vnd_per_chi`, `limit=1..500` (default 100), and
+`page` (default 1). Pagination uses canonical positive integers and an offset no
+larger than 100,000. Duplicate, unknown, blank and bracket parameters return 400
+`invalid_query`. Latest does not accept brand/purity/date filters. Neither route
+accepts source, revision, asset-ID or refresh switches.
+
+Example local request after synthetic seeding:
+
+```text
+http://127.0.0.1:3001/api/gold/quotes/history?provider=marketpulse-fixture&product=gold_bar_sjc&region=H%E1%BB%93%20Ch%C3%AD%20Minh&from=2026-10-01&to=2026-10-31&unit=vnd_per_chi
+```
+
+Responses use `{data: [rows], metadata: {...}}`. Public rows carry asset/snapshot
+identities, product/brand/purity/applied and requested region, dataset, quotes,
+source/collection/reference times, quality flags and complete original provenance
+including source URL. Internal database IDs, delivery IDs, hashes and ordering
+fields are excluded recursively. Metadata includes count/page/limit/totalRecords,
+totalPages/hasMore/status, fixed synthetic dataset/freshness labels, unknown
+completeness, selection semantics and history series/requested range. `count` is
+the returned page length; status is `no_data` for an empty page, even if earlier
+pages exist. Total pages is zero when no records match.
+
+Prices remain decimal strings. VND/chỉ divides buy/sell/spread by exactly ten
+using a separate precision-300 Decimal context and fixed notation. Null sides,
+negative/zero spread and original provenance/conversion factor are preserved;
+`presentationConversionFactor` records `0.1` (or `1` for canonical output).
+The canonical content digest is excluded from all public rows. Stored values and
+identities are never modified by presentation conversion.
+
+History filters winning snapshots by asset ID and `record.time.referenceDate`,
+then orders by source-as-of (or collected-at when unknown) at UTC microseconds,
+then snapshot ID. Latest follows the stored verified-source priority tuple; it
+can differ from the final chronological history row. Each page and count share
+one MongoDB aggregation facet/match. Operations set `maxTimeMS=1000` with disk
+spilling disabled; existing finite client timeouts still apply. This is not a
+one-second end-to-end HTTP deadline or snapshot-isolation guarantee. The existing
+asset/date index supports history filtering; sorting computes time within the
+bounded date range and can fail on timeout/memory limits. No extra index is added.
+
+Projection updates remain eventual and non-atomic across collections. Partial or
+failed ingestion may leave history/latest different; reads do not repair, retry
+ingestion, infer freshness, interpolate gaps, call a provider or substitute data.
+Selected assets/canonical rows, datasets, hashes and ordering metadata are checked
+before output. Corruption/disconnection gives sanitized 503
+`gold_latest_unavailable` or `gold_history_unavailable`. All gold route responses,
+including disabled 404, use `Cache-Control: no-store`. Existing fixture and
+observed routes retain their behavior. Live-source/public redisplay/training
+rights remain unverified; all data in this slice is synthetic.
+
 **P1.3A gold ingestion/storage · 16/10/2026:** the authenticated internal delivery
 endpoint and worker now validate and store the [synthetic gold fixture](../fixtures/gold/README.md)
 under the unchanged [gold v1 schema](../packages/schemas/gold-quotes-v1.schema.json).

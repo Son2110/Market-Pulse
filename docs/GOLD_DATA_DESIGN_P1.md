@@ -6,6 +6,28 @@
 
 ---
 
+## P1.4 stored read implementation · 16/10/2026
+
+P1.3A đã merge qua PR #34; các ghi nhận pending P1.3A ở dưới là lịch sử.
+P1.4 đã có hai API synthetic opt-in với flag `GOLD_READS_ENABLED=false` mặc định,
+không cần ingestion secret/init. Hợp đồng thực thi và giới hạn được ghi tại
+[local gold read API](LOCAL_DEVELOPMENT.md#optional-stored-synthetic-gold-read-api).
+Response là `{data: [rows], metadata}`; unit tường minh dùng `vnd_per_tael` hoặc
+`vnd_per_chi`, giữ precision và provenance. History chọn đúng series kể cả region
+JSON null, đọc winning snapshots theo chronology UTC microsecond; latest đọc
+projection có ưu tiên verified riêng. Cả hai không repair projection hoặc fallback.
+
+Page/count chia sẻ một aggregation facet, `maxTimeMS=1000`, không disk spilling;
+đây không phải HTTP deadline hay snapshot isolation. Explain query representative
+đã dùng index `asset_reference_history`; không thêm index. Read validate singleton
+canonical contract, asset/row hash, dataset và projection ordering, whitelist lồng
+nhau, trả 503 an toàn khi dữ liệu chọn bị hỏng. Full local checks và review/CI
+được ghi trong [roadmap](ROADMAP.md). Ngày 16/10/2026, review độc lập GPT-6 Astra
+chấp thuận không có finding, chạy đạt 14 focused checks (gồm năm integration
+MongoDB), không skip. CI remote P1.4 vẫn còn chờ.
+Không thêm UI, collector thật, cache hoặc thay ngữ nghĩa ingestion; quyền nguồn
+thật/public/training vẫn chưa được mở. Thiết kế tương lai bên dưới giữ bối cảnh.
+
 ## P1.2 contract implementation · 16/10/2026
 
 Đã triển khai riêng [schema gold-quotes-v1](../packages/schemas/gold-quotes-v1.schema.json),

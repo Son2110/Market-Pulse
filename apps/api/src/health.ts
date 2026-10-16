@@ -15,6 +15,7 @@ export interface HealthOptions {
   watchlistRouter?: Router;
   ingestionRouter?: Router;
   observedHistoryRouter?: Router;
+  goldReadRouter?: Router;
 }
 
 function within<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
@@ -24,7 +25,7 @@ function within<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-export function createApp({ checks, timeoutMs = 1000, applicationReady = () => true, authRouter, stockSearchRouter, dailyHistoryRouter, watchlistRouter, ingestionRouter, observedHistoryRouter }: HealthOptions): Express {
+export function createApp({ checks, timeoutMs = 1000, applicationReady = () => true, authRouter, stockSearchRouter, dailyHistoryRouter, watchlistRouter, ingestionRouter, observedHistoryRouter, goldReadRouter }: HealthOptions): Express {
   const app = express();
   app.disable("x-powered-by");
 
@@ -45,6 +46,8 @@ export function createApp({ checks, timeoutMs = 1000, applicationReady = () => t
   if (stockSearchRouter) app.use("/api/assets", stockSearchRouter);
   if (dailyHistoryRouter) app.use("/api/assets", dailyHistoryRouter);
   if (observedHistoryRouter) app.use("/api/observed/assets", observedHistoryRouter);
+  app.use("/api/gold/quotes", (_request, response, next) => { response.set("Cache-Control", "no-store"); next(); });
+  if (goldReadRouter) app.use("/api/gold/quotes", goldReadRouter);
   if (watchlistRouter) app.use("/api/watchlists", watchlistRouter);
   if (ingestionRouter) app.use("/internal/ingestion", ingestionRouter);
   app.use("/api", (_request, response) => response.status(404).json({ error: "not_found" }));

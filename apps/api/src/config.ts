@@ -11,6 +11,7 @@ export interface ApiConfig {
   authKdfConcurrency: number;
   ingestionSecret?: string;
   observedReadsEnabled: boolean;
+  goldReadsEnabled: boolean;
 }
 
 function integerSetting(name: string, value: string | undefined, fallback: number, minimum: number, maximum: number): number {
@@ -39,6 +40,7 @@ function hostSetting(value: string | undefined): string {
 }
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
+  if (env.GOLD_READS_ENABLED !== undefined && !["true", "false"].includes(env.GOLD_READS_ENABLED)) throw new Error("Invalid GOLD_READS_ENABLED configuration.");
   if (env.OBSERVED_READS_ENABLED !== undefined && !["true", "false"].includes(env.OBSERVED_READS_ENABLED)) throw new Error("Invalid OBSERVED_READS_ENABLED configuration.");
   if (env.INGESTION_SECRET && !/^[a-fA-F0-9]{64}$/.test(env.INGESTION_SECRET)) throw new Error("Invalid INGESTION_SECRET configuration.");
   return {
@@ -54,5 +56,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     authKdfConcurrency: integerSetting("AUTH_KDF_CONCURRENCY", env.AUTH_KDF_CONCURRENCY, 2, 1, 2),
     ingestionSecret: env.INGESTION_SECRET || undefined,
     observedReadsEnabled: env.OBSERVED_READS_ENABLED === "true",
+    goldReadsEnabled: env.GOLD_READS_ENABLED === "true",
   };
 }

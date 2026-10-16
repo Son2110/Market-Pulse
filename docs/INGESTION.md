@@ -1,5 +1,16 @@
 # MP-10 — fixture ingestion and replay
 
+**P1.4 stored synthetic gold reads · 16/10/2026:** P1.3A is merged in PR #34.
+The opt-in latest/history API reads its stored projections with strict series,
+date and pagination bounds, exact decimal presentation and selected-row integrity
+checks. Reads do not initialize ingestion or need its secret. Latest and history
+may diverge during partial writes; no read repair or fallback occurs. Page/count
+share one aggregation facet, without a cross-collection transaction or snapshot
+isolation guarantee. See [the complete local contract](LOCAL_DEVELOPMENT.md#optional-stored-synthetic-gold-read-api).
+All data remains synthetic, with freshness/completeness unknown. Earlier dated
+P1.3A pending/read-future statements below describe their historical state.
+No ingestion/provider behavior, schema, worker or web page changes in P1.4.
+
 **P1.3A gold ingestion/storage · 16/10/2026:** the existing authenticated delivery,
 durable outbox and worker accept the closed synthetic gold envelope alongside the
 stock fixture and observed candle contracts. Gold remains `schemaVersion: "1.0.0"`;

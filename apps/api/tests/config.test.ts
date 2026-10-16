@@ -2,6 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readConfig } from "../src/config.js";
 
+test("gold reads are strictly opt-in and independent of ingestion", () => {
+  assert.equal(readConfig({}).goldReadsEnabled, false);
+  assert.equal(readConfig({ GOLD_READS_ENABLED: "false" }).goldReadsEnabled, false);
+  const config = readConfig({ GOLD_READS_ENABLED: "true" });
+  assert.equal(config.goldReadsEnabled, true);
+  assert.equal(config.ingestionSecret, undefined);
+  for (const value of ["", "1", "TRUE", "true ", "yes"]) assert.throws(() => readConfig({ GOLD_READS_ENABLED: value }), /Invalid GOLD_READS_ENABLED configuration/);
+});
+
 test("internal ingestion secret is optional and requires 32 random bytes encoded as hex", () => {
   assert.equal(readConfig({}).ingestionSecret, undefined);
   assert.equal(readConfig({ INGESTION_SECRET: "" }).ingestionSecret, undefined);
