@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
+import { validateGoldPayload, type GoldPayload } from "./gold-contract.js";
 
 export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export interface Asset { [key: string]: Json; assetId: string; symbol: string; assetType: string; exchange: string; currency: Json; unit: string; timezone: string }
@@ -11,7 +12,8 @@ export interface FixturePayload { schemaVersion: "1.0.0"; dataset: Dataset; asse
 export interface ObservedAsset { [key: string]: Json; assetId: string; symbol: string; assetType: string; currency: Json; unit: string; timezone: string }
 export interface ObservedCandle { [key: string]: Json; assetId: string; tradingDate: string; interval: string; adjustmentBasis: string; collectedAt: string; barId: string; contentDigest: string; source: { provider: string; connector: string; connectorVersion: string; dependencyVersion: string; mode: string } }
 export interface ObservedPayload { schemaVersion: "2.0.0"; dataset: Dataset; request: { symbol: string; start: string; end: string; interval: string }; assets: ObservedAsset[]; candles: ObservedCandle[] }
-export type Payload = FixturePayload | ObservedPayload;
+export type Payload = FixturePayload | ObservedPayload | GoldPayload;
+export const isGoldPayload = (payload: Payload): payload is GoldPayload => Object.hasOwn(payload, "observations");
 export class ContractError extends Error { constructor() { super("invalid_contract"); } }
 function fail(): never { throw new ContractError(); }
 
@@ -94,6 +96,7 @@ function micros(value: string): bigint {
 }
 
 export function validatePayload(input: Json): Payload {
+  if (input !== null && !Array.isArray(input) && typeof input === "object" && Object.hasOwn(input, "observations")) return validateGoldPayload(input);
   if (input !== null && !Array.isArray(input) && typeof input === "object" && input.schemaVersion === "2.0.0") return validateObservedPayload(input);
   if (!validateSchema(input)) fail();
   const payload = input as unknown as FixturePayload;

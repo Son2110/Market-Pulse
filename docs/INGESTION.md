@@ -1,5 +1,13 @@
 # MP-10 — fixture ingestion and replay
 
+**P1.3A gold ingestion/storage · 16/10/2026:** the existing authenticated delivery,
+durable outbox and worker accept the closed synthetic gold envelope alongside the
+stock fixture and observed candle contracts. Gold remains `schemaVersion: "1.0.0"`;
+the presence of `observations` selects strict gold validation, with no fallback to
+stock validation. Mixed envelopes fail before any receipt is inserted. This slice
+adds storage only; gold provider collection, public reads and UI remain future work.
+All gold data retains `fixture / unknown`, VND/lượng and `Asia/Ho_Chi_Minh` labels.
+
 **MP-12 / FR-18 collection status · 13/10/2026:** the first MP-12 slice adds the API-only stored `collection-status` read behind the existing default-off observed-read flag. It summarizes delivery states referenced by the same validated per-bar latest selection as history, with candle counts and original collection-time bounds. Receipt status is read-time evidence of local ingestion, not provider health, market freshness, a coherent batch or complete session coverage. Missing or incompatible receipts are unknown. No provider call, UI, cache, scheduler or retry-policy change is introduced. MP-12 and original FR-18 remain partial; upstream redisplay/deployment rights remain unresolved. See [the local collection-status contract](LOCAL_DEVELOPMENT.md#optional-stored-observed-collection-status-api). Earlier dated statements that MP-12 has not begun describe their historical state.
 
 **Stored read slice · 08/10/2026:** `GET /api/observed/assets/:symbol/history` is available only with strict `OBSERVED_READS_ENABLED=true` (default false). It reads isolated stored assets/latest candles without a submission secret or provider call. Required inclusive dates span at most 31 days; FPT/VNINDEX return exact decimal strings/nulls/provenance in a separate read response. Query work is bounded and corrupt selected rows fail closed with sanitized 503. Per-bar collection ordering does not verify chronology/freshness; different deliveries and partial/failed-batch rows may be mixed, and completeness remains unknown. Existing fixture routes and web stay unchanged. See [the complete local read contract](LOCAL_DEVELOPMENT.md#optional-stored-observed-history-api). This does not complete MP-11, begin MP-12 or resolve upstream redisplay/deployment rights.
@@ -38,7 +46,7 @@ When an ingestion secret is configured, API readiness also requires successful i
 
 ## Observed v2 storage and ordering
 
-The exact version/mode pair selects the contract; neither schema is relaxed to accept the other. Observed requests contain one FPT or VNINDEX asset and at most 32 daily candles across a range of 0–31 days. Both validators check OHLC bounds, canonical decimal strings (no exponent, leading zero or trailing fractional zero), asset/unit/provenance consistency, ordered unique dates and identity/content hashes. `collectedAt` accepts at most six fractional digits, rejects invalid dates/offsets and UTC normalization outside years 0001–9999, and preserves its original representation.
+Gold is selected first by its exclusive observation envelope; otherwise the exact version selects fixture v1 or observed v2. None of these schemas is relaxed to accept another family. Observed requests contain one FPT or VNINDEX asset and at most 32 daily candles across a range of 0–31 days. Both validators check OHLC bounds, canonical decimal strings (no exponent, leading zero or trailing fractional zero), asset/unit/provenance consistency, ordered unique dates and identity/content hashes. `collectedAt` accepts at most six fractional digits, rejects invalid dates/offsets and UTC normalization outside years 0001–9999, and preserves its original representation.
 
 | Collection | Unique identity | Stored content |
 |---|---|---|
@@ -51,6 +59,72 @@ Accepted retrievals retain their complete normalized payload in `ingestion_deliv
 The latest row is the maximum tuple `(collectedAt UTC instant, contentDigest lexical order)`. Offset-equivalent instants compare equally, all six fractional digits survive, and equal-time different content has a deterministic winner. This represents collection ordering only; it does not verify provider chronology, correction precedence or market freshness. For identical time/content, the already selected complete row and delivery reference remain; either equivalent retrieval is valid audit evidence. No source as-of is inferred from the provider's naive calendar label.
 
 The worker confirms the immutable revision before an atomic conditional projection update, including when the revision already exists. Concurrent inserts handle the first-row race; late writes cannot regress the tuple. There is no multi-document transaction: interruption after a revision may leave the projection missing or older until replay repairs it. Success occurs only after all rows are confirmed; exhausted failures can retain earlier rows, and receipt counts describe processed records, not new revisions. Test-only worker hooks cover the inter-write boundary without adding HTTP or production environment fault switches. Strict validators enforce bounded shapes on all three new collections. No TTL, automatic pruning, unbounded revision array, replica set or time-series collection is introduced; retention remains a manual future policy, so local raw/revision totals can grow.
+
+## Synthetic gold storage and ordering
+
+The [gold schema](../packages/schemas/gold-quotes-v1.schema.json) accepts 1–500
+observations. Node independently matches Python's structural, exact decimal,
+conversion, spread/null-side, quality, identity and calendar checks. Decimal
+arithmetic uses an isolated 300-digit context for bounded 128-character strings;
+timestamps must be canonical UTC with exactly six fractional digits, within years
+0001–9999, including the UTC+7 reference-date bound. Brand SJC/PNJ identifies the
+product; provider/provenance remain `marketpulse-fixture`. Timestamp/region quality
+flags describe the fixture and establish no upstream verification or freshness.
+Region boundaries reject an explicit shared whitespace set: Unicode White_Space,
+U+001C–U+001F and U+FEFF. This avoids Python/JavaScript differences in `\s`;
+interior spaces remain allowed, and CR/LF remain forbidden anywhere in a region.
+
+| Collection | Unique identity | Stored content |
+|---|---|---|
+| `gold_assets` | `_id = assetId` | Immutable series definition (`assetId`, provider, brand, product, purity, applied region), asset digest, dataset/schema and first delivery ID. Requested region does not define a series. |
+| `gold_quote_revisions` | `_id = SHA-256([snapshotId, contentDigest])`; unique `{snapshotId:1,contentDigest:1}` | Complete first accepted observation, including its original `time.collectedAt`, provenance/quality flags, dataset/schema and first delivery ID. |
+| `gold_quote_snapshots` | `_id = snapshotId`; `{assetId:1,"record.time.referenceDate":1}` supports future bounded history | Complete winning observation, selected delivery ID, dataset/schema and exact ordering fields. |
+| `gold_quotes_latest` | `_id = assetId` | Complete selected observation and delivery ID, with the same metadata and ordering fields as snapshots. |
+
+Snapshot winners maximize `(collectedOrder, contentDigest)`. Latest winners maximize
+`(sourceVerified, sourceOrder, collectedOrder, contentDigest)`: verified source
+timestamps outrank unknown ones, then verified quotes order by source time before
+collection time; unknown quotes order by collection time. Strings preserve all six
+UTC fractional digits. A quote with an older source time arriving late can advance
+its snapshot while leaving the asset latest unchanged. Unknown refetches retain
+separate collection-based snapshot IDs. Equal tuples preserve the entire selected
+document, including its delivery reference.
+
+Every observation confirms its immutable revision, then attempts both atomic
+projections, even for a reused revision. A→B→A within a snapshot retains two
+revisions, preserves the first A row/time and advances both projections to the
+later A retrieval. Identity-only upserts evaluate ordering inside `$replaceWith` /
+`$cond`; a first-upsert E11000 race retries the same pipeline without upsert.
+Strict MongoDB validators resolve nested contract references and translate the
+product/brand condition into supported schema alternatives. Prices remain strings.
+
+Receipt `counts.assets` confirms distinct asset IDs in the delivery;
+`counts.observations` confirms observations whose revision and both projection
+attempts completed, including repeated snapshot/content rows. These are processed
+counts, not newly inserted revisions or candle counts. The committed fixture
+confirms three assets and eleven observations. Gold uses the existing retry budget
+and reconciliation; no new retry policy or secret is introduced. Writes remain
+individually atomic, with no batch transaction: a crash after revision or snapshot
+can temporarily leave projections behind until replay; exhausted delivery failure
+can retain partial rows. Raw deliveries/revisions have no automatic retention or
+pruning policy and can grow locally.
+
+Local verification on 16/10/2026 passed 177 Node unit tests, 36 real MongoDB/Redis
+integration tests (nine gold), 44 Python contract tests (17 gold), 29 collector
+tests, both fixture validators, lint/typecheck/build and documentation checks.
+A shared 138-case mutation corpus runs in Node and Python. Gold integration uses
+real authenticated HTTP, isolated random databases/queues, concurrent first writes,
+full-document replay comparisons and killed worker processes after revision,
+snapshot and terminal success. Independent review and remote CI are separate
+acceptance steps; this is local synthetic evidence only.
+
+Independent GPT-6 Astra review on 16/10 confirmed all nine gold storage integration
+tests and found a region-whitespace parity issue: Python and JavaScript disagreed
+on U+0085 and U+FEFF at string boundaries. The shared schema now spells out the
+boundary set, with eight resealed leading/trailing mutations for `region` and
+`requestedRegion` added to the corpus. Focused gold tests pass after the fix;
+reviewer recheck and remote CI remain pending. The full-suite counts above record
+the earlier worker verification, separate from the focused correction checks.
 
 ## Local commands
 

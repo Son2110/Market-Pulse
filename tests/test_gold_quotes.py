@@ -35,6 +35,17 @@ def set_path(document, path, value):
 
 
 class GoldContractTests(unittest.TestCase):
+    def test_shared_node_python_mutation_corpus(self):
+        cases = json.loads((ROOT / "apps/api/tests/gold-parity.json").read_text(encoding="utf-8"))
+        for entry in cases:
+            with self.subTest(name=entry["name"]):
+                document, row = self.one_row(entry["index"])
+                for path, value in entry["sets"]:
+                    set_path(row, path, value)
+                if entry["seal"]:
+                    seal(row)
+                self.assertEqual(not validate_gold_quotes(document), entry["valid"])
+
     def assert_invalid(self, document, message=None):
         errors = validate_gold_quotes(document)
         self.assertTrue(errors, "mutation unexpectedly accepted")

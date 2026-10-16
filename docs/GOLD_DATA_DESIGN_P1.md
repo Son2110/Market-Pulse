@@ -1,7 +1,7 @@
 # Thiết kế kỹ thuật tổng hợp dữ liệu vàng Việt Nam — Phase P1
 
 **Ngày lập tài liệu:** 15/10/2026<br>
-**Trạng thái thiết kế ngày 15/10:** Hoàn thành nghiên cứu và thiết kế kỹ thuật P1.1–P1.4; cập nhật implementation P1.2 ngày 16/10 ở dưới. Cổng live source chưa mở.<br>
+**Trạng thái thiết kế ngày 15/10:** Hoàn thành nghiên cứu và thiết kế kỹ thuật P1.1–P1.4; cập nhật implementation P1.2 và P1.3A ngày 16/10 ở dưới. Cổng live source chưa mở.<br>
 **Phạm vi:** Đặc tả kiến trúc, data contract, fixture, mô hình lưu trữ MongoDB, quy tắc collector, API đọc dữ liệu và kế hoạch triển khai từng bước cho luồng dữ liệu vàng Việt Nam (vàng miếng SJC và nhẫn trơn 9999) theo [PRD](PRD.md), [ROADMAP](ROADMAP.md) và kết quả khảo sát nguồn tại [GOLD_SOURCE_AUDIT.md](GOLD_SOURCE_AUDIT.md).
 
 ---
@@ -10,8 +10,9 @@
 
 Đã triển khai riêng [schema gold-quotes-v1](../packages/schemas/gold-quotes-v1.schema.json),
 [fixture synthetic](../fixtures/gold/README.md), validator Python offline và golden
-tests Python/Node dùng RFC 8785/SHA-256. Chờ review độc lập và CI remote; các phần
-collector, storage, worker, API và UI bên dưới vẫn là thiết kế tương lai.
+tests Python/Node dùng RFC 8785/SHA-256. Phần này ghi trạng thái P1.2;
+implementation storage/worker P1.3A và bằng chứng local hiện hành được ghi riêng
+ngay bên dưới. Collector nguồn thật, read API và UI vẫn là thiết kế tương lai.
 
 P1.2 dùng envelope đóng `schemaVersion`, `dataset`, `observations`; provider và
 provenance là `marketpulse-fixture`, URL thuộc `marketpulse.invalid`, SJC/PNJ là
@@ -28,6 +29,48 @@ unknown fetch mới tạo snapshot mới, replay giữ collection time gốc. Va
 kiểm tra cấu trúc, số học và identity trong payload; không thể chứng minh upstream
 đã công bố đồng thời hai phía. Future adapter phải xác minh pairing, giữ riêng
 snapshot của các phía lệch thời điểm. Không mở cổng nguồn thật hoặc public/training.
+
+## P1.3A ingestion/storage implementation · 16/10/2026
+
+Đã triển khai [validator Node](../apps/api/src/gold-contract.ts) và
+[GoldStore](../apps/api/src/gold-store.ts) vào internal delivery/outbox/worker hiện
+có, giữ schema gold `1.0.0`, không thêm dependency hoặc collector nguồn thật.
+Envelope có `observations` được kiểm tra riêng; envelope trộn stock/gold bị từ chối.
+Schema MongoDB giải quyết reference lồng nhau và điều kiện product/brand; decimal
+vẫn là string, timestamp UTC giữ sáu chữ số, precision phép tính riêng là 300.
+
+Bốn collection dùng tên ở mục 3.2; record đầy đủ nằm trong trường `record`.
+`gold_assets` chứa định nghĩa series bất biến, không chứa requested region;
+revision giữ **toàn bộ observation đầu tiên** và `firstDeliveryId` bất biến.
+Projection snapshot và latest dùng `contentDigest`, `collectedOrder`,
+`sourceOrder`, `sourceVerified`, `deliveryId`; các tên `winningContentDigest` và
+`latestObservationOrder` ở ví dụ thiết kế bên dưới là tên minh họa cũ.
+Index triển khai là unique `(snapshotId, contentDigest)` trên revision và
+`(assetId, record.time.referenceDate)` trên snapshot; latest dùng `_id` asset.
+Index/filter cho read API sẽ được đánh giá ở P1.4 theo truy vấn thực tế.
+
+Snapshot tối đa theo `(collectedOrder, contentDigest)`; latest tối đa theo
+`(sourceVerified, sourceOrder, collectedOrder, contentDigest)`. Mọi lần nhận lại
+revision vẫn thử cả hai projection. Equal tuple giữ nguyên toàn bộ document.
+Receipt xác nhận số asset khác nhau và số observation xử lý đủ ba bước; fixture
+có ba asset, 11 observation. Không có transaction nhiều document hoặc retention
+tự động; crash có thể để projection chậm hơn revision đến khi replay.
+
+Đã đạt local: 177 Node unit, 36 integration MongoDB/Redis (chín gold),
+44 Python contract (17 gold), 29 collector tests, hai fixture validators,
+lint/typecheck/build và docs checks. Corpus chung 138 mutation kiểm tra Python/Node.
+Integration dùng HTTP thật, race/upsert, A→B→A, replay so toàn bộ document,
+timestamp nguồn cũ đến muộn, unknown/verified và kill worker sau revision,
+snapshot, success. Chờ review độc lập và CI remote. Collector P1.3B, read API
+P1.4, UI, quyền nguồn thật/public/training chưa được mở; các mục tương ứng bên
+dưới vẫn là thiết kế tương lai. Xem [hợp đồng storage hiện hành](INGESTION.md#synthetic-gold-storage-and-ordering).
+
+Review GPT-6 Astra độc lập ngày 16/10 chạy đạt chín gold integration tests và tìm
+thấy một lỗi parity whitespace giữa Python/JavaScript (U+0085 và U+FEFF).
+Đã sửa schema bằng tập whitespace tường minh ở đầu/cuối region, thêm tám mutation
+đã tính lại identity cho `region`/`requestedRegion`, nâng corpus lên 138 case.
+Focused Node/Python gold checks sau sửa đạt; chờ reviewer kiểm tra lại và CI remote.
+Các con số full suite ở trên là bằng chứng worker trước lần sửa tập trung này.
 
 ## 1. Tổng quan kiến trúc dữ liệu vàng P1
 
@@ -670,7 +713,7 @@ Sau khi giai đoạn nghiên cứu và thiết kế hoàn tất, công việc tr
 | Hạng mục công việc | Trạng thái kỹ thuật | Khả năng triển khai hiện tại | Điều kiện mở lại / Yêu cầu tiên quyết |
 |---|---|---|---|
 | **P1.2 Contract & Fixture** | Thiết kế hoàn tất | **Triển khai được ngay** bằng synthetic fixture | Không có; hoàn toàn offline. |
-| **P1.3A Ingestion & Storage** | Thiết kế hoàn tất | **Triển khai được ngay** với mock/fixture payload | Không có; chỉ cần Docker Compose nội bộ. |
+| **P1.3A Ingestion & Storage** | Đã triển khai local 16/10; chờ review độc lập và CI remote | Synthetic fixture; HTTP/outbox/worker và bốn collection, kiểm thử replay/crash | Không mở collector nguồn thật, read API hoặc UI. |
 | **P1.4 Stored Read API** | Thiết kế hoàn tất | **Triển khai được ngay** trên dữ liệu fixture đã lưu | Không có; đọc dữ liệu nội bộ đã lưu. |
 | **P1.3B Collector Nguồn Thật** | Đã khảo sát 3 nguồn | **TẠM CHẶN (Blocked)** | 1. Thỏa thuận cấp phép bằng văn bản từ nhà cung cấp.<br>2. Xác minh phương thức truy cập máy ổn định.<br>3. Xác minh tính gắn kết khu vực và timestamp. |
 | **Public Deployment & Training** | Đã phân tích pháp lý | **TẠM CHẶN (Blocked)** | Có hợp đồng thương mại cho phép tái phân phối và huấn luyện AI; tuân thủ chính sách robots SJC. |

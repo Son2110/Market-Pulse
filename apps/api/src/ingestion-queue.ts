@@ -1,6 +1,6 @@
 import { Queue, createNodeRedisClient, type Job } from "bullmq";
 import { createClient } from "redis";
-import { digest } from "./ingestion-contract.js";
+import { digest, isGoldPayload } from "./ingestion-contract.js";
 import { ACTIVE_STATUSES, IngestionStore, MAX_ATTEMPTS } from "./ingestion-store.js";
 
 export interface DeliveryJob { deliveryId: string; payloadDigest: string }
@@ -32,7 +32,7 @@ export class DeliveryQueue {
       else if (state !== "unknown") return;
     }
     if (delivery.attempts >= MAX_ATTEMPTS) { await this.store.terminal(id, "failure", delivery.counts, "attempts_exhausted"); return; }
-    await this.queue.add(delivery.schemaVersion === "2.0.0" ? "persist-observed" : "persist-fixture", { deliveryId: id, payloadDigest }, { jobId: jobId(id), attempts: MAX_ATTEMPTS - delivery.attempts });
+    await this.queue.add(isGoldPayload(delivery.payload) ? "persist-gold" : delivery.schemaVersion === "2.0.0" ? "persist-observed" : "persist-fixture", { deliveryId: id, payloadDigest }, { jobId: jobId(id), attempts: MAX_ATTEMPTS - delivery.attempts });
     const updated = await this.store.deliveries.updateOne({ _id: id, status: "accepted" }, { $set: { status: "queued", updatedAt: new Date() } });
     if (updated.modifiedCount) console.info(JSON.stringify({ event: "ingestion_queued", deliveryId: id, provider: delivery.provider, status: "queued", attempt: delivery.attempts }));
   }

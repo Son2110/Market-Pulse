@@ -2,6 +2,21 @@
 
 ## Kế hoạch mở rộng hiện hành
 
+**P1.3A ingestion/storage vàng · 16/10/2026:** đã triển khai validator Node cùng
+contract v1, nhận fixture qua internal HTTP có xác thực, outbox/BullMQ worker và
+bốn collection MongoDB riêng. Revision giữ nguyên đầy đủ bản ghi đầu tiên; snapshot
+và latest dùng thứ tự nguyên tử, phục hồi sau crash và giữ đúng A→B→A.
+Kiểm tra local đạt: 177 Node unit, 36 integration MongoDB/Redis (chín gold),
+44 Python contract (17 gold), 29 collector tests; hai validators,
+lint/typecheck/build và docs checks. Corpus 138 mutation dùng chung Python/Node.
+Review GPT-6 Astra đã chạy đạt chín gold integration tests và tìm một lỗi parity
+whitespace region. Sau sửa schema/corpus, reviewer kiểm tra độc lập đạt 5 Node gold
+tests, 17 Python gold tests với corpus 138 case và chấp thuận, không còn finding.
+Worker chạy lại đạt chín gold integration tests sau sửa. CI remote còn chờ;
+full-suite counts ở trên thuộc lần kiểm tra trước sửa.
+P1.4 read API/UI và collector thật P1.3B chưa triển khai; cổng nguồn thật vẫn đóng.
+Xem [ngữ nghĩa lưu trữ và giới hạn](INGESTION.md#synthetic-gold-storage-and-ordering).
+
 **P1.2 contract vàng · 16/10/2026:** đã triển khai schema synthetic-only,
 [fixture vàng có nhãn](../fixtures/gold/README.md), validator offline và kiểm thử
 Python/Node cho decimal, đơn vị, thời gian và JCS/SHA-256; CI gọi validator tường
@@ -15,7 +30,7 @@ khai collector, ingestion/storage P1.3A, read API P1.4 hoặc UI; cổng nguồn
 P1.3B vẫn đóng. Quy tắc định danh được làm rõ trong
 [thiết kế P1](GOLD_DATA_DESIGN_P1.md#p12-contract-implementation--16102026).
 
-Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba tuần cho công việc tiếp theo. Bản kế hoạch **24/09–14/10/2026, 21 ngày / 42 giờ** và mọi bằng chứng tiến độ bên dưới được giữ làm baseline lịch sử; ngày cũ không phải cam kết hoàn thành phạm vi mới. Xem [PRD mở rộng](PRD.md) và [nghiên cứu nguồn, AI và dự báo](PRODUCT_EXPANSION_RESEARCH.md). Đây là thay đổi tài liệu; không đánh dấu tính năng mở rộng nào đã triển khai.
+Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba tuần cho công việc tiếp theo. Bản kế hoạch **24/09–14/10/2026, 21 ngày / 42 giờ** và mọi bằng chứng tiến độ bên dưới được giữ làm baseline lịch sử; ngày cũ không phải cam kết hoàn thành phạm vi mới. Xem [PRD mở rộng](PRD.md) và [nghiên cứu nguồn, AI và dự báo](PRODUCT_EXPANSION_RESEARCH.md). Các cập nhật triển khai có ngày ở trên là trạng thái hiện hành; baseline lịch sử bên dưới không tự đánh dấu hoàn tất các hạng mục mở rộng.
 
 **Baseline đã xác minh 13/10:** `origin/main` tại `1fc81a3b2e5e0c663cec8b8985c0435aefd8e3ee`; [PR #28](https://github.com/Son2110/Market-Pulse/pull/28) đã merge lúc 08:05:12 UTC. FR-04 FPT collection-status UI đã nằm trên main, nhưng MP-11/MP-12 và các FR gốc vẫn một phần; source as-of/freshness/completeness và quyền upstream public redisplay/deployment chưa được xác minh. MP-14 còn cần E2E được commit; MP-15 demo tái tạo vẫn cần nghiệm thu. Không suy ra hoàn tất core từ merge một lát cắt.
 

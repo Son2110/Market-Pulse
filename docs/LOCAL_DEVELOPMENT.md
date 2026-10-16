@@ -1,13 +1,20 @@
 # Local development
 
-**P1.2 gold contract · 16/10/2026:** [synthetic gold fixture](../fixtures/gold/README.md)
-and [schema](../packages/schemas/gold-quotes-v1.schema.json) are standalone offline
-artifacts. With `requirements-dev.txt` installed, run
+**P1.3A gold ingestion/storage · 16/10/2026:** the authenticated internal delivery
+endpoint and worker now validate and store the [synthetic gold fixture](../fixtures/gold/README.md)
+under the unchanged [gold v1 schema](../packages/schemas/gold-quotes-v1.schema.json).
+With `requirements-dev.txt` installed, run
 `python scripts/validate_gold_quotes.py`; Python contract discovery and
-`npm run test:unit` include gold arithmetic/identity checks. Both CI workflows
-explicitly validate gold offline. Local implementation awaits independent review
-and remote CI. The fixture is not consumed by the collector, storage, API or UI;
-P1.3A/P1.4 remain separate tasks and the live-source gate remains closed.
+`npm run test:unit` include the shared 138-case gold validation corpus.
+`npm run test:integration` includes real MongoDB/Redis gold HTTP, ordering, isolation
+and worker crash/recovery checks using random test databases and queues. Configure
+`MONGODB_URL`/`REDIS_URL` for running local services as below. Tests remove only
+their owned data. Both CI workflows explicitly validate gold offline. The existing
+Python stock submission CLI has no gold mode; the gold HTTP integration test is the
+reproducible submission harness. See [storage, counts and ordering](INGESTION.md#synthetic-gold-storage-and-ordering).
+Local checks passed; Astra's whitespace parity finding has a schema/corpus fix
+with passing focused gold checks, pending reviewer recheck and remote CI. Collector
+P1.3B, public gold reads P1.4 and UI remain future work; the live-source gate is closed.
 
 **Current local demo · 14/10/2026:** Docker Compose runs the fixture web/API plus worker, MongoDB and Redis. No provider credential, ingestion secret, host Node/Python installation or pre-existing account is required for the core tour. [GATE-5](GATE_5_REVIEW.md) records fresh startup, real browser QA and restart persistence; it does not approve upstream rights or production use.
 
