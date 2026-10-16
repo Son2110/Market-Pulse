@@ -11,6 +11,7 @@ const runtime = await startIngestionWorker(new IngestionStore(client.db(database
   name, reconcileMs: 250, lockDuration: 1000, stalledInterval: 1000,
   hooks: boundary === "success" ? { beforeComplete: async () => pause("success") }
     : boundary === "revision" ? { afterRevision: async () => pause("revision") }
+    : boundary === "snapshot" ? { afterSnapshot: async () => pause("snapshot") }
     : { afterWrite: async count => { if (count === (boundary === "observed-write" ? 2 : 12)) await pause("write"); } },
 });
 process.send?.({ stage: "ready" });

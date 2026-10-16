@@ -12,7 +12,7 @@ type Mutation = { name: string; path?: (string | number)[]; value?: Json; sets?:
 const cases = JSON.parse(readFileSync("apps/api/tests/ingestion-parity.json", "utf8")) as Mutation[];
 function mutate(input: Json, path: (string | number)[], value: Json) { let cursor = input; for (const part of path.slice(0, -1)) cursor = (cursor as Record<string | number, Json>)[part]!; (cursor as Record<string | number, Json>)[path.at(-1)!] = value; }
 test("full fixture contract and shared negative parity corpus", () => {
-  assert.equal(validatePayload(fixture()).candles.length, 33);
+  const validated = validatePayload(fixture()); assert("candles" in validated); assert.equal(validated.candles.length, 33);
   for (const entry of cases) { const input = fixture(); for (const [path, value] of entry.sets ?? [[entry.path!, entry.value!]]) mutate(input, path, value); assert.throws(() => validatePayload(input), Error, entry.name); }
 });
 test("strict JSON detects duplicates, malformed primitives, unsafe numbers and Unicode", () => {

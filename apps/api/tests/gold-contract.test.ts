@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { canonicalJson, digest, strictJson, type Json } from "../src/ingestion-contract.js";
+import { validatePayload } from "../src/ingestion-contract.js";
+import { validateGoldPayload } from "../src/gold-contract.js";
+import { gold, goldOne, sealGold, asJson } from "./gold-test-data.js";
 
 type GoldRow = {
   assetId: string; snapshotId: string; contentDigest: string;
@@ -56,4 +59,41 @@ test("gold economic digest preserves A-B-A and excludes collection metadata", ()
   assert.equal(digest(content(changed)), rows[0]!.contentDigest);
   changed.quotes.spread = "0.5";
   assert.notEqual(digest(content(changed)), rows[0]!.contentDigest);
+});
+
+test("gold Node/Python shared mutation corpus preserves decimal, microsecond and calendar parity", () => {
+  assert.doesNotThrow(() => validatePayload(asJson(gold())));
+  const cases = JSON.parse(readFileSync("apps/api/tests/gold-parity.json", "utf8")) as { name: string; index: number; sets: [(string | number)[], Json][]; seal: boolean; valid: boolean }[];
+  for (const entry of cases) {
+    const payload = goldOne(entry.index); const row = payload.observations[0]!;
+    for (const [path, value] of entry.sets) {
+      let cursor = row as unknown as Record<string | number, Json>;
+      for (const part of path.slice(0, -1)) cursor = cursor[part] as Record<string | number, Json>;
+      cursor[path.at(-1)!] = value;
+    }
+    if (entry.seal) sealGold(row);
+    if (entry.valid) assert.doesNotThrow(() => validatePayload(asJson(payload)), entry.name);
+    else assert.throws(() => validatePayload(asJson(payload)), Error, entry.name);
+  }
+});
+
+test("gold closed objects, array bound, fixture labels and exclusive routing reject mixed envelopes", () => {
+  for (const path of [[], ["dataset"], ["observations", 0], ...["quotes", "time", "qualityFlags", "provenance"].map(key => ["observations", 0, key])] as (string | number)[][]) {
+    const payload = asJson(goldOne()); let cursor = payload as Record<string | number, Json>;
+    for (const part of path) cursor = cursor[part] as Record<string | number, Json>;
+    cursor.extra = "unexpected"; assert.throws(() => validateGoldPayload(payload)); delete cursor.extra;
+    delete cursor[Object.keys(cursor)[0]!]; assert.throws(() => validateGoldPayload(payload));
+  }
+  const empty = goldOne(); empty.observations = []; assert.throws(() => validatePayload(asJson(empty)));
+  const bounded = goldOne(); bounded.observations = Array.from({ length: 500 }, () => bounded.observations[0]!);
+  assert.doesNotThrow(() => validatePayload(asJson(bounded))); bounded.observations.push(bounded.observations[0]!); assert.throws(() => validatePayload(asJson(bounded)));
+  const fixture = strictJson(readFileSync("fixtures/market/mp-02-synthetic.json", "utf8")) as Record<string, Json>;
+  fixture.observations = asJson(goldOne()); assert.throws(() => validatePayload(fixture));
+  const mixed = { ...goldOne(), assets: [] }; assert.throws(() => validatePayload(mixed as unknown as Json));
+  for (const [group, field, value] of [["dataset", "mode", "observed"], ["dataset", "label", "market data"], ["dataset", "freshness", "fresh"], ["dataset", "timezone", "UTC"]]) {
+    const payload = asJson(goldOne()) as Record<string, Json>; (payload[group!] as Record<string, Json>)[field!] = value!; assert.throws(() => validatePayload(payload));
+  }
+  for (const [field, value] of [["provider", "PNJ"], ["brand", "PNJ"], ["product", "world_gold"], ["purity", "995"], ["region", ""], ["region", " region"], ["requestedRegion", "region\n"]]) {
+    const payload = goldOne(); payload.observations[0]![field!] = value!; assert.throws(() => validatePayload(asJson(payload)));
+  }
 });
