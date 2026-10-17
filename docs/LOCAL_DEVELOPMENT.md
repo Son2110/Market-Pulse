@@ -9,6 +9,7 @@ and `GET /api/gold/quotes/history`; missing/`false` returns 404. Only literal
 Reads need MongoDB and normal API startup dependencies, but no ingestion secret
 or ingestion initialization. The integration suite seeds synthetic data through
 the existing store; no source collector or web page is added.
+The dated P1.3A note below records the historical state before P1.4 implemented public gold reads.
 
 History requires `provider=marketpulse-fixture`, `product=gold_bar_sjc` or
 `plain_ring_9999`, and real `from`/`to` dates (`YYYY-MM-DD`, years 0001–9999).
