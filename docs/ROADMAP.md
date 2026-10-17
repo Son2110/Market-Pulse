@@ -2,6 +2,25 @@
 
 ## Kế hoạch mở rộng hiện hành
 
+**P1.4 stored gold reads · 16/10/2026:** triển khai API-only trên P1.3A đã merge
+PR #34; flag `GOLD_READS_ENABLED` mặc định false, hai route latest/history chỉ đọc
+synthetic projection đã lưu. Exact series/filter/pagination, decimal/null/provenance,
+chi conversion, whitelist/validation và 503 no-store đã có; không gọi provider,
+repair/fallback, thay ingestion hoặc thêm UI. History và latest có semantics riêng,
+đọc eventual/non-atomic, không suy ra freshness hoặc completeness. Xem
+[hợp đồng local](LOCAL_DEVELOPMENT.md#optional-stored-synthetic-gold-read-api).
+Local đạt 183 Node unit và 41 integration MongoDB/Redis (5 read mới), không skip;
+lint/typecheck/build, 44 Python contract, 29 collector tests, hai validators,
+Compose config, 173 docs targets và portal 23 tài liệu đạt. Sau bổ sung null-region
+và product isolation, 10 focused checks chạy lại đạt. Bằng chứng local không thay
+review/CI; CI remote P1.4 còn chờ. Cổng collector thật P1.3B,
+public redisplay/training vẫn đóng; các ghi nhận P1.3A pending bên dưới là lịch sử.
+
+**Review độc lập P1.4 · 16/10/2026:** GPT-6 Astra chấp thuận implementation,
+không có finding cần sửa. Reviewer chạy độc lập 14 focused checks, gồm năm
+integration MongoDB, tất cả đạt và không skip. Bằng chứng này tách biệt với full
+suite của worker ở trên; CI remote vẫn còn chờ. User quản lý tạo PR và merge.
+
 **P1.3A ingestion/storage vàng · 16/10/2026:** đã triển khai validator Node cùng
 contract v1, nhận fixture qua internal HTTP có xác thực, outbox/BullMQ worker và
 bốn collection MongoDB riêng. Revision giữ nguyên đầy đủ bản ghi đầu tiên; snapshot

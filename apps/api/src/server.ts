@@ -11,6 +11,7 @@ import { createIngestionApi } from "./ingestion-api.js";
 import { IngestionStore } from "./ingestion-store.js";
 import { createIngestionQueue, DeliveryQueue } from "./ingestion-queue.js";
 import { createObservedHistoryRouter, ObservedHistoryService } from "./observed-history.js";
+import { createGoldReadRouter, GoldReadService } from "./gold-read.js";
 
 const config = readConfig();
 const stores = createStores(config);
@@ -59,6 +60,7 @@ const server = createServer(createApp({
   stockSearchRouter: createStockSearchRouter(stockSearch),
   dailyHistoryRouter: createDailyHistoryRouter(marketData),
   observedHistoryRouter: config.observedReadsEnabled ? createObservedHistoryRouter(new ObservedHistoryService(stores.mongo.db(), config.dependencyTimeoutMs), () => connectedBefore && !shuttingDown) : undefined,
+  goldReadRouter: config.goldReadsEnabled ? createGoldReadRouter(new GoldReadService(stores.mongo.db()), () => connectedBefore && !shuttingDown) : undefined,
   watchlistRouter: watchlists.router,
   ingestionRouter: createIngestionApi({ store: ingestionStore, secret: config.ingestionSecret, isReady: () => ingestionReady, enqueue: async (id, digest) => { await deliveries?.enqueue(id, digest); } }),
 }));

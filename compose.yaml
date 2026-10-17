@@ -41,6 +41,7 @@ services:
       DEPENDENCY_TIMEOUT_MS: 1000
       INGESTION_SECRET: ${INGESTION_SECRET:-}
       OBSERVED_READS_ENABLED: ${OBSERVED_READS_ENABLED:-false}
+      GOLD_READS_ENABLED: ${GOLD_READS_ENABLED:-false}
     depends_on:
       mongodb:
         condition: service_healthy
