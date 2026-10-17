@@ -1,6 +1,46 @@
-# Lộ trình MarketPulse VN — cập nhật 14/10/2026
+# Lộ trình MarketPulse VN — cập nhật 18/10/2026
 
 ## Kế hoạch mở rộng hiện hành
+
+**Baseline hiện hành · 18/10/2026:** P1.4 đã merge qua
+[PR #35](https://github.com/Son2110/Market-Pulse/pull/35); `main` tại
+`cebfede2724d97f43ed2a33e4a565d567472b9d4`.
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311421)
+và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311438)
+trên baseline này đều thành công. P1.2 contract, P1.3A storage và P1.4 API đọc
+synthetic đã có; P1.4 không có UI. Collector vàng thật P1.3B, public redisplay và
+training vẫn đóng. Các dòng “CI còn chờ”, “P1.4 chưa triển khai” có ngày cũ bên
+dưới là bằng chứng lịch sử, không là trạng thái hiện tại.
+
+### Foundation A1–A4 — thứ tự đã duyệt
+
+Quyết định tại [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md): modular monolith,
+một codebase Node với API/worker tách process, Python collector và nghiên cứu
+forecast offline. Giữ outbox/reconciliation/revision hiện có, không viết framework
+chung hoặc di chuyển hàng loạt thư mục. A1 chỉ bàn giao tài liệu. Review độc lập
+GPT-6 Astra ngày 18/10/2026 đã chấp thuận, không có finding, sau đối chiếu code
+server/health, ingestion, auth, gold storage, Compose và CI; reviewer chạy lại
+docs check (186 local targets), portal build (24 tài liệu) và diff check đều đạt.
+Đây là review tài liệu, không phải lần chạy runtime test mới. CI remote của nhánh
+A1 vẫn còn chờ; không dùng CI baseline để nghiệm thu thay đổi mới.
+
+| Thứ tự serial | Task và nhánh | Công sức | Phạm vi và cổng |
+|---|---|---|---|
+| 1 | A1 · tài liệu kiến trúc · `docs/architecture-foundation` | 3–4 giờ | Baseline so với đề xuất, module/dependency, dataflow, quyền nguồn, compatibility/rollback và ADR; không đổi app. |
+| 2 | A2 · ingestion primitives · `feat/fr-18-ingestion-foundation-1` | 4–6 giờ | Tách primitive cần thiết, giữ parity Python/Node, decimal, UTC microsecond, hash/ID và replay; một worker, kiểm tra/review trước task tiếp. |
+| 3 | A3 · family dispatch · `feat/fr-18-ingestion-foundation-2` | 5–7 giờ | Phân loại nội bộ payload legacy **đã validate**, không đổi wire/hash/delivery/job ID; derive metadata cũ, chỉ additive nếu cần, không bulk migration. |
+| 4 | P2.1 · nghiên cứu nguồn news / quyền theo mục đích | Theo ngân sách P2 hiện có | Chốt feed/field được phép, registry decision cho access/store/redisplay/AI/training và retention; unknown đóng. Research không mở collector. |
+| 5 | A4 · dependency health/recovery · `ci/dependency-health-recovery` | 8–12 giờ | Sửa lifecycle Redis có chủ đích, full/capability readiness, outage/recovery và outbox. **Phải xong trước P2.2 hoặc bất kỳ collector tự động nào.** Đọc degraded cần bằng chứng routing; auth limiter hiện ở process, không ở Redis. |
+| 6 | P2.2 → P2.3 | Theo ngân sách P2 hiện có | Ingest/dedup/revision news sau cổng quyền và A4; rồi API/UI theo design app hiện có, làm từng task serial. |
+
+Tổng riêng **A1–A4: 20–29 giờ**, cộng **20% buffer: khoảng 24–35 giờ**,
+không gồm chờ quyền/review bên ngoài. P2.1/P2.2/P2.3 thuộc **24–36 giờ P2**
+trong bảng pha, không cộng lần nữa vào A1–A4. Các ngân sách P1–P6 bên dưới là
+baseline kế hoạch trước foundation, không là ước lượng giờ còn lại đã đo lại;
+không trừ tùy ý giờ P1 đã làm hay cộng buffer foundation lần hai vào tổng cũ.
+Đo lại phần còn lại sau A4 và audit P2.1.
+
+### Ghi nhận có ngày — giữ bằng chứng triển khai trước baseline hiện hành
 
 **P1.4 stored gold reads · 16/10/2026:** triển khai API-only trên P1.3A đã merge
 PR #34; flag `GOLD_READS_ENABLED` mặc định false, hai route latest/history chỉ đọc
@@ -74,13 +114,13 @@ Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba 
 | P0 · Core local — đã qua GATE-5 trong scope fixture | Ước lượng trước gate: 24–36 giờ; không cộng vào phần còn lại | P0.1 giới hạn MP-12; P0.2 MP-14 E2E fixture và CI; P0.3 MP-15 startup/demo, GATE-5 | Core fixture có bằng chứng trên; review độc lập/CI nhánh tài liệu là bước riêng. MP-11/12 và nguồn live vẫn một phần/chưa xác minh. Không bắt buộc cache nếu chưa có nhu cầu và kiểm tra invalidation/expiry. |
 | P1 · Bắt buộc — dữ liệu vàng Việt Nam | 32–48 giờ (trong đó 16–24 giờ cho P1.2–P1.4 kỹ thuật local) | P1.1 nghiên cứu & khảo sát 3 nguồn; P1.2 contract + synthetic fixture; P1.3A ingestion pipeline & storage MongoDB; P1.4 API đọc dữ liệu đã lưu; P1.3B collector nguồn thật (có điều kiện mở lại) | Sau P0. Nghiên cứu & thiết kế P1.1–P1.4 hoàn tất tại [Thiết kế dữ liệu vàng P1](GOLD_DATA_DESIGN_P1.md). Cổng live source vẫn **TẠM CHẶN**; các task kỹ thuật P1.2–P1.4 thực hiện trên synthetic fixture có nhãn; collector thật P1.3B chỉ mở khi có văn bản thỏa thuận cấp phép. |
 
-| P2 · Bắt buộc — news FR-07 | 24–36 giờ | P2.1 quyền một RSS/feed tiếng Việt và link chính thức tuyển chọn; P2.2 ingest/dedup/revision; P2.3 danh sách + lọc vàng/FX/cổ phiếu | Sau P1. Có title, canonical URL, publisher, publishedAt, collectedAt, language; lỗi/thiếu tin/stale minh bạch. Không giả định RSS cho phép toàn văn hoặc AI processing. |
+| P2 · Bắt buộc — news FR-07 | 24–36 giờ; không gồm A1–A4 | P2.1 quyền một RSS/feed tiếng Việt và link chính thức tuyển chọn; P2.2 ingest/dedup/revision; P2.3 danh sách + lọc vàng/FX/cổ phiếu | Sau lát cắt synthetic P1, theo thứ tự foundation ở trên: P2.1 research sau A3; P2.2 chỉ sau A4 và cổng quyền. Có title, canonical URL, publisher, publishedAt, collectedAt, language; lỗi/thiếu tin/stale minh bạch. Không giả định RSS cho phép toàn văn hoặc AI processing. |
 | P3 · Bắt buộc — AI FR-08 và market brief | 32–48 giờ | P3.1 entity/category; P3.2 summary có citation; P3.3 brief ghép dữ liệu đo được với tin; P3.4 đánh giá held-out, budget/fallback | Sau P2 và dữ liệu định danh P1. Phân tách sự thật có nguồn, số liệu tính bằng code và diễn giải. Gate AI theo PRD/nghiên cứu; event do AI đề xuất phải duyệt. Fallback về tin gốc khi thiếu bằng chứng/lỗi model/hết budget. |
 | P4 · Bắt buộc — dashboard vàng và events | 28–44 giờ | P4.1 giá mua/bán/spread/history; P4.2 FR-09/10 timeline/detail có nguồn; P4.3 FR-11 chỉ khi đủ lịch sử | Sau P3. SJC và nhẫn là hai sản phẩm riêng; gap/stale/unknown không bị che. Phản ứng quanh event có cửa sổ và số quan sát; không tuyên bố nhân quả. Thiếu lịch sử thì chỉ hiển thị event và dữ liệu mô tả. |
 | P5 · Bắt buộc nghiên cứu — dự báo vàng | 40–60 giờ | P5.1 khóa target/horizon/ngưỡng và audit quyền/lịch sử; P5.2 baseline + walk-forward; P5.3 holdout/calibration; P5.4 shadow + báo cáo go/no-go | Sau P4, lịch sử đủ điều kiện và quyền training. Luôn bàn giao báo cáo, kể cả không có edge. Xác suất trong app chỉ mở sau gate nghiên cứu; chưa đạt thì duy trì descriptive dashboard. Không dùng LLM làm oracle giá. |
 | P6 · Bắt buộc — local v2; pilot tùy chọn | 18–30 giờ | P6.1 E2E news/gold/AI citation và kiểm tra budget; P6.2 tài liệu/demo local v2; P6.3 audit khả năng pilot | Sau P5 có quyết định và P0–P4 đạt. Local v2 có thể hoàn tất với kết luận dự báo chưa đủ bằng chứng. Pilot/production cần cổng riêng về quyền public, secrets, chi phí, backup/restore, network và vận hành; không mặc nhiên deploy. |
 
-P1 bắt đầu lưu quan sát thực sớm sau khi cổng quyền và contract đạt; collector đã nghiệm thu có thể tự tích lũy dữ liệu khi người phát triển làm các pha sau. Đây là vận hành thu thập tự động, không là triển khai song song hoặc cho phép bỏ qua review. Không đảm bảo lịch sử thu mới sẽ đủ cho P5; thử khả năng mua/nhận lịch sử có quyền ngay ở P1.
+P1 chỉ bắt đầu lưu quan sát thực khi cổng quyền, contract **và A4 dependency health/recovery** đạt; collector đã nghiệm thu có thể tự tích lũy dữ liệu khi người phát triển làm các pha sau. Đây là vận hành thu thập tự động, không là triển khai song song hoặc cho phép bỏ qua review. Không đảm bảo lịch sử thu mới sẽ đủ cho P5; thử khả năng mua/nhận lịch sử có quyền ngay ở P1.
 
 ### Phạm vi cam kết và tiêu chí dừng
 

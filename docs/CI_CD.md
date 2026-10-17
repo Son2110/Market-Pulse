@@ -1,12 +1,33 @@
 # CI/CD
 
-MP-10 extends Application CI with an ephemeral randomly generated internal ingestion secret, a separate worker health check, explicit collector HTTP submission/replay and MongoDB assertions for one raw delivery / 11 assets / 44 observations / success. Real BullMQ retry and child-worker interruption tests join the existing MongoDB/Redis suite. GitHub Actions masking is registered before the secret is saved to the runner environment, preventing later step environment displays from exposing it; no live provider credential is needed. See [ingestion evidence and limits](INGESTION.md). Local checks are recorded there; GitHub CI on this branch remains unconfirmed.
+**Baseline đã xác minh · 18/10/2026:** P1.4 đã merge qua
+[PR #35](https://github.com/Son2110/Market-Pulse/pull/35), `main` tại
+`cebfede2724d97f43ed2a33e4a565d567472b9d4`.
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311421)
+và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311438)
+thành công trên baseline này. CI nhánh A1 là bằng chứng riêng, chưa được xác nhận
+bằng các run baseline. Xem [kiến trúc hiện hành và đề xuất](SYSTEM_ARCHITECTURE.md).
+
+MP-10 đã bổ sung ephemeral internal ingestion secret, health worker riêng,
+collector HTTP submission/replay và MongoDB assertions cho một raw delivery /
+11 assets / 44 observations / success. BullMQ retry và child-worker interruption
+được kiểm tra cùng MongoDB/Redis thật. GitHub Actions đăng ký mask trước khi lưu
+secret vào runner environment; không cần credential provider. Xem
+[ingestion evidence and limits](INGESTION.md) cho lịch sử và giới hạn.
 
 ## Đang hoạt động
 
-`Documentation CI` chạy khi mở/cập nhật pull request và khi push vào `main`, `ci/**`, `feat/**` hoặc `docs/**`. Workflow cài dependency validation đã pin, kiểm tra link cục bộ, xác thực schema/fixture thị trường offline, chạy unit tests hợp đồng, build portal từ danh sách tài liệu cho phép và lưu `_site/` thành artifact trong 7 ngày. Link ngoài không được truy cập; fragment anchor không được kiểm tra. Thiếu file cục bộ hoặc lỗi validation/test sẽ làm job thất bại.
+`Documentation CI` chạy khi mở/cập nhật pull request và khi push vào `main`, `ci/**`, `feat/**` hoặc `docs/**`. Workflow cài dependency validation đã pin, kiểm tra link cục bộ, xác thực schema/fixture thị trường và gold synthetic offline, chạy unit tests hợp đồng, build portal từ danh sách tài liệu cho phép và lưu `_site/` thành artifact trong 7 ngày. Link ngoài không được truy cập; fragment anchor không được kiểm tra. Thiếu file cục bộ hoặc lỗi validation/test sẽ làm job thất bại.
 
-`Application CI` là workflow riêng trên cùng pull request và các nhánh push đó. Nó chạy `npm ci`, lint, typecheck source và test, unit tests, build API/web, validator và Python tests; sau đó kiểm tra/build Compose, khởi động stack và đợi health checks, chạy collector fixture cùng integration thật với MongoDB/Redis. Integration không skip khi thiếu dependency. Workflow chỉ có quyền `contents: read`, không cần provider secret.
+`Application CI` là workflow riêng trên cùng pull request và các nhánh push đó.
+Nó cài workspace, lint, typecheck source/tests, unit tests và build API/web;
+chạy validator market/gold cùng Python contract/collector tests; kiểm tra/build
+Compose, khởi động stack, đợi health và smoke test API/web/proxy. Collector fixture
+được validate, submit và replay qua HTTP/worker; integration MongoDB/Redis thật
+không skip khi thiếu dependency. Cuối cùng workflow cài Chromium, chạy regression
+harness và Playwright core-flow E2E đã commit. Screenshot browser được mask và
+giữ tối đa ba ngày khi lỗi; log service chỉ lấy khi lỗi, cleanup luôn chạy.
+Workflow chỉ có quyền `contents: read`, không cần provider secret.
 
 Chạy cùng các bước tại máy:
 
@@ -14,6 +35,7 @@ Chạy cùng các bước tại máy:
 python -m pip install -r requirements-dev.txt
 python scripts/check_docs.py
 python scripts/validate_market_data.py
+python scripts/validate_gold_quotes.py
 python -m unittest discover -s tests -v
 python scripts/build_docs.py
 ~~~
@@ -24,11 +46,29 @@ Portal build chỉ dùng thư viện chuẩn của Python 3.12; workflow không 
 
 ## Luồng ứng dụng local hiện tại
 
-`Application CI` kiểm tra API health/auth cùng route lịch sử fixture của MP-05; smoke test xác nhận response FPT trong API image có schema/provenance và hai candle được lọc. Web root cố ý trống tới khi có page được thiết kế trong Stitch, còn collector chỉ xác thực fixture. Những check này không chứng minh đã có luồng frontend, live data, E2E sản phẩm hay deploy.
+Web đã có search, detail/chart, VN-Index, account và watchlist theo design app
+hiện có. Smoke test xác nhận route shell, same-origin proxy và response fixture
+có schema/provenance; đây là lớp kiểm tra khác với browser E2E. Collector fixture
+không chỉ validate: CI submit/replay và kiểm tra durable receipt/canonical counts.
+
+MP-14 dùng Playwright/Chromium đi qua API thật ở desktop 1440px và mobile 320px:
+search FPT → detail/chart → register → tạo/thêm FPT watchlist → reload → logout;
+context B xác nhận cách ly quyền sở hữu. Harness tự khởi động API/Vite, database
+cách ly có ownership marker, ingestion/observed tắt; không seed account, mock
+response thành công hoặc gọi provider. Xem
+[phạm vi và lệnh E2E](LOCAL_DEVELOPMENT.md#committed-core-flow-browser-tests-mp-14).
+Gold contract/storage/read có unit/integration riêng; core browser E2E không bao
+phủ gold UI (chưa có), news/AI, outage Redis, nguồn live hoặc production deploy.
 
 ## Luồng ứng dụng sau này
 
-Khi có luồng sản phẩm, pull request cần bổ sung unit test normalization/analytics và E2E dùng fixture. E2E nên đi qua search → chart → watchlist, kiểm tra quyền sở hữu phủ định và replay/retry idempotency. Vercel có thể tạo Preview cho pull request; chỉ dùng fixture và không đưa khóa provider vào preview.
+Task runtime mới chạy các check hiện có phù hợp và bổ sung coverage cho hành vi
+mới khi cần; giữ core E2E search → chart → watchlist, negative ownership và
+integration replay/retry. [A4 trong roadmap](ROADMAP.md) phải kiểm tra dependency
+health/recovery trước P2.2 hoặc collector tự động. Redis mất kết nối hiện làm API
+shutdown; CI baseline không chứng minh degraded reads hoặc load-balancer routing.
+Vercel Preview là hướng triển khai tương lai, không phải check đang hoạt động;
+chỉ dùng dữ liệu có quyền và không đưa khóa provider vào preview.
 
 Sau review và khi app gate đạt, user merge vào `main`. Đưa API và worker lên Render staging sau CI hoặc deploy thủ công đúng commit đã kiểm tra; chạy smoke test health, search/chart/watchlist và nhãn source/as-of/freshness. Chỉ promote production ở một bước riêng có người duyệt sau này. Một trạng thái Render bị skip/neutral không chứng minh app gate thành công: bảo vệ `main` bằng check cuối cùng yêu cầu job gate thực sự pass.
 

@@ -4,6 +4,18 @@
 **Trạng thái thiết kế ngày 15/10:** Hoàn thành nghiên cứu và thiết kế kỹ thuật P1.1–P1.4; cập nhật implementation P1.2 và P1.3A ngày 16/10 ở dưới. Cổng live source chưa mở.<br>
 **Phạm vi:** Đặc tả kiến trúc, data contract, fixture, mô hình lưu trữ MongoDB, quy tắc collector, API đọc dữ liệu và kế hoạch triển khai từng bước cho luồng dữ liệu vàng Việt Nam (vàng miếng SJC và nhẫn trơn 9999) theo [PRD](PRD.md), [ROADMAP](ROADMAP.md) và kết quả khảo sát nguồn tại [GOLD_SOURCE_AUDIT.md](GOLD_SOURCE_AUDIT.md).
 
+**Trạng thái hiện hành · 18/10/2026:** P1.2/P1.3A/P1.4 synthetic đã có trên
+`main`; P1.4 merge [PR #35](https://github.com/Son2110/Market-Pulse/pull/35) tại
+`cebfede2724d97f43ed2a33e4a565d567472b9d4`, với
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311421)
+và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311438)
+thành công. Các trạng thái pending hoặc “triển khai được ngay” có ngày cũ bên
+dưới giữ bối cảnh lịch sử; P1.4 chỉ API, chưa có gold UI/collector thật.
+[Quyết định kiến trúc A1](SYSTEM_ARCHITECTURE.md) yêu cầu A4 trước collector tự
+động và retention theo quyền nguồn; mô tả revision “vĩnh viễn” trong thiết kế
+ban đầu không cho phép lưu vô hạn nội dung thật/toàn văn. Hiện chưa có retention
+tự động cho synthetic raw/revision; quyền nguồn thật/public/AI/training vẫn đóng.
+
 ---
 
 ## P1.4 stored read implementation · 16/10/2026

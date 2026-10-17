@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Event-driven market intelligence for Vietnam</strong></p>
 
-**Project status · 14/10/2026: GATE-5 PASS — reproducible local fixture core demo / P0 closure.** Stock search, detail/daily closing-price chart, VN-Index, local accounts and one private watchlist run with Docker Compose. [Gate 5 evidence](docs/GATE_5_REVIEW.md) separates fresh worker QA, successful baseline CI and independent approval of this documentation branch; its own remote CI remains pending. The committed MP-14 browser tests passed on merged `main`. MP-11 has optional stored KBS candles and FPT/VNINDEX views; MP-12 has collection-status APIs and an FPT status card. Both remain bounded, partial work: default reads use the synthetic fixture, observed reads are off, and a fresh clone contains no stored observed data. Source as-of/freshness/completeness, upstream data rights, equity adjustment and broader coverage remain unverified.
+**Project status · 18/10/2026:** the reproducible local fixture core has passed GATE-5. P1.2 synthetic gold contract, P1.3A ingestion/storage and P1.4 stored read API are merged; [PR #35](https://github.com/Son2110/Market-Pulse/pull/35) is the current baseline, with successful [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311421) and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311438). Gold reads are API-only and off by default; there is no gold UI or real gold collector. Stock search, detail/daily chart, VN-Index, local accounts and one private watchlist run with Compose and committed MP-14 browser tests. MP-11/12 provide optional stored KBS views and bounded collection-status evidence. Default reads remain synthetic, observed reads are off, and a fresh clone has no stored observed/gold data. Source freshness/completeness, upstream rights, equity adjustment and broader coverage remain unverified. [Gate 5 evidence](docs/GATE_5_REVIEW.md) preserves its dated acceptance record.
 
 MarketPulse VN is designed to bring Vietnamese equities, market indices, gold, foreign exchange, macro data, financial news and public events into one research experience. The central idea is to show market movement alongside relevant events while making data source and freshness visible. A nearby event is context, not proof of cause.
 
@@ -21,7 +21,7 @@ The reproducible demo uses ten synthetic equities plus VN-Index, with three dail
 | Stage | Scope |
 |---|---|
 | Local core · P0 | Reproducible fixture authentication, stock search/detail/daily chart, VN-Index and one private watchlist; provenance/as-of/freshness labels, replay/ownership checks and committed browser CI. |
-| Next · P1 | Audit one Vietnamese gold publisher covering both SJC and plain 9999 rings; verify rights, history, units and source timestamps before data integration. |
+| Current · P1 + foundation | Gold audit/design and synthetic contract/storage/read API exist. Real-source collection, public redisplay and training remain gated. A1–A4 document and incrementally strengthen the existing ingestion foundation before news ingestion or automated collectors. |
 | Planned · P2–P4 | Vietnamese news, evidence-linked AI analysis, then a gold dashboard and sourced events. These features are not implemented. |
 | Planned · P5–P6 | Separately validated domestic-gold probability research, then a reproducible local v2; forecasts enter the app only after their research gate. Production/pilot has a separate gate. |
 
@@ -47,25 +47,31 @@ Five-minute tour:
 
 The five-minute tour starts after the stack is ready; first build/download time depends on the machine and network. `down --volumes` removes account/watchlist storage, so it is not a routine restart command. [Full startup, recovery and optional observed-data prerequisites](docs/LOCAL_DEVELOPMENT.md) and [Gate 5 limits](docs/GATE_5_REVIEW.md) are available for review.
 
-## Planned architecture
+## Architecture
 
-The diagram below is the intended design, not a claim that these services are running today.
+The implemented baseline uses one Node codebase with separate API and worker
+processes. Dashed nodes are future features. The dated [architecture decision](docs/SYSTEM_ARCHITECTURE.md)
+separates current behavior from proposed module, rights and recovery boundaries.
 
 ~~~mermaid
 flowchart LR
-  Web["React + Vite<br/>Market views"] --> API["Express API<br/>Authentication and queries"]
-  API --> Mongo["MongoDB<br/>Canonical records"]
-  API --> Redis["Redis<br/>Cache and queue"]
-  Collector["Python collector<br/>Provider adapter"] -->|authenticated ingestion| API
-  Redis --> Worker["Node + BullMQ<br/>Normalization and jobs"]
-  Worker --> Raw["Raw and normalized<br/>regular collections"]
-  Worker --> TS["Time-series projection<br/>query workload"]
-  Raw --> Mongo
-  TS --> Mongo
-  Events["Curated events<br/>later phase"] -.-> API
+  Web["React + Vite"] --> API["Express API<br/>fixture and opt-in stored reads"]
+  Fixture["Packaged synthetic market fixture"] --> API
+  API --> Mongo["MongoDB<br/>outbox, revisions, projections, accounts"]
+  API --> Redis["Redis / BullMQ<br/>job transport"]
+  Collector["Python collector<br/>explicit fixture / opt-in KBS"] -->|authenticated ingestion| API
+  Redis --> Worker["Node worker<br/>same API codebase / image"]
+  Worker -->|persist and reconcile outbox| Mongo
+  Future["News / AI / events<br/>future gated phases"] -.-> API
 ~~~
 
-Ingestion keeps provider payloads separate from canonical data. Replay must be idempotent, and a time-series projection is treated as rebuildable because MongoDB time-series collections do not support unique indexes. Market values carry provider, currency/units, timezone, as-of time and freshness; missing observations are left missing. Event pages describe **associated market movement**, never causation.
+Ingestion retains normalized deliveries separately from family records in ordinary
+MongoDB collections, with durable acceptance, idempotent replay and worker
+reconciliation. There is no implemented market cache or time-series projection.
+The API currently requires Redis even for startup/readiness and shuts down after
+Redis loss; degraded reads are future A4 work. Market values retain provider,
+currency/units, timezone, as-of and freshness; missing observations remain missing.
+Future event pages describe **associated market movement**, never causation.
 
 ## Repository guide
 
@@ -73,7 +79,8 @@ Ingestion keeps provider payloads separate from canonical data. Replay must be i
 |---|---|
 | [Product requirements](docs/PRD.md) | Vietnamese scope, all FR-01–FR-18 statuses, acceptance boundaries and explicit omissions. |
 | [Market-data contract](docs/DATA_CONTRACT.md) | Versioned canonical schema, synthetic fixture semantics, units, provenance and offline checks. |
-| [Three-week roadmap](docs/ROADMAP.md) | 21-day sequence, 15 implementation days, 6 review/buffer days, gates, fallback and risks. |
+| [Current roadmap](docs/ROADMAP.md) | Serial A1–A4 foundation, gated P1–P6 expansion and preserved three-week history. |
+| [System architecture](docs/SYSTEM_ARCHITECTURE.md) | Implemented baseline, modular-monolith decision, proposed boundaries, dependencies and rollback. |
 | [Provider research](docs/PROVIDER_RESEARCH.md) | MP-01 comparison and limited probe, owner’s Vnstock direction, unresolved live-source gate and MP-02 fixture decision. |
 | [Vnstock adapter](docs/VNSTOCK_ADAPTER.md) | Optional local KBS candle adapter, v2 contract, bounded runtime evidence and next ingestion boundary. |
 | [Gate 5 review](docs/GATE_5_REVIEW.md) | Exact baseline CI, fresh isolated startup, browser flow, restart persistence and remaining limits. |

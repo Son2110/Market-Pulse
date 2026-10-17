@@ -17,6 +17,7 @@ DOCUMENTS = (
     "MarketPulse_VN_Project_Documentation.md",
     "docs/PRD.md",
     "docs/DATA_CONTRACT.md",
+    "docs/SYSTEM_ARCHITECTURE.md",
     "docs/ROADMAP.md",
     "docs/PROVIDER_RESEARCH.md",
     "docs/PRODUCT_EXPANSION_RESEARCH.md",
