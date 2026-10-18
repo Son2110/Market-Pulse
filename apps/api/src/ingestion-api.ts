@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import express from "express";
-import { ContractError, digest, strictJson, validatePayload } from "./ingestion-contract.js";
+import { validatePayload } from "./ingestion-contract.js";
+import { ContractError, digest, strictJson } from "./platform/contracts/json.js";
 import { DeliveryConflict, IngestionStore, receipt } from "./ingestion-store.js";
 
 async function boundedEnqueue(operation: Promise<void>): Promise<void> {

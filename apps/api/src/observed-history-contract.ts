@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
-import { canonicalJson, collectedOrder, digest, observedContent, type Dataset, type Json, type ObservedAsset, type ObservedCandle } from "./ingestion-contract.js";
+import { collectedOrder, observedContent, type Dataset, type ObservedAsset, type ObservedCandle } from "./ingestion-contract.js";
+import { canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 
 export interface ObservedHistoryRange { from: string; to: string }
 export interface ObservedHistoryResponse {

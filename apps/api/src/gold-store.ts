@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { MongoServerError, type Collection, type Db, type Document } from "mongodb";
-import { digest, type Json } from "./ingestion-contract.js";
+import { digest, type Json } from "./platform/contracts/json.js";
 import { goldAsset, type GoldDataset, type GoldObservation, type GoldPayload } from "./gold-contract.js";
 import { IdentityConflict, type Delivery } from "./ingestion-store.js";
 

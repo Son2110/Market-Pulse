@@ -1,5 +1,6 @@
 import { MongoServerError, type Collection, type Db, type Document } from "mongodb";
-import { digest, isGoldPayload, type Json, type Payload } from "./ingestion-contract.js";
+import { isGoldPayload, type Payload } from "./ingestion-contract.js";
+import { digest, type Json } from "./platform/contracts/json.js";
 import { ObservedStore, observedCollectionSchemas } from "./observed-store.js";
 import { GoldStore, goldCollectionSchemas } from "./gold-store.js";
 

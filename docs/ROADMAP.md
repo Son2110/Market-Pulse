@@ -2,11 +2,11 @@
 
 ## Kế hoạch mở rộng hiện hành
 
-**Baseline hiện hành · 18/10/2026:** P1.4 đã merge qua
-[PR #35](https://github.com/Son2110/Market-Pulse/pull/35); `main` tại
-`cebfede2724d97f43ed2a33e4a565d567472b9d4`.
-[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311421)
-và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311438)
+**Baseline hiện hành · 18/10/2026:** P1.4 và A1 đã merge, mới nhất qua
+[PR #36](https://github.com/Son2110/Market-Pulse/pull/36); `main` tại
+`a7206fee2fcfb317c2ee44c6342d3359510eea9e`.
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998099)
+và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998107)
 trên baseline này đều thành công. P1.2 contract, P1.3A storage và P1.4 API đọc
 synthetic đã có; P1.4 không có UI. Collector vàng thật P1.3B, public redisplay và
 training vẫn đóng. Các dòng “CI còn chờ”, “P1.4 chưa triển khai” có ngày cũ bên
@@ -21,8 +21,8 @@ chung hoặc di chuyển hàng loạt thư mục. A1 chỉ bàn giao tài liệu
 GPT-6 Astra ngày 18/10/2026 đã chấp thuận, không có finding, sau đối chiếu code
 server/health, ingestion, auth, gold storage, Compose và CI; reviewer chạy lại
 docs check (186 local targets), portal build (24 tài liệu) và diff check đều đạt.
-Đây là review tài liệu, không phải lần chạy runtime test mới. CI remote của nhánh
-A1 vẫn còn chờ; không dùng CI baseline để nghiệm thu thay đổi mới.
+Đây là review tài liệu, không phải lần chạy runtime test mới. A1 đã merge và CI
+đạt như baseline ở trên; không dùng CI baseline để nghiệm thu thay đổi A2 mới.
 
 | Thứ tự serial | Task và nhánh | Công sức | Phạm vi và cổng |
 |---|---|---|---|
@@ -40,7 +40,29 @@ baseline kế hoạch trước foundation, không là ước lượng giờ còn
 không trừ tùy ý giờ P1 đã làm hay cộng buffer foundation lần hai vào tổng cũ.
 Đo lại phần còn lại sau A4 và audit P2.1.
 
-### Ghi nhận có ngày — giữ bằng chứng triển khai trước baseline hiện hành
+### Ghi nhận có ngày — bằng chứng triển khai và kiểm tra
+
+**A2 ingestion primitives · 18/10/2026:** nhánh
+`feat/fr-18-ingestion-foundation-1` tách `Json`, `ContractError`, canonical JSON,
+SHA-256 và strict parser sang
+[platform/contracts/json.ts](../apps/api/src/platform/contracts/json.ts), giữ nguyên
+implementation và re-export cùng binding từ `ingestion-contract.ts`. Gold và các
+consumer primitive dùng module độc lập; domain validation, family dispatch,
+decimal, timestamp, collection và queue semantics giữ nguyên. Trước khi sửa đã
+đóng băng literal digest của fixture v1, observed v2, gold v1, queue ID và ba
+persisted identity; tests mới khóa các giá trị này, export/error identity cùng
+depth boundary, `__proto__` và native string `SyntaxError` hiện có. Local đạt lint,
+typecheck, 186 Node unit, 41 integration MongoDB/Redis, API/web build, 44 Python
+contract và 29 collector tests, hai validators, Compose config, bốn browser
+harness tests và hai Playwright journeys desktop/mobile; không skip. Docs check
+đạt 188 local targets, portal build 24 tài liệu và diff check đạt. Dịch vụ test cô
+lập dùng loopback 27019/6381, không đổi stack có sẵn; database ngẫu nhiên đã được
+dọn. SHA-256 yêu cầu gốc giữ
+`21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`.
+**Review độc lập A2 · 18/10/2026:** GPT-6 Astra chấp thuận, không có finding sau
+khi kiểm tra cả 13 file, xác nhận implementation giống hệt khi chuẩn hóa newline
+và không có dependency cycle mới. Reviewer chạy độc lập 13 focused tests, gồm ba
+test mới, tất cả đạt. CI remote A2 còn chờ; A3 chưa triển khai.
 
 **P1.4 stored gold reads · 16/10/2026:** triển khai API-only trên P1.3A đã merge
 PR #34; flag `GOLD_READS_ENABLED` mặc định false, hai route latest/history chỉ đọc

@@ -1,6 +1,7 @@
 import { Queue, createNodeRedisClient, type Job } from "bullmq";
 import { createClient } from "redis";
-import { digest, isGoldPayload } from "./ingestion-contract.js";
+import { isGoldPayload } from "./ingestion-contract.js";
+import { digest } from "./platform/contracts/json.js";
 import { ACTIVE_STATUSES, IngestionStore, MAX_ATTEMPTS } from "./ingestion-store.js";
 
 export interface DeliveryJob { deliveryId: string; payloadDigest: string }
