@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
 import { goldAsset, goldAssetIdentity, validateGoldPayload, type GoldDataset, type GoldObservation } from "./gold-contract.js";
-import { canonicalJson, digest, type Json } from "./ingestion-contract.js";
+import { canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 import { validObservedDate } from "./observed-history-contract.js";
 
 export interface GoldReadQuery {

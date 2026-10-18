@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
-import { ContractError, canonicalJson, digest, type Json } from "./ingestion-contract.js";
+import { ContractError, canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 
 export interface GoldDataset { [key: string]: Json; mode: string; label: string; freshness: string; timezone: string }
 export interface GoldObservation {

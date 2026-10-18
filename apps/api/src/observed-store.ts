@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { MongoServerError, type Collection, type Db, type Document } from "mongodb";
-import { collectedOrder, digest, observedContent, type Json, type ObservedPayload } from "./ingestion-contract.js";
+import { collectedOrder, observedContent, type ObservedPayload } from "./ingestion-contract.js";
+import { digest, type Json } from "./platform/contracts/json.js";
 import { IdentityConflict, type Delivery } from "./ingestion-store.js";
 
 interface StoredObserved extends Document { _id: string; record: Json; dataset: ObservedPayload["dataset"]; schemaVersion: string; firstDeliveryId: string }

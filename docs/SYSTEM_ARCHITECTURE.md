@@ -1,23 +1,56 @@
 # System architecture — MarketPulse VN
 
-**Decision date:** 18/10/2026 · **Scope:** A1 documentation and architecture decision only.
-**Implemented baseline:** merged [PR #35](https://github.com/Son2110/Market-Pulse/pull/35),
-`main` at `cebfede2724d97f43ed2a33e4a565d567472b9d4` (P1.4 stored synthetic gold reads).
-[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311421)
-and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39060311438)
-succeeded on that baseline. These runs do not validate later A1 changes.
+**Decision date:** 18/10/2026 · **Scope:** A1 architecture decision, with A2 implementation evidence below.
+**Merged baseline:** [PR #36](https://github.com/Son2110/Market-Pulse/pull/36),
+`main` at `a7206fee2fcfb317c2ee44c6342d3359510eea9e` (P1.4 reads and A1 architecture).
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998099)
+and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998107)
+succeeded on that baseline. These runs do not validate the A2 working branch.
 
 This decision follows the [original brief](../MarketPulse_VN_Project_Documentation.md),
 [current PRD](PRD.md), [data contract](DATA_CONTRACT.md), [ingestion contract](INGESTION.md)
 and [gold design](GOLD_DATA_DESIGN_P1.md). It separates working code from proposed
-boundaries; it does not implement a refactor, source approval or deployment.
+boundaries. A2 implements only the shared JSON primitive extraction described
+below; source approval and deployment remain separate decisions.
 
 **Independent review · 18/10/2026:** GPT-6 Astra approved A1 with no findings
 after comparing the document with server/health, ingestion, auth, gold storage,
 Compose and CI code. The reviewer independently reran the documentation link
 check (186 local targets), portal build (24 documents) and `git diff --check`;
 all passed. This is documentation review evidence, not a new runtime test run.
-A1 remote CI remains pending.
+A1 is now merged with successful remote CI as recorded above.
+
+### A2 implementation evidence · 18/10/2026
+
+The working branch `feat/fr-18-ingestion-foundation-1` moves the existing `Json`,
+`ContractError`, `canonicalJson`, `digest` and `strictJson` implementations verbatim
+to [platform/contracts/json.ts](../apps/api/src/platform/contracts/json.ts), whose
+only import is Node crypto. `ingestion-contract.ts` imports and re-exports those
+same bindings for compatibility. Gold contracts/read validation/storage and
+ingestion/observed consumers import primitives directly; family-specific
+validation, decimal/time rules, storage, queue dispatch and identities stay in
+their existing modules. This removes the gold contract's dependency on the
+ingestion domain module without introducing a family framework or A3 dispatch.
+
+Before extraction, the worker captured literal payload digests for fixture v1,
+observed v2 and gold v1, plus a queue ID and representative persisted identities
+for all three families. The existing ingestion test file now asserts those fixed
+values, binding/`ContractError` identity, depth boundaries, null-prototype own
+`__proto__` keys and existing native `SyntaxError` behavior for malformed strings.
+The existing Python golden and live Python/Node JCS parity checks remain intact.
+Local verification passed lint/typecheck, 186 Node unit tests, 41 real MongoDB/Redis
+integration tests, API/web build, 44 Python contract tests, 29 collector tests,
+both fixture validators, Compose configuration, four browser harness tests and
+two desktop/mobile core-flow journeys, with no skipped tests. Documentation checks
+passed for 188 local targets, the 24-document portal build and diff whitespace.
+Test services use isolated loopback ports 27019/6381; existing stacks were not
+changed and random test databases were cleaned. The original brief remains
+unchanged (SHA-256 `21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`).
+The full-suite results above are worker evidence. **Independent A2 review ·
+18/10/2026:** GPT-6 Astra approved with no findings after inspecting all 13 changed
+files, confirming newline-normalized implementation equality and no new dependency
+cycles. The reviewer independently ran 13 focused tests, including the three new
+tests; all passed. A2 remote CI remains pending.
 
 ## Decision and constraints
 
@@ -54,7 +87,7 @@ flowchart LR
 | Composition | `apps/api/src/server.ts`, `health.ts`, `stores.ts`, `config.ts`; `worker.ts` composes the separate process | API startup and readiness require both MongoDB and Redis. Redis error/end after connection initiates API shutdown. |
 | Accounts / watchlist | `auth.ts`, `watchlists.ts`; MongoDB `users`, `sessions`, `watchlists` | Auth rate limiting and KDF concurrency guards are in process, **not Redis-backed**. Sessions and ownership are Mongo-backed; this is the bounded local auth slice. |
 | Fixture market reads | `fixture-market-data-provider.ts`, `stock-search.ts`, `daily-history.ts` | Search/history/default web views read the packaged fixture, not ingestion collections. |
-| Ingestion contracts | `ingestion-contract.ts`, `gold-contract.ts`, `packages/schemas`; Python validators and shared parity corpora | Strict fixture v1, observed candle v2 and synthetic gold v1 are different payload families; version alone cannot distinguish both v1 families. |
+| Ingestion contracts | `ingestion-contract.ts`, `gold-contract.ts`, `packages/schemas`; shared JSON primitives in `platform/contracts/json.ts` on A2; Python validators and shared parity corpora | Strict fixture v1, observed candle v2 and synthetic gold v1 are different payload families; version alone cannot distinguish both v1 families. |
 | Delivery lifecycle | `ingestion-api.ts`, `ingestion-store.ts`, `ingestion-queue.ts`, `ingestion-worker.ts` | Authenticated HTTP, Mongo outbox, bounded enqueue, reconciliation, attempts and receipt statuses already exist. |
 | Family persistence | `IngestionStore` delegates to `ObservedStore` and `GoldStore`; fixture writes remain in `IngestionStore` | Ordinary collections with unique identities; no MongoDB time-series collection or multi-document batch transaction. |
 | Stored queries | `observed-history.ts`, collection-status contract, `gold-read.ts` and their services/contracts | Observed and gold flags default false. Gold P1.4 is API-only and synthetic-only. Reads do not repair projections, fetch providers or fall back to fixture. |
@@ -225,8 +258,8 @@ task may publish a validated report/probability artifact to the app.
 
 | Serial task | Bounded change | Acceptance and rollback boundary |
 |---|---|---|
-| A1 · this decision | Documentation and portal navigation | Local link/build checks passed; independent GPT-6 Astra review approved with no findings. Remote CI remains pending. No runtime behavior changed. |
-| A2 · ingestion primitives | Extract only shared primitives required by the approved task | Existing Node/Python parity, identities/hashes, decimals/microseconds and ingestion tests remain authoritative. Revert extraction if parity changes; no bulk migration. |
+| A1 · architecture decision | Documentation and portal navigation | Local link/build checks passed; independent GPT-6 Astra review approved with no findings. Merged baseline CI passed as linked above. No runtime behavior changed. |
+| A2 · ingestion primitives | Shared JSON primitives extracted on the working branch; domain rules remain local | Existing Node/Python parity, identities/hashes, decimals/microseconds and ingestion tests remain authoritative; local checks passed and independent GPT-6 Astra review approved with no findings as recorded above. Remote CI pending. Revert extraction if parity changes; no bulk migration. |
 | A3 · family dispatch | Introduce explicit internal classification/dispatch of **validated legacy payloads** | Preserve all three existing envelopes, digests, delivery IDs, queue IDs and job compatibility. Test replay/recovery and persisted nonterminal deliveries. Revert code without data rewrite. |
 | P2.1 · source research | Decide allowed news fields, purpose-specific rights and retention | Research only; no new collector or automatic jobs. |
 | A4 · dependency health/recovery | Change Redis lifecycle, capability readiness and recovery deliberately | Required before P2.2 or any automated collector; verify dependency loss/restoration, outbox, retries and read/routing claims. Roll back to prior API/worker pair if regression. |
