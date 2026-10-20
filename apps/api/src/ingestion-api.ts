@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import express from "express";
-import { validatePayload } from "./ingestion-contract.js";
+import { classifyPayload } from "./ingestion-contract.js";
 import { ContractError, digest, strictJson } from "./platform/contracts/json.js";
 import { DeliveryConflict, IngestionStore, receipt } from "./ingestion-store.js";
 
@@ -40,9 +40,9 @@ export function createIngestionApi({ store, secret, isReady, enqueue }: { store:
       if (!envelope || Array.isArray(envelope) || typeof envelope !== "object" || Object.keys(envelope).sort().join(",") !== "deliveryId,payload,payloadDigest") throw new ContractError();
       const { deliveryId, payloadDigest, payload } = envelope;
       if (typeof deliveryId !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(deliveryId) || typeof payloadDigest !== "string" || !/^[a-f0-9]{64}$/.test(payloadDigest) || payload === undefined) throw new ContractError();
-      const validated = validatePayload(payload);
+      const classified = classifyPayload(payload);
       if (digest(payload) !== payloadDigest) throw new ContractError();
-      const delivery = await store.accept(deliveryId, payloadDigest, validated);
+      const delivery = await store.accept(deliveryId, payloadDigest, classified.payload);
       console.info(JSON.stringify({ event: "ingestion_receipt", deliveryId, provider: delivery.provider, status: delivery.status, attempt: delivery.attempts, counts: delivery.counts }));
       if (["accepted", "queued", "running"].includes(delivery.status)) { try { await boundedEnqueue(enqueue(deliveryId, payloadDigest)); } catch { console.warn(JSON.stringify({ event: "ingestion_enqueue_deferred", deliveryId, provider: delivery.provider, status: delivery.status })); } }
       const current = await store.deliveries.findOne({ _id: deliveryId });

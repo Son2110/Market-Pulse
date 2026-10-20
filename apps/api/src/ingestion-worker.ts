@@ -1,6 +1,7 @@
 import { Worker, UnrecoverableError, type Job } from "bullmq";
-import { IdentityConflict, IngestionStore, ACTIVE_STATUSES, MAX_ATTEMPTS } from "./ingestion-store.js";
-import { createIngestionQueue, DeliveryQueue, queueConnection, QUEUE_NAME, safeJob, type DeliveryJob } from "./ingestion-queue.js";
+import { ContractError } from "./platform/contracts/json.js";
+import { classifyDelivery, IdentityConflict, IngestionStore, ACTIVE_STATUSES, MAX_ATTEMPTS } from "./ingestion-store.js";
+import { createIngestionQueue, DeliveryQueue, queueConnection, queueJobName, QUEUE_NAME, safeJob, type DeliveryJob } from "./ingestion-queue.js";
 
 export interface WorkerHooks { afterWrite?: (count: number, id: string) => Promise<void>; afterRevision?: (id: string) => Promise<void>; afterSnapshot?: (id: string) => Promise<void>; beforeComplete?: (id: string) => Promise<void> }
 export async function startIngestionWorker(store: IngestionStore, redisUrl: string, options: { name?: string; reconcileMs?: number; lockDuration?: number; stalledInterval?: number; hooks?: WorkerHooks } = {}) {
@@ -19,13 +20,16 @@ export async function startIngestionWorker(store: IngestionStore, redisUrl: stri
     if (!current) { await store.terminal(delivery._id, "failure", delivery.counts, "attempts_exhausted"); throw new UnrecoverableError("attempts_exhausted"); }
     console.info(JSON.stringify({ event: "ingestion_running", ...safeJob(job, current.provider), status: "running", attempt: current.attempts }));
     try {
+      const classified = classifyDelivery(current);
+      if (job.name !== queueJobName(classified.family)) throw new ContractError();
       const counts = await store.persist(current, count => options.hooks?.afterWrite?.(count, current._id) ?? Promise.resolve(), () => options.hooks?.afterRevision?.(current._id) ?? Promise.resolve(), () => options.hooks?.afterSnapshot?.(current._id) ?? Promise.resolve());
       await store.terminal(current._id, "success", counts, undefined, current.attempts);
       console.info(JSON.stringify({ event: "ingestion_success", ...safeJob(job, current.provider), status: "success", attempt: current.attempts, durationMs: Date.now() - started, counts }));
       await options.hooks?.beforeComplete?.(current._id);
     } catch (error) {
-      const permanent = error instanceof IdentityConflict;
-      const code = permanent ? "canonical_identity_conflict" : "persistence_unavailable";
+      const contract = error instanceof ContractError;
+      const permanent = error instanceof IdentityConflict || contract;
+      const code = contract ? "invalid_contract" : permanent ? "canonical_identity_conflict" : "persistence_unavailable";
       const confirmed = await store.deliveries.findOne({ _id: current._id });
       if (permanent || current.attempts >= MAX_ATTEMPTS) await store.terminal(current._id, "failure", confirmed?.counts ?? current.counts, code, current.attempts);
       else await store.deliveries.updateOne({ _id: current._id, status: "running", attempts: current.attempts }, { $set: { status: "queued", updatedAt: new Date(), errorCode: code } });

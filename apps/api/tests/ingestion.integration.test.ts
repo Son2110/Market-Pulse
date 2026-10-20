@@ -6,13 +6,15 @@ import { createServer } from "node:http";
 import { delimiter, resolve } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { MongoClient } from "mongodb";
+import { MongoClient, MongoServerError } from "mongodb";
 import { createIngestionApi } from "../src/ingestion-api.js";
 import { digest, strictJson, validatePayload, type Json, type FixturePayload } from "../src/ingestion-contract.js";
 import { createApp } from "../src/health.js";
 import { createIngestionQueue, DeliveryQueue, jobId } from "../src/ingestion-queue.js";
-import { IngestionStore } from "../src/ingestion-store.js";
+import { IngestionStore, type Delivery } from "../src/ingestion-store.js";
 import { startIngestionWorker } from "../src/ingestion-worker.js";
+import { goldOne } from "./gold-test-data.js";
+import { observed } from "./observed-test-data.js";
 
 const execute = promisify(execFile);
 const fixture = () => validatePayload(strictJson(readFileSync("fixtures/market/mp-02-synthetic.json", "utf8"))) as FixturePayload;
@@ -188,4 +190,77 @@ test("API ingestion initialization failure exits for restart; repaired and disab
   assert.equal((await fetch(`${disabled.url}/internal/ingestion/deliveries/missing`)).status, 503);
   assert(disabled.output().includes('"event":"ingestion_disabled"'));
   disabled.child.kill("SIGKILL"); await disabled.exited;
+});
+
+test("legacy malformed family metadata becomes terminal without blocking healthy reconciliation", async t => {
+  const context = await setup(); t.after(context.close);
+  const accepted = await context.accept("healthy-after-malformed");
+  const rawDeliveries = context.store.db.collection<Omit<Delivery, "family"> & { family: unknown }>("ingestion_deliveries");
+  // These extra metadata values were allowed before A3; preserve them for diagnosis.
+  for (const [index, family] of ["unknown", null].entries()) {
+    await rawDeliveries.insertOne({ ...accepted, _id: `malformed-family-${index}`, family, updatedAt: new Date(0) }, { bypassDocumentValidation: true });
+  }
+  await context.store.initialize();
+  await context.deliveries.reconcile();
+  for (const [index, family] of ["unknown", null].entries()) {
+    const failed = await rawDeliveries.findOne({ _id: `malformed-family-${index}` });
+    assert.equal(failed?.status, "failure");
+    assert.equal(failed?.errorCode, "invalid_contract");
+    assert.equal(failed?.family, family);
+    assert.equal(failed?.attempts, 0);
+    assert.equal(digest(failed!.payload as unknown as Json), accepted.payloadDigest);
+    assert.equal(await context.producer.queue.getJob(jobId(`malformed-family-${index}`)), undefined);
+  }
+  assert(await context.producer.queue.getJob(jobId(accepted._id)));
+  const runtime = await startIngestionWorker(context.store, redisUrl, { name: context.name, reconcileMs: 100 }); t.after(() => runtime.close());
+  await context.terminal(accepted._id);
+  assert.deepEqual(await context.counts(), [3, 11, 44]);
+  await assert.rejects(context.store.db.collection<{ _id: string }>("ingestion_deliveries").updateOne({ _id: accepted._id }, { $set: { status: "invalid" } }), (error: unknown) => error instanceof MongoServerError && error.code === 121);
+});
+
+test("legacy nonterminal outbox rows without family and pre-queued jobs dispatch across all three families while isolating invalid contracts", async t => {
+  const context = await setup(); t.after(context.close);
+  const now = new Date();
+  const marketPayload = fixture();
+  const observedPayload = observed();
+  const goldPayload = goldOne();
+  const legacyRows: Delivery[] = [
+    { _id: "legacy-fixture", payloadDigest: digest(marketPayload as unknown as Json), payload: marketPayload, provider: "marketpulse-fixture", schemaVersion: "1.0.0", dataset: marketPayload.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 } },
+    { _id: "legacy-observed", payloadDigest: digest(observedPayload as unknown as Json), payload: observedPayload, provider: "KBS", schemaVersion: "2.0.0", dataset: observedPayload.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 } },
+    { _id: "legacy-gold", payloadDigest: digest(goldPayload as unknown as Json), payload: goldPayload, provider: "marketpulse-fixture", schemaVersion: "1.0.0", dataset: goldPayload.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 } },
+    { _id: "legacy-queued-gold", payloadDigest: digest(goldPayload as unknown as Json), payload: goldPayload, provider: "marketpulse-fixture", schemaVersion: "1.0.0", dataset: goldPayload.dataset, serverReceivedAt: now, updatedAt: now, status: "queued", attempts: 0, counts: { assets: 0, observations: 0 } },
+    { _id: "mismatched-job", payloadDigest: digest(marketPayload as unknown as Json), payload: marketPayload, provider: "marketpulse-fixture", schemaVersion: "1.0.0", dataset: marketPayload.dataset, serverReceivedAt: now, updatedAt: now, status: "queued", attempts: 0, counts: { assets: 0, observations: 0 } },
+  ];
+  await context.store.deliveries.insertMany(legacyRows);
+  await context.store.deliveries.insertOne({
+    _id: "tampered-outbox", payloadDigest: digest(observedPayload as unknown as Json), family: "synthetic-gold", payload: observedPayload,
+    provider: "KBS", schemaVersion: "2.0.0", dataset: observedPayload.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 },
+  }, { bypassDocumentValidation: true });
+  await context.producer.queue.add("persist-gold", { deliveryId: "legacy-queued-gold", payloadDigest: digest(goldPayload as unknown as Json) }, { jobId: jobId("legacy-queued-gold"), attempts: 3 });
+  await context.producer.queue.add("persist-gold", { deliveryId: "mismatched-job", payloadDigest: digest(marketPayload as unknown as Json) }, { jobId: jobId("mismatched-job"), attempts: 3 });
+
+  const runtime = await startIngestionWorker(context.store, redisUrl, { name: context.name, reconcileMs: 100 }); t.after(() => runtime.close());
+  for (const id of ["legacy-fixture", "legacy-observed", "legacy-gold", "legacy-queued-gold"]) await context.terminal(id, "success");
+  for (const id of ["tampered-outbox", "mismatched-job"]) {
+    await context.terminal(id, "failure");
+    const failed = await context.store.deliveries.findOne({ _id: id });
+    assert.equal(failed?.errorCode, "invalid_contract");
+  }
+  for (const id of ["legacy-fixture", "legacy-observed", "legacy-gold", "legacy-queued-gold"]) {
+    const completed = await context.store.deliveries.findOne({ _id: id });
+    assert.equal(completed?.family, undefined);
+  }
+  assert.equal(await context.store.assets.countDocuments(), 11);
+  assert.equal(await context.store.observations.countDocuments(), 44);
+  assert.equal(await context.store.observed.assets.countDocuments(), 1);
+  assert.equal(await context.store.observed.revisions.countDocuments(), 1);
+  assert.equal(await context.store.observed.latest.countDocuments(), 1);
+  assert.equal(await context.store.gold.assets.countDocuments(), 1);
+  assert.equal(await context.store.gold.revisions.countDocuments(), 1);
+  assert.equal(await context.store.gold.snapshots.countDocuments(), 1);
+  assert.equal(await context.store.gold.latest.countDocuments(), 1);
+
+  const replay = await context.store.accept("legacy-gold", digest(goldPayload as unknown as Json), goldPayload);
+  assert.equal(replay.status, "success");
+  assert.equal(replay.family, undefined);
 });
