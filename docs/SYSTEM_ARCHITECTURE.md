@@ -1,17 +1,18 @@
 # System architecture — MarketPulse VN
 
-**Decision date:** 18/10/2026 · **Scope:** A1 architecture decision, with A2 implementation evidence below.
-**Merged baseline:** [PR #36](https://github.com/Son2110/Market-Pulse/pull/36),
-`main` at `a7206fee2fcfb317c2ee44c6342d3359510eea9e` (P1.4 reads and A1 architecture).
-[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998099)
-and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998107)
-succeeded on that baseline. These runs do not validate the A2 working branch.
+**Decision date:** 18/10/2026 · **Scope:** A1 architecture decision, with A2 and A3 implementation evidence below.
+**Merged baseline:** [PR #37](https://github.com/Son2110/Market-Pulse/pull/37),
+`main` at `f51dbd3958dc0d4db6410d13c2a28085dcb02853` (A2 ingestion primitives).
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893071)
+and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893021)
+succeeded on that baseline (following [PR #36](https://github.com/Son2110/Market-Pulse/pull/36) at `a7206fee2fcfb317c2ee44c6342d3359510eea9e`). These runs do not validate the A3 working branch.
 
 This decision follows the [original brief](../MarketPulse_VN_Project_Documentation.md),
 [current PRD](PRD.md), [data contract](DATA_CONTRACT.md), [ingestion contract](INGESTION.md)
 and [gold design](GOLD_DATA_DESIGN_P1.md). It separates working code from proposed
-boundaries. A2 implements only the shared JSON primitive extraction described
-below; source approval and deployment remain separate decisions.
+boundaries. A2 implements the shared JSON primitive extraction and A3 implements
+validated-family classification and dispatch described below; source approval
+and deployment remain separate decisions.
 
 **Independent review · 18/10/2026:** GPT-6 Astra approved A1 with no findings
 after comparing the document with server/health, ingestion, auth, gold storage,
@@ -22,7 +23,7 @@ A1 is now merged with successful remote CI as recorded above.
 
 ### A2 implementation evidence · 18/10/2026
 
-The working branch `feat/fr-18-ingestion-foundation-1` moves the existing `Json`,
+The branch `feat/fr-18-ingestion-foundation-1` moved the existing `Json`,
 `ContractError`, `canonicalJson`, `digest` and `strictJson` implementations verbatim
 to [platform/contracts/json.ts](../apps/api/src/platform/contracts/json.ts), whose
 only import is Node crypto. `ingestion-contract.ts` imports and re-exports those
@@ -50,7 +51,73 @@ The full-suite results above are worker evidence. **Independent A2 review ·
 18/10/2026:** GPT-6 Astra approved with no findings after inspecting all 13 changed
 files, confirming newline-normalized implementation equality and no new dependency
 cycles. The reviewer independently ran 13 focused tests, including the three new
-tests; all passed. A2 remote CI remains pending.
+tests; all passed. A2 is now merged via [PR #37](https://github.com/Son2110/Market-Pulse/pull/37)
+with successful remote CI recorded above.
+
+### A3 implementation evidence · 20/10/2026
+
+The working branch `feat/fr-18-ingestion-foundation-2` introduces explicit internal
+family classification and dispatch of validated legacy payloads without changing
+accepted wire envelopes, RFC 8785 / SHA-256 digests, delivery IDs, deterministic
+queue IDs (`jobId`) or BullMQ job names (`persist-fixture`, `persist-observed`,
+`persist-gold`). `classifyPayload` in `ingestion-contract.ts` strictly validates
+every payload through `validatePayload` first and returns a typed `ClassifiedPayload`
+discriminated union (`fixture-market`, `observed-candle`, `synthetic-gold`); it never
+infers family from `schemaVersion` alone and rejects injected `family` fields on
+both the delivery envelope and inner payload.
+
+`ingestion-store.ts` adds optional internal `family` metadata to `ingestion_deliveries`
+(omitted from public/internal `receipt` responses), derives and verifies family,
+provider, `schemaVersion`, dataset and digest on read via `classifyDelivery` so
+legacy outbox rows without `family` remain supported without a database migration,
+and dispatches persistence explicitly across `gold.persist`, `observed.persist`
+and `persistFixture`. `ingestion-queue.ts` maps validated families to their existing
+BullMQ job names via `queueJobName` and isolates corrupted or mismatched nonterminal
+outbox rows during reconciliation by marking them terminal `failure` (`invalid_contract`)
+so healthy deliveries continue. `ingestion-worker.ts` verifies `classifyDelivery` and
+job-name compatibility before executing family persistence, treating contract or
+job-name mismatches as permanent `invalid_contract` failures.
+
+The earlier Gemini handoff reported 187 Node unit tests, 42 integration tests and
+the supporting local checks; those are historical worker claims, separate from
+the fresh verification below. Astra's initial review found that a new MongoDB
+enum for optional `family` metadata prevented terminal failure updates to legacy
+rows containing `family: "unknown"` or `family: null`, blocking reconciliation.
+Sol reproduced MongoDB error 121 with a real-service regression, then removed
+only that new enum restriction, retaining the pre-A3 strict core validator and
+runtime `classifyDelivery` checks. Malformed metadata and raw payloads remain
+available for diagnosis; no production validation bypass or data rewrite is used.
+The regression places both malformed rows before a healthy delivery, verifies
+terminal isolation and healthy completion, and confirms invalid core status
+updates are still rejected. The existing all-family legacy and job-mismatch
+regressions remain in place.
+
+**Fresh Sol verification · 20/10/2026:** lint/typecheck, 187 Node unit tests,
+43 real MongoDB/Redis integration tests, API/web build, 44 Python contract tests,
+29 collector tests, both fixture validators, Compose configuration, four browser
+harness tests and two desktop/mobile core-flow journeys passed with no skipped
+tests. Isolated test services use loopback
+ports 27019/6381 and remain available for independent review; test databases are
+cleaned by the suites. The original brief remains unchanged (SHA-256
+`21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`).
+**Independent A3 review · 20/10/2026:** GPT-6 Astra approved the corrected
+implementation with no remaining findings. The reviewer independently passed
+two focused real MongoDB/Redis tests covering malformed-family isolation, strict
+core validation, all three legacy families, pre-queued jobs and job-name mismatch,
+plus `git diff --check`. The full-suite results above remain Sol worker evidence.
+**Remote CI attempt · 20/10/2026:** [Application CI run 39395657217](https://github.com/Son2110/Market-Pulse/actions/runs/39395657217)
+on `222daa9` failed during Compose startup, before application smoke/integration
+checks: MongoDB reported fatal error 12257600, identifying a Linux kernel 6.19+
+incompatibility. The `ubuntu-24.04` retry, [run 39432136010](https://github.com/Son2110/Market-Pulse/actions/runs/39432136010)
+on `c1473be`, failed with the same kernel incompatibility. The application job is
+temporarily pinned to `ubuntu-22.04`: the [official runner image manifest](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2204-Readme.md)
+for image `20261012.322.1` records kernel `6.8.0-1064-azure`. An early step prints
+the actual kernel and rejects unparseable versions or kernel 6.19+, including
+later major versions, before dependencies are installed. The label is a temporary
+workaround, not a guarantee of the kernel on future runner images; migrate after
+MongoDB compatibility is verified and before this runner retires. MongoDB images,
+required checks and startup behavior are unchanged. Retry and remote acceptance
+of A3 remain pending; neither infrastructure failure supplies acceptance evidence.
 
 ## Decision and constraints
 
@@ -87,9 +154,9 @@ flowchart LR
 | Composition | `apps/api/src/server.ts`, `health.ts`, `stores.ts`, `config.ts`; `worker.ts` composes the separate process | API startup and readiness require both MongoDB and Redis. Redis error/end after connection initiates API shutdown. |
 | Accounts / watchlist | `auth.ts`, `watchlists.ts`; MongoDB `users`, `sessions`, `watchlists` | Auth rate limiting and KDF concurrency guards are in process, **not Redis-backed**. Sessions and ownership are Mongo-backed; this is the bounded local auth slice. |
 | Fixture market reads | `fixture-market-data-provider.ts`, `stock-search.ts`, `daily-history.ts` | Search/history/default web views read the packaged fixture, not ingestion collections. |
-| Ingestion contracts | `ingestion-contract.ts`, `gold-contract.ts`, `packages/schemas`; shared JSON primitives in `platform/contracts/json.ts` on A2; Python validators and shared parity corpora | Strict fixture v1, observed candle v2 and synthetic gold v1 are different payload families; version alone cannot distinguish both v1 families. |
-| Delivery lifecycle | `ingestion-api.ts`, `ingestion-store.ts`, `ingestion-queue.ts`, `ingestion-worker.ts` | Authenticated HTTP, Mongo outbox, bounded enqueue, reconciliation, attempts and receipt statuses already exist. |
-| Family persistence | `IngestionStore` delegates to `ObservedStore` and `GoldStore`; fixture writes remain in `IngestionStore` | Ordinary collections with unique identities; no MongoDB time-series collection or multi-document batch transaction. |
+| Ingestion contracts | `ingestion-contract.ts`, `gold-contract.ts`, `packages/schemas`; shared JSON primitives in `platform/contracts/json.ts`; validated-family classifier in `ingestion-contract.ts` on A3; Python validators and shared parity corpora | Strict fixture v1, observed candle v2 and synthetic gold v1 are different payload families; version alone cannot distinguish both v1 families, and wire discriminators are rejected. |
+| Delivery lifecycle | `ingestion-api.ts`, `ingestion-store.ts`, `ingestion-queue.ts`, `ingestion-worker.ts` | Authenticated HTTP, Mongo outbox with derived legacy family support, bounded enqueue, reconciliation, attempts and receipt statuses already exist. |
+| Family persistence | `IngestionStore` dispatches validated families to `ObservedStore`, `GoldStore` and `persistFixture` | Ordinary collections with unique identities; no MongoDB time-series collection or multi-document batch transaction. |
 | Stored queries | `observed-history.ts`, collection-status contract, `gold-read.ts` and their services/contracts | Observed and gold flags default false. Gold P1.4 is API-only and synthetic-only. Reads do not repair projections, fetch providers or fall back to fixture. |
 | Python / browser | `services/collector/collector`, `apps/web/src`, `tests/e2e` | Fixture validation/submission and bounded opt-in KBS collection exist. No automated gold/news collector, news/AI/forecast pipeline or gold UI exists. |
 
@@ -259,18 +326,18 @@ task may publish a validated report/probability artifact to the app.
 | Serial task | Bounded change | Acceptance and rollback boundary |
 |---|---|---|
 | A1 · architecture decision | Documentation and portal navigation | Local link/build checks passed; independent GPT-6 Astra review approved with no findings. Merged baseline CI passed as linked above. No runtime behavior changed. |
-| A2 · ingestion primitives | Shared JSON primitives extracted on the working branch; domain rules remain local | Existing Node/Python parity, identities/hashes, decimals/microseconds and ingestion tests remain authoritative; local checks passed and independent GPT-6 Astra review approved with no findings as recorded above. Remote CI pending. Revert extraction if parity changes; no bulk migration. |
-| A3 · family dispatch | Introduce explicit internal classification/dispatch of **validated legacy payloads** | Preserve all three existing envelopes, digests, delivery IDs, queue IDs and job compatibility. Test replay/recovery and persisted nonterminal deliveries. Revert code without data rewrite. |
+| A2 · ingestion primitives | Shared JSON primitives extracted; domain rules remain local | Existing Node/Python parity, identities/hashes, decimals/microseconds and ingestion tests remain authoritative; local checks, independent GPT-6 Astra review and merged baseline CI passed as recorded above. Revert extraction if parity changes; no bulk migration. |
+| A3 · family dispatch | Explicit internal classification/dispatch of **validated legacy payloads** on the working branch | Preserves all three existing envelopes, digests, delivery IDs, queue IDs and BullMQ job names; tests verify replay/recovery, legacy nonterminal outbox rows without `family`, and invalid-contract isolation. Local checks passed and independent GPT-6 Astra review approved on 20/10/2026 as recorded above; remote CI pending. Revert code without data rewrite. |
 | P2.1 · source research | Decide allowed news fields, purpose-specific rights and retention | Research only; no new collector or automatic jobs. |
 | A4 · dependency health/recovery | Change Redis lifecycle, capability readiness and recovery deliberately | Required before P2.2 or any automated collector; verify dependency loss/restoration, outbox, retries and read/routing claims. Roll back to prior API/worker pair if regression. |
 
-The future classifier must inspect a payload only after its existing strict
-validation, yielding an internal family such as fixture-market, observed-candle
-or synthetic-gold. It is not a new wire discriminator. Do not infer family from
+The classifier inspects a payload only after its existing strict validation,
+yielding an internal family (`fixture-market`, `observed-candle` or
+`synthetic-gold`). It is not a new wire discriminator. Do not infer family from
 `schemaVersion` alone, change accepted JSON to inject a field, or alter the bytes
 that participate in any digest/identity. Derive classification for legacy outbox
-rows on read; if internal persisted metadata is later necessary, make it additive
-and tolerate its absence. No bulk database migration is required for A2/A3.
+rows on read; optional internal `family` metadata is additive and its absence is
+tolerated. No bulk database migration is required for A2/A3.
 
 Keep queue payload/name/job identities compatible with jobs already waiting or
 retrying. Keep projection ownership and per-document ordering unchanged across

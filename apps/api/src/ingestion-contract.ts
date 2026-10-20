@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
-import { validateGoldPayload, type GoldPayload } from "./gold-contract.js";
+import { validateGoldPayload, type GoldDataset, type GoldPayload } from "./gold-contract.js";
 import { ContractError, canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 
 export { ContractError, canonicalJson, digest, strictJson, type Json } from "./platform/contracts/json.js";
@@ -14,7 +14,17 @@ export interface ObservedAsset { [key: string]: Json; assetId: string; symbol: s
 export interface ObservedCandle { [key: string]: Json; assetId: string; tradingDate: string; interval: string; adjustmentBasis: string; collectedAt: string; barId: string; contentDigest: string; source: { provider: string; connector: string; connectorVersion: string; dependencyVersion: string; mode: string } }
 export interface ObservedPayload { schemaVersion: "2.0.0"; dataset: Dataset; request: { symbol: string; start: string; end: string; interval: string }; assets: ObservedAsset[]; candles: ObservedCandle[] }
 export type Payload = FixturePayload | ObservedPayload | GoldPayload;
-export const isGoldPayload = (payload: Payload): payload is GoldPayload => Object.hasOwn(payload, "observations");
+export type PayloadFamily = "fixture-market" | "observed-candle" | "synthetic-gold";
+export type ClassifiedPayload =
+  | { family: "fixture-market"; provider: "marketpulse-fixture"; schemaVersion: "1.0.0"; dataset: Dataset; payload: FixturePayload }
+  | { family: "observed-candle"; provider: "KBS"; schemaVersion: "2.0.0"; dataset: Dataset; payload: ObservedPayload }
+  | { family: "synthetic-gold"; provider: "marketpulse-fixture"; schemaVersion: "1.0.0"; dataset: GoldDataset; payload: GoldPayload };
+export const isGoldPayload = (payload: Payload): payload is GoldPayload =>
+  payload.schemaVersion === "1.0.0" && Object.hasOwn(payload, "observations") && !Object.hasOwn(payload, "assets") && !Object.hasOwn(payload, "candles") && !Object.hasOwn(payload, "request");
+export const isObservedPayload = (payload: Payload): payload is ObservedPayload =>
+  payload.schemaVersion === "2.0.0" && Object.hasOwn(payload, "request") && Object.hasOwn(payload, "assets") && Object.hasOwn(payload, "candles") && !Object.hasOwn(payload, "quotes") && !Object.hasOwn(payload, "indexObservations") && !Object.hasOwn(payload, "observations");
+export const isFixturePayload = (payload: Payload): payload is FixturePayload =>
+  payload.schemaVersion === "1.0.0" && Object.hasOwn(payload, "assets") && Object.hasOwn(payload, "candles") && Object.hasOwn(payload, "quotes") && !Object.hasOwn(payload, "request") && !Object.hasOwn(payload, "observations") && Object.hasOwn(payload, "indexObservations");
 function fail(): never { throw new ContractError(); }
 
 function validDate(value: string): boolean {
@@ -39,7 +49,7 @@ function micros(value: string): bigint {
 
 export function validatePayload(input: Json): Payload {
   if (input !== null && !Array.isArray(input) && typeof input === "object" && Object.hasOwn(input, "observations")) return validateGoldPayload(input);
-  if (input !== null && !Array.isArray(input) && typeof input === "object" && input.schemaVersion === "2.0.0") return validateObservedPayload(input);
+  if (input !== null && !Array.isArray(input) && typeof input === "object" && (Object.hasOwn(input, "request") || (input.schemaVersion === "2.0.0" && !Object.hasOwn(input, "quotes") && !Object.hasOwn(input, "indexObservations")))) return validateObservedPayload(input);
   if (!validateSchema(input)) fail();
   const payload = input as unknown as FixturePayload;
   const { dataset, assets, candles, quotes, indexObservations } = payload;
@@ -89,6 +99,14 @@ export function validatePayload(input: Json): Payload {
     }
   }
   return payload;
+}
+
+export function classifyPayload(input: Json | Payload): ClassifiedPayload {
+  const payload = validatePayload(input as unknown as Json);
+  if (isGoldPayload(payload)) return { family: "synthetic-gold", provider: "marketpulse-fixture", schemaVersion: payload.schemaVersion, dataset: payload.dataset, payload };
+  if (isObservedPayload(payload)) return { family: "observed-candle", provider: "KBS", schemaVersion: payload.schemaVersion, dataset: payload.dataset, payload };
+  if (isFixturePayload(payload)) return { family: "fixture-market", provider: "marketpulse-fixture", schemaVersion: payload.schemaVersion, dataset: payload.dataset, payload };
+  return fail();
 }
 
 // Whole seconds are calendar-normalized; fractions retain exact microsecond precision.

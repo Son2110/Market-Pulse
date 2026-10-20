@@ -1,6 +1,6 @@
 import { MongoServerError, type Collection, type Db, type Document } from "mongodb";
-import { isGoldPayload, type Payload } from "./ingestion-contract.js";
-import { digest, type Json } from "./platform/contracts/json.js";
+import { classifyPayload, type ClassifiedPayload, type FixturePayload, type Payload, type PayloadFamily } from "./ingestion-contract.js";
+import { ContractError, canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 import { ObservedStore, observedCollectionSchemas } from "./observed-store.js";
 import { GoldStore, goldCollectionSchemas } from "./gold-store.js";
 
@@ -11,12 +11,25 @@ export interface Counts { assets: number; observations: number }
 export interface Delivery {
   _id: string; payloadDigest: string; payload: Payload; provider: string; schemaVersion: string;
   dataset: Payload["dataset"]; serverReceivedAt: Date; updatedAt: Date; status: DeliveryStatus;
-  attempts: number; counts: Counts; startedAt?: Date; finishedAt?: Date; errorCode?: string;
+  attempts: number; counts: Counts; family?: PayloadFamily; startedAt?: Date; finishedAt?: Date; errorCode?: string;
 }
 interface Canonical extends Document { _id: string; rowDigest: string; record: Json; dataset: Payload["dataset"]; firstDeliveryId: string }
 export class IdentityConflict extends Error { constructor() { super("canonical_identity_conflict"); } }
 export class DeliveryConflict extends Error { constructor() { super("delivery_identity_conflict"); } }
 function duplicate(error: unknown): boolean { return error instanceof MongoServerError && error.code === 11000; }
+
+export function classifyDelivery(delivery: Pick<Delivery, "payload" | "payloadDigest" | "provider" | "schemaVersion" | "dataset" | "family">): ClassifiedPayload {
+  const classified = classifyPayload(delivery.payload);
+  if (!delivery.dataset || typeof delivery.dataset !== "object" || Array.isArray(delivery.dataset)) throw new ContractError();
+  if (
+    digest(classified.payload as unknown as Json) !== delivery.payloadDigest ||
+    classified.provider !== delivery.provider ||
+    classified.schemaVersion !== delivery.schemaVersion ||
+    canonicalJson(classified.dataset) !== canonicalJson(delivery.dataset) ||
+    (delivery.family !== undefined && delivery.family !== classified.family)
+  ) throw new ContractError();
+  return classified;
+}
 
 export class IngestionStore {
   readonly deliveries: Collection<Delivery>;
@@ -54,14 +67,19 @@ export class IngestionStore {
     await this.gold.initialize();
   }
   async accept(id: string, payloadDigest: string, payload: Payload): Promise<Delivery> {
+    const classified = classifyPayload(payload);
+    if (digest(classified.payload as unknown as Json) !== payloadDigest) throw new ContractError();
     const now = new Date();
-    const delivery: Delivery = { _id: id, payloadDigest, payload, provider: payload.schemaVersion === "2.0.0" ? "KBS" : "marketpulse-fixture", schemaVersion: payload.schemaVersion,
-      dataset: payload.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 } };
+    const delivery: Delivery = { _id: id, payloadDigest, family: classified.family, payload: classified.payload, provider: classified.provider, schemaVersion: classified.schemaVersion,
+      dataset: classified.dataset, serverReceivedAt: now, updatedAt: now, status: "accepted", attempts: 0, counts: { assets: 0, observations: 0 } };
     try { await this.deliveries.insertOne(delivery, { writeConcern: { w: 1, j: true } }); return delivery; }
     catch (error) {
       if (!duplicate(error)) throw error;
       const existing = await this.deliveries.findOne({ _id: id });
       if (!existing || existing.payloadDigest !== payloadDigest) throw new DeliveryConflict();
+      // Preserve legacy unknown/null family failure receipts while validating their stored payload and identity.
+      const family: unknown = existing.family;
+      classifyDelivery(existing.status === "failure" && existing.errorCode === "invalid_contract" && (family === "unknown" || family === null) ? { ...existing, family: undefined } : existing);
       return existing;
     }
   }
@@ -69,32 +87,41 @@ export class IngestionStore {
     await this.deliveries.updateOne({ _id: id, status: { $in: ACTIVE_STATUSES }, ...(attempt === undefined ? {} : { attempts: attempt }) }, { $set: { status, counts, finishedAt: new Date(), updatedAt: new Date(), ...(errorCode ? { errorCode } : {}) }, ...(errorCode ? {} : { $unset: { errorCode: "" } }) });
   }
   async persist(delivery: Delivery, afterWrite?: (count: number) => Promise<void>, afterRevision?: () => Promise<void>, afterSnapshot?: () => Promise<void>): Promise<Counts> {
+    const classified = classifyDelivery(delivery);
     const counts = { assets: 0, observations: 0 };
+    const progress = async (kind: "assets" | "observations") => {
+      counts[kind]++;
+      await this.deliveries.updateOne({ _id: delivery._id, status: "running", attempts: delivery.attempts }, { $set: { counts, updatedAt: new Date() } });
+      await afterWrite?.(counts.assets + counts.observations);
+    };
+    switch (classified.family) {
+      case "synthetic-gold":
+        await this.gold.persist(delivery, classified.payload, progress, afterRevision, afterSnapshot);
+        return counts;
+      case "observed-candle":
+        await this.observed.persist(delivery, classified.payload, progress, afterRevision);
+        return counts;
+      case "fixture-market":
+        await this.persistFixture(delivery, classified.payload, progress);
+        return counts;
+    }
+  }
+  private async persistFixture(delivery: Delivery, payload: FixturePayload, progress: (kind: "assets" | "observations") => Promise<void>): Promise<void> {
     const insert = async (collection: Collection<Canonical>, id: string, record: Json, natural: Document) => {
-      const rowDigest = digest({ record, dataset: delivery.dataset });
-      try { await collection.insertOne({ _id: id, rowDigest, record, dataset: delivery.dataset, firstDeliveryId: delivery._id, ...natural }); }
+      const rowDigest = digest({ record, dataset: payload.dataset });
+      try { await collection.insertOne({ _id: id, rowDigest, record, dataset: payload.dataset, firstDeliveryId: delivery._id, ...natural }); }
       catch (error) {
         if (!duplicate(error)) throw error;
         const existing = await collection.findOne({ _id: id }, { projection: { rowDigest: 1 } });
         if (!existing || existing.rowDigest !== rowDigest) throw new IdentityConflict();
       }
     };
-    const progress = async () => { await this.deliveries.updateOne({ _id: delivery._id, status: "running", attempts: delivery.attempts }, { $set: { counts, updatedAt: new Date() } }); await afterWrite?.(counts.assets + counts.observations); };
-    if (isGoldPayload(delivery.payload)) {
-      await this.gold.persist(delivery, delivery.payload, async kind => { counts[kind]++; await progress(); }, afterRevision, afterSnapshot);
-      return counts;
-    }
-    if (delivery.payload.schemaVersion === "2.0.0") {
-      await this.observed.persist(delivery, delivery.payload, async kind => { counts[kind]++; await progress(); }, afterRevision);
-      return counts;
-    }
-    for (const asset of delivery.payload.assets) { await insert(this.assets, asset.assetId, asset, { assetId: asset.assetId }); counts.assets++; await progress(); }
-    for (const [kind, rows] of [["candle", delivery.payload.candles], ["quote", delivery.payload.quotes], ["index", delivery.payload.indexObservations]] as const) for (const row of rows) {
+    for (const asset of payload.assets) { await insert(this.assets, asset.assetId, asset, { assetId: asset.assetId }); await progress("assets"); }
+    for (const [kind, rows] of [["candle", payload.candles], ["quote", payload.quotes], ["index", payload.indexObservations]] as const) for (const row of rows) {
       const identity: Json[] = kind === "candle" ? [kind, row.assetId, row.source.provider, "1d", row.tradingDate, row.adjustmentBasis] : [kind, row.assetId, row.source.provider, row.tradingDate];
       await insert(this.observations, digest(identity), row, { kind, assetId: row.assetId, provider: row.source.provider, tradingDate: row.tradingDate, ...(kind === "candle" ? { interval: "1d", adjustmentBasis: row.adjustmentBasis } : {}) });
-      counts.observations++; await progress();
+      await progress("observations");
     }
-    return counts;
   }
 }
 export function receipt(delivery: Delivery) {

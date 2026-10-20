@@ -11,9 +11,25 @@ permissions:
 jobs:
   app:
     name: app
-    runs-on: ubuntu-latest
+    # Temporary MongoDB kernel workaround; migrate before this runner retires.
+    runs-on: ubuntu-22.04
     timeout-minutes: 25
     steps:
+      - name: Verify runner kernel compatibility with MongoDB
+        shell: bash
+        run: |
+          kernel_release=$(uname -r)
+          printf 'Runner kernel: %s\n' "$kernel_release"
+          if [[ ! "$kernel_release" =~ ^([0-9]{1,3})\.([0-9]{1,3})([.-]|$) ]]; then
+            echo 'Cannot parse runner kernel version; refusing MongoDB startup.' >&2
+            exit 1
+          fi
+          major=$((10#${BASH_REMATCH[1]}))
+          minor=$((10#${BASH_REMATCH[2]}))
+          if (( major > 6 || (major == 6 && minor >= 19) )); then
+            echo 'MongoDB is incompatible with Linux kernel 6.19+ (SERVER-121912).' >&2
+            exit 1
+          fi
       - name: Check out source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Set up Node.js

@@ -1,16 +1,17 @@
-# Lộ trình MarketPulse VN — cập nhật 18/10/2026
+# Lộ trình MarketPulse VN — cập nhật 20/10/2026
 
 ## Kế hoạch mở rộng hiện hành
 
-**Baseline hiện hành · 18/10/2026:** P1.4 và A1 đã merge, mới nhất qua
-[PR #36](https://github.com/Son2110/Market-Pulse/pull/36); `main` tại
-`a7206fee2fcfb317c2ee44c6342d3359510eea9e`.
-[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998099)
-và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39061998107)
-trên baseline này đều thành công. P1.2 contract, P1.3A storage và P1.4 API đọc
-synthetic đã có; P1.4 không có UI. Collector vàng thật P1.3B, public redisplay và
-training vẫn đóng. Các dòng “CI còn chờ”, “P1.4 chưa triển khai” có ngày cũ bên
-dưới là bằng chứng lịch sử, không là trạng thái hiện tại.
+**Baseline hiện hành · 20/10/2026:** P1.4, A1 và A2 đã merge, mới nhất qua
+[PR #37](https://github.com/Son2110/Market-Pulse/pull/37); `main` tại
+`f51dbd3958dc0d4db6410d13c2a28085dcb02853` (sau [PR #36](https://github.com/Son2110/Market-Pulse/pull/36) tại `a7206fee2fcfb317c2ee44c6342d3359510eea9e`).
+[Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893071)
+và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893021)
+trên baseline `f51dbd3` đều thành công. P1.2 contract, P1.3A storage, P1.4 API đọc
+synthetic và A2 shared primitives đã nằm trên `main`; P1.4 không có UI. Collector
+vàng thật P1.3B, public redisplay và training vẫn đóng. Các dòng “CI còn chờ”,
+“P1.4/A3 chưa triển khai” có ngày cũ bên dưới là bằng chứng lịch sử, không là trạng
+thái hiện tại; CI baseline trên không tự nghiệm thu nhánh làm việc A3.
 
 ### Foundation A1–A4 — thứ tự đã duyệt
 
@@ -21,8 +22,8 @@ chung hoặc di chuyển hàng loạt thư mục. A1 chỉ bàn giao tài liệu
 GPT-6 Astra ngày 18/10/2026 đã chấp thuận, không có finding, sau đối chiếu code
 server/health, ingestion, auth, gold storage, Compose và CI; reviewer chạy lại
 docs check (186 local targets), portal build (24 tài liệu) và diff check đều đạt.
-Đây là review tài liệu, không phải lần chạy runtime test mới. A1 đã merge và CI
-đạt như baseline ở trên; không dùng CI baseline để nghiệm thu thay đổi A2 mới.
+Đây là review tài liệu, không phải lần chạy runtime test mới. A1 và A2 đã merge và
+CI đạt như baseline ở trên; không dùng CI baseline để nghiệm thu thay đổi A3 mới.
 
 | Thứ tự serial | Task và nhánh | Công sức | Phạm vi và cổng |
 |---|---|---|---|
@@ -41,6 +42,53 @@ không trừ tùy ý giờ P1 đã làm hay cộng buffer foundation lần hai v
 Đo lại phần còn lại sau A4 và audit P2.1.
 
 ### Ghi nhận có ngày — bằng chứng triển khai và kiểm tra
+
+**A3 family dispatch · 20/10/2026:** nhánh `feat/fr-18-ingestion-foundation-2`
+bổ sung phân loại nội bộ tường minh (`fixture-market`, `observed-candle`,
+`synthetic-gold`) qua `classifyPayload` tại `ingestion-contract.ts` chỉ sau khi
+payload đi qua `validatePayload`, không suy ra family từ `schemaVersion` đơn lẻ và
+từ chối mọi trường `family` bơm vào envelope hoặc payload. `ingestion_deliveries`
+lưu trường nội bộ tùy chọn `family` (không trả trong `receipt`), suy dẫn và kiểm
+tra lại family/provider/`schemaVersion`/dataset/digest khi đọc qua `classifyDelivery`
+để các dòng outbox legacy không có `family` vẫn tương thích mà không cần bulk
+migration. `IngestionStore.persist` điều phối theo `classified.family` sang
+`gold.persist`, `observed.persist` và `persistFixture`; `DeliveryQueue.enqueue` giữ
+nguyên `jobId` và tên job BullMQ (`persist-fixture`, `persist-observed`,
+`persist-gold`), đồng thời cô lập dòng outbox hỏng/sai contract thành `failure`
+(`invalid_contract`) khi reconcile để không chặn các delivery hợp lệ; worker kiểm
+tra `classifyDelivery` và khớp tên job trước khi ghi. Handoff Gemini trước đó báo
+187 Node unit, 42 integration và các kiểm tra hỗ trợ; đây là bằng chứng worker
+lịch sử, tách khỏi lần xác minh Sol mới. Review Astra ban đầu phát hiện enum MongoDB
+mới cho `family` tùy chọn chặn cập nhật terminal khi dòng cũ chứa `"unknown"` hoặc
+`null`, làm reconcile không tới delivery hợp lệ phía sau. Sol tái hiện lỗi MongoDB
+121 rồi bỏ riêng enum mới, giữ strict validator lõi trước A3 và kiểm tra runtime
+`classifyDelivery`; metadata hỏng và payload thô được giữ để chẩn đoán, không bypass
+validation trong production hay rewrite dữ liệu. Regression mới xác nhận hai dòng
+hỏng thành `invalid_contract`, delivery hợp lệ hoàn tất và status lõi sai vẫn bị
+MongoDB từ chối; test legacy cả ba family và job mismatch vẫn đạt.
+**Xác minh Sol mới · 20/10/2026:** lint/typecheck, 187 Node unit, 43 integration
+MongoDB/Redis, API/web build, 44 Python contract, 29 collector tests, hai validators,
+Compose config, bốn browser harness tests và hai journeys desktop/mobile đạt,
+không skip. Dịch vụ test cô lập
+trên loopback 27019/6381 được giữ cho review độc lập; các suite dọn database test.
+SHA-256 yêu cầu gốc giữ
+`21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`.
+**Review độc lập A3 · 20/10/2026:** GPT-6 Astra chấp thuận implementation sau sửa,
+không còn finding. Reviewer tự chạy đạt hai focused tests MongoDB/Redis thật,
+bao phủ cô lập family hỏng, strict validator lõi, legacy cả ba family, job đã xếp
+hàng và tên job sai; diff check đạt. Full suite ở trên vẫn là bằng chứng worker
+Sol. **CI remote lần đầu · 20/10/2026:** [Application CI 39395657217](https://github.com/Son2110/Market-Pulse/actions/runs/39395657217)
+tại `222daa9` lỗi hạ tầng lúc khởi động Compose, trước smoke/integration app:
+MongoDB báo fatal 12257600 do không tương thích Linux kernel 6.19+. Lần thử
+`ubuntu-24.04`, [run 39432136010](https://github.com/Son2110/Market-Pulse/actions/runs/39432136010)
+tại `c1473be`, cũng lỗi kernel tương tự. App job tạm pin `ubuntu-22.04` theo
+[manifest runner chính thức](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2204-Readme.md):
+image `20261012.322.1` dùng kernel `6.8.0-1064-azure`. Guard đầu job in kernel thật,
+từ chối phiên bản không parse được hoặc từ 6.19 trở lên, gồm major mới hơn, trước
+khi cài dependency. Đây là workaround tạm, label không bảo đảm kernel của image
+tương lai; cần chuyển runner sau khi xác minh MongoDB tương thích và trước khi
+runner này bị ngừng. Giữ nguyên image MongoDB, check bắt buộc và hành vi startup.
+Retry và nghiệm thu CI A3 còn chờ; hai lỗi hạ tầng không là bằng chứng nghiệm thu.
 
 **A2 ingestion primitives · 18/10/2026:** nhánh
 `feat/fr-18-ingestion-foundation-1` tách `Json`, `ContractError`, canonical JSON,
@@ -62,7 +110,7 @@ dọn. SHA-256 yêu cầu gốc giữ
 **Review độc lập A2 · 18/10/2026:** GPT-6 Astra chấp thuận, không có finding sau
 khi kiểm tra cả 13 file, xác nhận implementation giống hệt khi chuẩn hóa newline
 và không có dependency cycle mới. Reviewer chạy độc lập 13 focused tests, gồm ba
-test mới, tất cả đạt. CI remote A2 còn chờ; A3 chưa triển khai.
+test mới, tất cả đạt. Đã merge qua PR #37 với CI remote đạt như baseline ở trên.
 
 **P1.4 stored gold reads · 16/10/2026:** triển khai API-only trên P1.3A đã merge
 PR #34; flag `GOLD_READS_ENABLED` mặc định false, hai route latest/history chỉ đọc
