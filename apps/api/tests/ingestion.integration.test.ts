@@ -239,10 +239,11 @@ test("terminal invalid-contract family failures replay their unchanged receipt w
     const id = `receipt-family-${index}`;
     const before = await rawDeliveries.findOne({ _id: id }); assert(before);
     assert.equal(before.status, "failure"); assert.equal(before.errorCode, "invalid_contract"); assert.equal(before.family, family);
+    const replayable = family === "unknown" || family === null;
     const expectedReceipt = JSON.parse(JSON.stringify(receipt(before as Delivery)));
     for (let replay = 0; replay < 2; replay++) {
-      const response = await send(id); assert.equal(response.status, 202);
-      assert.deepEqual(await response.json(), expectedReceipt);
+      const response = await send(id); assert.equal(response.status, replayable ? 202 : 400, String(family));
+      assert.deepEqual(await response.json(), replayable ? expectedReceipt : { error: "invalid_contract" });
       assert.deepEqual(await rawDeliveries.findOne({ _id: id }), before);
     }
     assert.equal((await send(id, revised)).status, 409);
