@@ -108,10 +108,16 @@ plus `git diff --check`. The full-suite results above remain Sol worker evidence
 **Remote CI attempt · 20/10/2026:** [Application CI run 39395657217](https://github.com/Son2110/Market-Pulse/actions/runs/39395657217)
 on `222daa9` failed during Compose startup, before application smoke/integration
 checks: MongoDB reported fatal error 12257600, identifying a Linux kernel 6.19+
-incompatibility. The application job is now pinned to `ubuntu-24.04` instead of
-`ubuntu-latest` as a bounded runner compatibility change. MongoDB images and
-required checks are unchanged; the retry and verification of this change remain
-pending. This infrastructure failure does not provide remote acceptance of A3.
+incompatibility. The `ubuntu-24.04` retry, [run 39432136010](https://github.com/Son2110/Market-Pulse/actions/runs/39432136010)
+on `c1473be`, failed with the same kernel incompatibility. The application job is
+temporarily pinned to `ubuntu-22.04`: the [official runner image manifest](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2204-Readme.md)
+for image `20261012.322.1` records kernel `6.8.0-1064-azure`. An early step prints
+the actual kernel and rejects unparseable versions or kernel 6.19+, including
+later major versions, before dependencies are installed. The label is a temporary
+workaround, not a guarantee of the kernel on future runner images; migrate after
+MongoDB compatibility is verified and before this runner retires. MongoDB images,
+required checks and startup behavior are unchanged. Retry and remote acceptance
+of A3 remain pending; neither infrastructure failure supplies acceptance evidence.
 
 ## Decision and constraints
 

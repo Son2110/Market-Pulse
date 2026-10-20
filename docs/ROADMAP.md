@@ -79,9 +79,16 @@ bao phủ cô lập family hỏng, strict validator lõi, legacy cả ba family,
 hàng và tên job sai; diff check đạt. Full suite ở trên vẫn là bằng chứng worker
 Sol. **CI remote lần đầu · 20/10/2026:** [Application CI 39395657217](https://github.com/Son2110/Market-Pulse/actions/runs/39395657217)
 tại `222daa9` lỗi hạ tầng lúc khởi động Compose, trước smoke/integration app:
-MongoDB báo fatal 12257600 do không tương thích Linux kernel 6.19+. App job được
-pin sang `ubuntu-24.04` thay `ubuntu-latest`; giữ nguyên image MongoDB và các check
-bắt buộc. Retry và xác minh thay đổi runner còn chờ, chưa nghiệm thu CI A3.
+MongoDB báo fatal 12257600 do không tương thích Linux kernel 6.19+. Lần thử
+`ubuntu-24.04`, [run 39432136010](https://github.com/Son2110/Market-Pulse/actions/runs/39432136010)
+tại `c1473be`, cũng lỗi kernel tương tự. App job tạm pin `ubuntu-22.04` theo
+[manifest runner chính thức](https://raw.githubusercontent.com/actions/runner-images/main/images/ubuntu/Ubuntu2204-Readme.md):
+image `20261012.322.1` dùng kernel `6.8.0-1064-azure`. Guard đầu job in kernel thật,
+từ chối phiên bản không parse được hoặc từ 6.19 trở lên, gồm major mới hơn, trước
+khi cài dependency. Đây là workaround tạm, label không bảo đảm kernel của image
+tương lai; cần chuyển runner sau khi xác minh MongoDB tương thích và trước khi
+runner này bị ngừng. Giữ nguyên image MongoDB, check bắt buộc và hành vi startup.
+Retry và nghiệm thu CI A3 còn chờ; hai lỗi hạ tầng không là bằng chứng nghiệm thu.
 
 **A2 ingestion primitives · 18/10/2026:** nhánh
 `feat/fr-18-ingestion-foundation-1` tách `Json`, `ContractError`, canonical JSON,
