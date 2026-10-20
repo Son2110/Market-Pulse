@@ -105,7 +105,13 @@ implementation with no remaining findings. The reviewer independently passed
 two focused real MongoDB/Redis tests covering malformed-family isolation, strict
 core validation, all three legacy families, pre-queued jobs and job-name mismatch,
 plus `git diff --check`. The full-suite results above remain Sol worker evidence.
-Remote CI for A3 remains pending.
+**Remote CI attempt · 20/10/2026:** [Application CI run 39395657217](https://github.com/Son2110/Market-Pulse/actions/runs/39395657217)
+on `222daa9` failed during Compose startup, before application smoke/integration
+checks: MongoDB reported fatal error 12257600, identifying a Linux kernel 6.19+
+incompatibility. The application job is now pinned to `ubuntu-24.04` instead of
+`ubuntu-latest` as a bounded runner compatibility change. MongoDB images and
+required checks are unchanged; the retry and verification of this change remain
+pending. This infrastructure failure does not provide remote acceptance of A3.
 
 ## Decision and constraints
 

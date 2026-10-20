@@ -11,7 +11,8 @@ permissions:
 jobs:
   app:
     name: app
-    runs-on: ubuntu-latest
+    # Keep MongoDB 8.0 CI on a runner compatible with its kernel requirements.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - name: Check out source

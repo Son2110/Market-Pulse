@@ -77,7 +77,11 @@ SHA-256 yêu cầu gốc giữ
 không còn finding. Reviewer tự chạy đạt hai focused tests MongoDB/Redis thật,
 bao phủ cô lập family hỏng, strict validator lõi, legacy cả ba family, job đã xếp
 hàng và tên job sai; diff check đạt. Full suite ở trên vẫn là bằng chứng worker
-Sol; CI remote cho A3 còn chờ.
+Sol. **CI remote lần đầu · 20/10/2026:** [Application CI 39395657217](https://github.com/Son2110/Market-Pulse/actions/runs/39395657217)
+tại `222daa9` lỗi hạ tầng lúc khởi động Compose, trước smoke/integration app:
+MongoDB báo fatal 12257600 do không tương thích Linux kernel 6.19+. App job được
+pin sang `ubuntu-24.04` thay `ubuntu-latest`; giữ nguyên image MongoDB và các check
+bắt buộc. Retry và xác minh thay đổi runner còn chờ, chưa nghiệm thu CI A3.
 
 **A2 ingestion primitives · 18/10/2026:** nhánh
 `feat/fr-18-ingestion-foundation-1` tách `Json`, `ContractError`, canonical JSON,
