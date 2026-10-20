@@ -77,7 +77,8 @@ export class IngestionStore {
       if (!duplicate(error)) throw error;
       const existing = await this.deliveries.findOne({ _id: id });
       if (!existing || existing.payloadDigest !== payloadDigest) throw new DeliveryConflict();
-      classifyDelivery(existing);
+      // Preserve invalid-contract failure receipts while still validating their stored payload and identity.
+      classifyDelivery(existing.status === "failure" && existing.errorCode === "invalid_contract" ? { ...existing, family: undefined } : existing);
       return existing;
     }
   }

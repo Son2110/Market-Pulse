@@ -11,7 +11,7 @@ import { createIngestionApi } from "../src/ingestion-api.js";
 import { digest, strictJson, validatePayload, type Json, type FixturePayload } from "../src/ingestion-contract.js";
 import { createApp } from "../src/health.js";
 import { createIngestionQueue, DeliveryQueue, jobId } from "../src/ingestion-queue.js";
-import { IngestionStore, type Delivery } from "../src/ingestion-store.js";
+import { IngestionStore, receipt, type Delivery } from "../src/ingestion-store.js";
 import { startIngestionWorker } from "../src/ingestion-worker.js";
 import { goldOne } from "./gold-test-data.js";
 import { observed } from "./observed-test-data.js";
@@ -216,6 +216,74 @@ test("legacy malformed family metadata becomes terminal without blocking healthy
   await context.terminal(accepted._id);
   assert.deepEqual(await context.counts(), [3, 11, 44]);
   await assert.rejects(context.store.db.collection<{ _id: string }>("ingestion_deliveries").updateOne({ _id: accepted._id }, { $set: { status: "invalid" } }), (error: unknown) => error instanceof MongoServerError && error.code === 121);
+});
+
+test("terminal invalid-contract family failures replay their unchanged receipt while other stored invariants remain strict", async t => {
+  const context = await setup(); t.after(context.close);
+  const accepted = await context.accept("receipt-baseline");
+  const rawDeliveries = context.store.db.collection<Omit<Delivery, "family"> & { family: unknown }>("ingestion_deliveries");
+  const families = ["unknown", null, "synthetic-gold", "arbitrary-invalid-family"];
+  for (const [index, family] of families.entries()) {
+    await rawDeliveries.insertOne({ ...accepted, _id: `receipt-family-${index}`, family });
+    await context.deliveries.enqueue(`receipt-family-${index}`, accepted.payloadDigest);
+  }
+  let enqueueCalls = 0;
+  const secret = "d".repeat(64);
+  const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, ingestionRouter: createIngestionApi({ store: context.store, secret, isReady: () => true, enqueue: async (id, hash) => { enqueueCalls++; await context.deliveries.enqueue(id, hash); } }) }));
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert(address && typeof address === "object");
+  const url = `http://127.0.0.1:${address.port}/internal/ingestion/deliveries`;
+  const send = (deliveryId: string, payload = fixture()) => fetch(url, { method: "POST", headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" }, body: JSON.stringify({ deliveryId, payloadDigest: digest(payload as unknown as Json), payload }) });
+  const revised = fixture(); revised.candles[0]!.source.recordId += "-revision";
+  for (const [index, family] of families.entries()) {
+    const id = `receipt-family-${index}`;
+    const before = await rawDeliveries.findOne({ _id: id }); assert(before);
+    assert.equal(before.status, "failure"); assert.equal(before.errorCode, "invalid_contract"); assert.equal(before.family, family);
+    const expectedReceipt = JSON.parse(JSON.stringify(receipt(before as Delivery)));
+    for (let replay = 0; replay < 2; replay++) {
+      const response = await send(id); assert.equal(response.status, 202);
+      assert.deepEqual(await response.json(), expectedReceipt);
+      assert.deepEqual(await rawDeliveries.findOne({ _id: id }), before);
+    }
+    assert.equal((await send(id, revised)).status, 409);
+    assert.deepEqual(await rawDeliveries.findOne({ _id: id }), before);
+    assert.equal(await context.producer.queue.getJob(jobId(id)), undefined);
+  }
+
+  const changedPayload = fixture(); changedPayload.candles[0]!.source.recordId += "-stored-change";
+  const corruptions = [
+    { name: "payload", fields: { payload: { ...accepted.payload, schemaVersion: "invalid" } }, expectedStatus: 400 },
+    { name: "provider", fields: { provider: "KBS" }, expectedStatus: 400 },
+    { name: "schema", fields: { schemaVersion: "2.0.0" }, expectedStatus: 400 },
+    { name: "dataset", fields: { dataset: { ...accepted.dataset, freshness: "tampered" } }, expectedStatus: 400 },
+    { name: "content-digest", fields: { payload: changedPayload }, expectedStatus: 400 },
+    { name: "digest", fields: { payloadDigest: "0".repeat(64) }, expectedStatus: 409 },
+  ];
+  for (const { name, fields, expectedStatus } of corruptions) {
+    const id = `receipt-corrupt-${name}`;
+    await context.store.db.collection<{ _id: string } & Record<string, unknown>>("ingestion_deliveries").insertOne({ ...accepted, _id: id, family: "unknown", status: "failure", errorCode: "invalid_contract", finishedAt: new Date(), ...fields }, { bypassDocumentValidation: true });
+    const before = await rawDeliveries.findOne({ _id: id });
+    const response = await send(id); assert.equal(response.status, expectedStatus, name);
+    assert.deepEqual(await response.json(), { error: expectedStatus === 409 ? "delivery_identity_conflict" : "invalid_contract" });
+    assert.deepEqual(await rawDeliveries.findOne({ _id: id }), before);
+    assert.equal(await context.producer.queue.getJob(jobId(id)), undefined);
+  }
+  for (const status of ["accepted", "queued", "running", "success", "failure"] as const) {
+    for (const [index, family] of families.entries()) {
+      const id = `receipt-strict-${status}-${index}`;
+      await rawDeliveries.insertOne({ ...accepted, _id: id, family, status, ...(status === "failure" ? { errorCode: "persistence_unavailable" } : {}) });
+      const before = await rawDeliveries.findOne({ _id: id });
+      const response = await send(id); assert.equal(response.status, 400, `${status}/${String(family)}`);
+      assert.deepEqual(await response.json(), { error: "invalid_contract" });
+      assert.deepEqual(await rawDeliveries.findOne({ _id: id }), before);
+      assert.equal(await context.producer.queue.getJob(jobId(id)), undefined);
+    }
+  }
+  assert.equal(enqueueCalls, 0);
+  assert.deepEqual(await context.counts(), [31, 0, 0]);
+  for (const name of ["observed_assets", "observed_candle_revisions", "observed_candles_latest", "gold_assets", "gold_quote_revisions", "gold_quote_snapshots", "gold_quotes_latest"]) {
+    assert.equal(await context.store.db.collection(name).countDocuments(), 0, name);
+  }
 });
 
 test("legacy nonterminal outbox rows without family and pre-queued jobs dispatch across all three families while isolating invalid contracts", async t => {

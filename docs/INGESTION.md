@@ -37,6 +37,8 @@ The payload passes the full JSON Schema and independent Node cross-record checks
 
 An acknowledged raw insert (`w:1,j:true`) precedes HTTP 202. Same ID/digest returns its existing receipt; same ID with changed content returns 409 without replacement. 202 means durably accepted, and its receipt may already be queued/running/success/failure. Enqueue has a 1.5-second response bound; failure leaves an accepted receipt for reconciliation. MongoDB write failure returns 503. Polling success, rather than 202 alone, proves completion.
 
+For an existing terminal `failure / invalid_contract`, same-ID/digest replay ignores only stored `family` metadata when validating the receipt. The stored payload, digest, provider, schema version and dataset must still agree. It returns the original failure receipt without rewriting metadata or enqueueing work. Active deliveries, successes, other failures and queue/worker dispatch retain strict family validation.
+
 ## Storage and recovery
 
 | Collection | Unique identity | Stored content and access |
