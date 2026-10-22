@@ -1,5 +1,33 @@
 # MP-10 — fixture ingestion and replay
 
+**Candidate A4 v1.1 · 22/10/2026:** [reference](MarketPulse_A4_Architecture_Requirements.md), [current report](A4_IMPLEMENTATION_REPORT.md).
+API tolerates cold Redis loss after Mongo/init, starting Redis clients only after
+required initialization. HTTP enqueue retains at most 4 raw
+operations through timeout/settlement, with abort checkpoints and producer backlog 256,
+offline queue disabled. Contracts/IDs/attempts remain unchanged. Dated Anti evidence
+below belongs to the previous candidate, not verification of this working tree.
+
+
+**A4 dependency health and recovery · 21/10/2026:** on branch `ci/dependency-health-recovery`
+(baseline `eb3a6b2`, PR #38), ingestion acceptance and worker recovery are hardened
+against post-startup Redis and MongoDB outages without changing any wire contract,
+digest, delivery ID, BullMQ job name/ID, or collection schema. `GET /health/ready/ingestion`
+reports `200 {"status":"ready"}` only when `INGESTION_SECRET` is configured,
+`IngestionStore` is initialized, and the live bounded MongoDB check succeeds (`503`
+otherwise, independent of Redis). During a post-startup Redis outage, the API stays
+alive on the same PID, durably records accepted deliveries in `ingestion_deliveries`
+(`w:1,j:true`) before returning `202 Accepted`, bounds queue enqueue to `1500` ms with
+`disableOfflineQueue: true`, and leaves deferred receipts in the MongoDB outbox. When
+Redis returns on the same API and worker PIDs, the producer and worker reconnect with
+bounded backoff (`100ms..1000ms`) and `createReconciliationCoordinator` (non-overlapping,
+bounded timeout) reconciles deferred `fixture-market`, `observed-candle`, and
+`synthetic-gold` deliveries to `success` within `MAX_ATTEMPTS = 3`, preserving A3
+`invalid_contract` isolation and canonical/revision/projection ordering. During a
+MongoDB outage, delivery submission fails closed with `503` before any `202` response
+and recovers automatically on the same PID once MongoDB returns. See
+[A4_IMPLEMENTATION_REPORT.md](A4_IMPLEMENTATION_REPORT.md) and
+[LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md#health-capability-readiness-and-dependency-recovery-a4--21102026).
+
 **P1.4 stored synthetic gold reads · 16/10/2026:** P1.3A is merged in PR #34.
 The opt-in latest/history API reads its stored projections with strict series,
 date and pagination bounds, exact decimal presentation and selected-row integrity
@@ -156,6 +184,24 @@ Default collector behavior remains offline validation/summary. Explicit `--submi
 For recovery, restart only the worker (`docker compose restart worker`) and poll the same delivery. Re-submit the same file/ID after a lost response. Fixture identities remain immutable; observed revision/refetch handling is described below. There is no arbitrary retry admin API. Do not delete volumes to replay. Host tests require the actual `MONGODB_URL`/`REDIS_URL`; Node does not automatically load `.env`.
 
 ## Verification and limits
+
+**A4 dependency health and recovery verification · 21/10/2026:** local verification on
+`ci/dependency-health-recovery` passed lint, typecheck, build, 194 Node unit tests
+(including 7 unit tests in `dependency-lifecycle.test.ts` covering multi-cycle timeout
+slot/mutex retention, nested probes, late resolve/reject immunity, and worker producer
+`disableOfflineQueue: true`), 51 real MongoDB/Redis integration tests (including 7
+isolated container outage/recovery tests in `dependency-recovery.integration.test.ts`
+using `compose.a4-test.yaml` and the real Vite `/api` proxy), 44 Python contract tests,
+29 collector tests, both fixture validators, isolated Compose build/smoke/collector/replay,
+4 E2E harness tests, and 2 Playwright desktop/mobile journeys with zero skipped tests.
+The real-process recovery suite proves same-PID survival and recovery across Redis
+stop/start, MongoDB stop/start, deferred outbox reconciliation for all three families
+(`fixture-market`, `observed-candle`, `synthetic-gold`) including gold `A -> B -> A`
+projection convergence, digest conflict (`409 delivery_identity_conflict`), malformed-family
+`invalid_contract` isolation, pre-exhausted `attempts_exhausted` and runtime 3-attempt
+`persistence_unavailable` exhaustion, settlement-held probe/reconcile bounds, and
+bounded `SIGTERM`/`SIGINT` shutdown during startup retry and dependency outage. See
+[A4_IMPLEMENTATION_REPORT.md](A4_IMPLEMENTATION_REPORT.md).
 
 **Collection-status verification · 13/10/2026:** lint, API/web typecheck, 165 Node unit tests, 27 real MongoDB/Redis integration tests, API/web build, fixture validation, 27 Python contract tests, 29 collector tests, 112 local documentation targets and the 19-document portal build passed; no required tests skipped. New coverage checks both symbols, every delivery state, repeated references counted per candle, absent/unusable/incompatible receipts, 32 distinct receipt references, latest failed retrieval displacing older success, exact UTC microseconds/original offsets, empty ranges, corrupted selected asset/candle rejection, sanitized failures and unchanged history projection. Actual API startup verifies absent/false/true registration with no ingestion secret. Tests use isolated disposable databases and make no provider calls. An initial new test exceeded MongoDB's database-name limit and leaked its connection after failed cleanup; the prefix was shortened and cleanup now closes in `finally`, after which focused and full integration passed. Windows loopback/build/Docker checks needed accepted scoped escalation; existing environment, ports and volumes were preserved. The original requirements SHA-256 remains `21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`. This is worker verification; independent review evidence is recorded below, and remote CI remains pending.
 

@@ -68,8 +68,10 @@ flowchart LR
 Ingestion retains normalized deliveries separately from family records in ordinary
 MongoDB collections, with durable acceptance, idempotent replay and worker
 reconciliation. There is no implemented market cache or time-series projection.
-The API currently requires Redis even for startup/readiness and shuts down after
-Redis loss; degraded reads are future A4 work. Market values retain provider,
+The A4 v1.1 candidate separates strict `/health/ready` from fixture read routing
+`/health/read-ready`. API startup can tolerate Redis loss after Mongo/index/fixture
+initialization; [candidate checks and limits](docs/A4_IMPLEMENTATION_REPORT.md)
+remain subject to review and merge. Market values retain provider,
 currency/units, timezone, as-of and freshness; missing observations remain missing.
 Future event pages describe **associated market movement**, never causation.
 

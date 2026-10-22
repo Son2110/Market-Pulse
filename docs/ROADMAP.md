@@ -1,8 +1,16 @@
-# Lộ trình MarketPulse VN — cập nhật 20/10/2026
+# Lộ trình MarketPulse VN — cập nhật 22/10/2026
+
+**A4 v1.1 candidate · 22/10/2026:** đang kiểm tra theo [requirements](MarketPulse_A4_Architecture_Requirements.md), gồm platform seams/cold Redis-down/Compose routing. Actual Compose đã xác nhận API/web healthy khi Redis chưa tồn tại, nhận durable outbox, tự phục hồi cùng API PID và giữ CLI replay/canonical counts. [Báo cáo mới](A4_IMPLEMENTATION_REPORT.md) ghi checks hiện hành và tách lịch sử Anti. Chưa DONE/review/CI/merge; P2.2 và collector tự động còn đóng.
 
 ## Kế hoạch mở rộng hiện hành
 
-**Baseline hiện hành · 20/10/2026:** P1.4, A1 và A2 đã merge, mới nhất qua
+**Baseline hiện hành · 21/10/2026:** P1.4, A1, A2 và A3 đã merge vào `main`, mới nhất qua
+[PR #38](https://github.com/Son2110/Market-Pulse/pull/38) tại `eb3a6b2`. Nhánh làm việc
+hiện tại `ci/dependency-health-recovery` triển khai **A4 (dependency health và recovery)**
+trên baseline `eb3a6b2`, tách biệt với bộ tài liệu khảo sát P2.1 đang chờ cổng quyền riêng.
+Ghi nhận baseline ngày 20/10/2026 bên dưới được giữ nguyên theo lịch sử:
+
+**Baseline ghi nhận · 20/10/2026:** P1.4, A1 và A2 đã merge, mới nhất qua
 [PR #37](https://github.com/Son2110/Market-Pulse/pull/37); `main` tại
 `f51dbd3958dc0d4db6410d13c2a28085dcb02853` (sau [PR #36](https://github.com/Son2110/Market-Pulse/pull/36) tại `a7206fee2fcfb317c2ee44c6342d3359510eea9e`).
 [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893071)
@@ -42,6 +50,38 @@ không trừ tùy ý giờ P1 đã làm hay cộng buffer foundation lần hai v
 Đo lại phần còn lại sau A4 và audit P2.1.
 
 ### Ghi nhận có ngày — bằng chứng triển khai và kiểm tra
+
+**Lịch sử Anti trước v1.1 — A4 dependency health và recovery · 21/10/2026:** các chi tiết cold start và counts sau đây thuộc candidate cũ, không nghiệm thu working tree v1.1. Nhánh `ci/dependency-health-recovery`
+(baseline `eb3a6b2`, PR #38) triển khai quản lý vòng đời dependency, bounded probes giữ
+slot đến khi operation thực sự settle, capability readiness và phục hồi tự động sau sự cố
+Redis/MongoDB cho API và worker mà không đổi schema, payload contract, digest/identity hay
+tạo dữ liệu migration. Cold start giữ nguyên cơ chế fail-closed với retry hữu hạn
+(`connectWithRetry`). Sau khi khởi động thành công, sự cố mất kết nối Redis không còn gọi
+`shutdown("redis_error", 1)` làm thoát API: `GET /health/live` giữ `200`, `GET /health/ready`
+trả `503`, trong khi các capability probe mới (`GET /health/ready/fixture`,
+`GET /health/ready/mongo`, `GET /health/ready/ingestion`) và các luồng đọc fixture, đọc
+observed/gold đã lưu, auth/watchlist (trực tiếp lẫn qua Vite `/api` proxy thật) và nhận
+delivery bền vững vào MongoDB outbox (`202 Accepted` trước khi enqueue) vẫn hoạt động đúng
+theo dependency thực tế của từng capability. Khi Redis được khôi phục trên cùng API/worker
+PID, client health cùng cả API/worker BullMQ producer tự kết nối lại với linear step backoff
+hữu hạn (`100ms, 200ms, ..., 1000ms`, `disableOfflineQueue: true`) và
+`createReconciliationCoordinator` (giữ mutex đến khi `runReconcile()` thực sự settle, không
+chồng lấp qua nhiều chu kỳ timeout, chặn late completion sau timeout) tự động đẩy các delivery
+deferred của cả ba family (`fixture-market`, `observed-candle`, `synthetic-gold`) tới trạng thái
+`success` trong ngân sách `MAX_ATTEMPTS = 3`, đồng thời giữ cô lập `invalid_contract`,
+`attempts_exhausted`, `persistence_unavailable` và conflict `409 delivery_identity_conflict`.
+Khi mất MongoDB, `GET /health/ready`, `GET /health/ready/mongo`, `GET /health/ready/ingestion`,
+worker readiness trên cổng `127.0.0.1:3002` và các route phụ thuộc MongoDB chuyển sang fail-closed
+(`503`, không bao giờ trả false `202`), còn `GET /health/ready/fixture` và các route đọc fixture
+vẫn trả `200`; khi MongoDB trở lại trên cùng PID, cả probe lẫn request thật tự phục hồi mà
+không cần khởi động lại process. Kiểm tra local đạt: lint/typecheck/build, 194 Node unit tests
+(gồm 7 unit tests tại `dependency-lifecycle.test.ts`), 51 Node integration tests (gồm 7 kịch
+bản outage/recovery thực tế tại `dependency-recovery.integration.test.ts` chạy API/worker/Vite
+thật trên container Docker Compose cô lập `compose.a4-test.yaml`), 44 Python contract tests,
+29 collector tests, hai fixture validators, Compose build/smoke/collector/replay cô lập, 4 E2E
+harness tests và 2 Playwright journeys desktop/mobile; không skip check nào. Xem chi tiết tại
+[A4_IMPLEMENTATION_REPORT.md](A4_IMPLEMENTATION_REPORT.md). Review độc lập của Codex và CI
+remote trên nhánh A4 là bước nghiệm thu riêng.
 
 **A3 family dispatch · 20/10/2026:** nhánh `feat/fr-18-ingestion-foundation-2`
 bổ sung phân loại nội bộ tường minh (`fixture-market`, `observed-candle`,

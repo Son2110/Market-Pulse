@@ -1,11 +1,11 @@
 # System architecture — MarketPulse VN
 
-**Decision date:** 18/10/2026 · **Scope:** A1 architecture decision, with A2 and A3 implementation evidence below.
-**Merged baseline:** [PR #37](https://github.com/Son2110/Market-Pulse/pull/37),
-`main` at `f51dbd3958dc0d4db6410d13c2a28085dcb02853` (A2 ingestion primitives).
+**Decision date:** 18/10/2026 · **Scope:** A1 architecture decision, with A2, A3 and A4 implementation evidence below.
+**Merged baseline:** [PR #38](https://github.com/Son2110/Market-Pulse/pull/38),
+`main` at `eb3a6b2` (A3 family dispatch), following [PR #37](https://github.com/Son2110/Market-Pulse/pull/37) at `f51dbd3958dc0d4db6410d13c2a28085dcb02853` (A2 ingestion primitives, where
 [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893071)
 and [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39106893021)
-succeeded on that baseline (following [PR #36](https://github.com/Son2110/Market-Pulse/pull/36) at `a7206fee2fcfb317c2ee44c6342d3359510eea9e`). These runs do not validate the A3 working branch.
+succeeded) and [PR #36](https://github.com/Son2110/Market-Pulse/pull/36) at `a7206fee2fcfb317c2ee44c6342d3359510eea9e`. These baseline runs do not validate the A4 working branch (`ci/dependency-health-recovery`).
 
 This decision follows the [original brief](../MarketPulse_VN_Project_Documentation.md),
 [current PRD](PRD.md), [data contract](DATA_CONTRACT.md), [ingestion contract](INGESTION.md)
@@ -117,7 +117,102 @@ later major versions, before dependencies are installed. The label is a temporar
 workaround, not a guarantee of the kernel on future runner images; migrate after
 MongoDB compatibility is verified and before this runner retires. MongoDB images,
 required checks and startup behavior are unchanged. Retry and remote acceptance
-of A3 remain pending; neither infrastructure failure supplies acceptance evidence.
+of A3 remain pending at that historical note; A3 was subsequently merged via [PR #38](https://github.com/Son2110/Market-Pulse/pull/38) at `eb3a6b2`.
+
+### Candidate A4 v1.1 · 22/10/2026
+
+[Requirements](MarketPulse_A4_Architecture_Requirements.md) and [current evidence](A4_IMPLEMENTATION_REPORT.md)
+separate this candidate from Anti history. Platform health/dependencies/recovery now own
+pure policy, bounded probes/state and reconnect/reconcile; existing helper is a compatibility seam.
+API tolerates cold Redis loss after Mongo/init; `/health/read-ready` is fixture routing,
+`/health/capabilities` distinguishes disabled/unavailable and worker unknown. Compose API
+uses read health and has no Redis startup dependency. Full readiness remains strict.
+Redis health recovery and the optional producer start after required Mongo/index/catalog
+initialization, preventing missing Redis DNS from blocking Mongo startup. The actual
+Compose cold/runtime Redis-loss regression verifies read routing, unchanged API PID,
+durable outbox recovery and collector replay; the report records current check results.
+Checks/review/CI/merge are separate; A4 is not DONE. Domain moves/cycles stay deferred.
+
+### Historical Anti A4 implementation before v1.1 · 21/10/2026
+
+The cold-start/routing details and dated evidence below describe the pre-v1.1 candidate;
+use the current report above for v1.1 verification.
+
+The branch `ci/dependency-health-recovery` (baseline `eb3a6b2`) implements deliberate
+dependency health, additive capability readiness probes, bounded timeouts/concurrency,
+and post-startup Redis and MongoDB outage survival and automatic recovery on the
+same API and worker processes. See [A4_IMPLEMENTATION_REPORT.md](A4_IMPLEMENTATION_REPORT.md)
+for full runtime and outage evidence.
+
+- **Cold-start vs post-startup lifecycle (`stores.ts`, `server.ts`, `worker.ts`):**
+  Cold start remains fail-closed with bounded retry (`connectWithRetry`, default
+  5 attempts, 500 ms delay); if MongoDB, Redis, or required store/index/catalog
+  initialization fails during startup, the process exits `1` via bounded shutdown.
+  Once Redis emits its initial `ready` event on the API health client, `stores.ts`
+  switches from fail-closed startup to bounded automatic reconnect (`computeReconnectDelayMs`,
+  linear step `100ms, 200ms, 300ms, ..., 1000ms` cap) with `disableOfflineQueue: true`,
+  and `server.ts` logs `dependency_error` / `dependency_disconnected` / `dependency_recovered`
+  instead of calling `shutdown("redis_error", 1)`. Both the API producer queue and the
+  worker producer queue created via `createIngestionQueue` in `ingestion-queue.ts`
+  default to `producer = true` (`disableOfflineQueue: true` + bounded linear reconnect
+  `100ms..1000ms`), while BullMQ job retries retain exponential backoff from `250ms`
+  across `MAX_ATTEMPTS = 3`.
+- **Bounded probes, settlement-held slots and capability readiness (`dependency-lifecycle.ts`, `health.ts`, `worker.ts`):**
+  All health probes use `createBoundedProbe` (`timeoutMs = config.dependencyTimeoutMs`
+  default `1000ms`, `maxInFlight = 4`) and `withinTimeout` / `trackOperation` (which
+  track root and nested operations via `AsyncLocalStorage`, attach no-op rejection
+  handlers, and clear timers in `finally` so late rejections never escape as
+  `unhandledRejection`). A probe timeout returns `false` (`503`) to the HTTP caller
+  at `timeoutMs` and marks the execution context timed out, but **retains the
+  concurrency slot until the underlying operation and all tracked child operations
+  actually settle**, and ignores any late resolve/reject after timeout so a late
+  `true` cannot flip readiness. All health endpoints send `Cache-Control: no-store`
+  and sanitized JSON bodies:
+  - `GET /health/live` -> `200 {"status":"alive"}` (process/HTTP liveness only).
+  - `GET /health/ready` -> `200 {"status":"ready"}` or `503 {"status":"not_ready"}`
+    (requires live MongoDB + live Redis + all initialized stores, plus `IngestionStore`
+    when `INGESTION_SECRET` is configured; Redis is never removed from full readiness).
+  - `GET /health/ready/fixture` -> `200`/`503` (requires initialized packaged fixture
+    market provider and 10-equity search catalog; independent of MongoDB and Redis).
+  - `GET /health/ready/mongo` -> `200`/`503` (requires initialized auth, watchlists,
+    and fixture catalog plus live MongoDB ping; independent of Redis).
+  - `GET /health/ready/ingestion` -> `200`/`503` (requires configured `INGESTION_SECRET`,
+    initialized `IngestionStore`, and live MongoDB ping; returns `503` when disabled,
+    uninitialized, shutting down, or MongoDB is unavailable; independent of Redis).
+  - Worker loopback (`http://127.0.0.1:3002/health/live` -> `200 {"status":"alive"}`,
+    `GET /` and `GET /health/ready` via `createWorkerHealthHandler` ->
+    `200 {"status":"ready"}` or `503 {"status":"not_ready"}`) requires initialized
+    `IngestionStore`, running BullMQ worker, live MongoDB ping, live worker and
+    producer Redis pings tracked under a single bounded probe timeout (`1000ms`),
+    and recent non-stale reconciliation within `reconcileIntervalMs * 3`.
+- **MongoDB outage gating and live request recovery (`server.ts`, `health.ts`, `ingestion-api.ts`):**
+  Auth and watchlist readiness combine initialization state with `stores.tracker.isMongoHealthy()`,
+  and `beforeMongoRoute` re-probes MongoDB when marked unhealthy so that as soon as
+  MongoDB returns on the same PID, both `GET /health/ready/mongo` and real auth/watchlist
+  requests recover automatically without a process restart. Live MongoDB connectivity/topology
+  errors caught during a request return sanitized `503` (`{"error":"not_ready"}` on
+  auth/watchlists, `{"error":"observed_history_unavailable"}` / `{"error":"observed_collection_status_unavailable"}`
+  on observed reads, `{"error":"gold_latest_unavailable"}` / `{"error":"gold_history_unavailable"}`
+  on gold reads, and `{"error":"ingestion_unavailable"}` on internal ingestion),
+  preserving auth validation and rate-limit semantics.
+- **Durable outbox and non-overlapping reconciliation (`ingestion-api.ts`, `ingestion-worker.ts`):**
+  `POST /internal/ingestion/deliveries` preserves durable MongoDB `w:1,j:true` acceptance
+  before returning `202`. When Redis is down, `boundedEnqueue` (`1500ms`) fails fast and
+  defers the durably accepted delivery to the MongoDB outbox. When Redis is restored on
+  the same API and worker PIDs, `createReconciliationCoordinator` (`reconcileTimeoutMs = Math.max(intervalMs * 2, 2000)`,
+  default `10000ms` for `intervalMs = 5000ms`) holds its single-flight mutex until the
+  underlying `runReconcile()` and all tracked child operations actually settle (never
+  overlapping across timeout cycles and ignoring late completion after timeout), and
+  re-enqueues and persists all three validated families (`fixture-market`,
+  `observed-candle`, `synthetic-gold`) while preserving `MAX_ATTEMPTS = 3`, terminal
+  failure codes (`invalid_contract`, `attempts_exhausted`, `queue_attempts_exhausted`,
+  `persistence_unavailable`), digest conflict `409 {"error":"delivery_identity_conflict"}`,
+  canonical digests, and revision/projection ordering.
+- **Routing boundary:** `compose.yaml` retains `GET /health/ready` as the default API
+  container healthcheck and real Vite (`apps/web/vite.config.ts`) proxies only `/api`
+  (returning the SPA HTML shell on `/health/*`), so local direct HTTP and real Vite
+  `/api` proxy survival during Redis outage do not claim external production load-balancer
+  routing availability.
 
 ## Decision and constraints
 
@@ -151,7 +246,7 @@ flowchart LR
 
 | Area | Code and ownership today | Important limit |
 |---|---|---|
-| Composition | `apps/api/src/server.ts`, `health.ts`, `stores.ts`, `config.ts`; `worker.ts` composes the separate process | API startup and readiness require both MongoDB and Redis. Redis error/end after connection initiates API shutdown. |
+| Composition | `apps/api/src/server.ts`, `health.ts`, `stores.ts`, `dependency-lifecycle.ts`, `config.ts`; `worker.ts` composes the separate process | Cold start requires both MongoDB and Redis; post-startup Redis loss keeps the API process alive, lowers full readiness (`GET /health/ready` -> 503), preserves fixture/Mongo capability probes and reads, and auto-reconnects with bounded backoff. |
 | Accounts / watchlist | `auth.ts`, `watchlists.ts`; MongoDB `users`, `sessions`, `watchlists` | Auth rate limiting and KDF concurrency guards are in process, **not Redis-backed**. Sessions and ownership are Mongo-backed; this is the bounded local auth slice. |
 | Fixture market reads | `fixture-market-data-provider.ts`, `stock-search.ts`, `daily-history.ts` | Search/history/default web views read the packaged fixture, not ingestion collections. |
 | Ingestion contracts | `ingestion-contract.ts`, `gold-contract.ts`, `packages/schemas`; shared JSON primitives in `platform/contracts/json.ts`; validated-family classifier in `ingestion-contract.ts` on A3; Python validators and shared parity corpora | Strict fixture v1, observed candle v2 and synthetic gold v1 are different payload families; version alone cannot distinguish both v1 families, and wire discriminators are rejected. |
@@ -243,13 +338,13 @@ flowchart TD
 This table identifies the dependency a capability actually uses and the future
 failure boundary to validate; it does not change today's all-dependency gate.
 
-| Capability | Direct work dependencies | Current process constraint | Proposed A4 behavior / later gate |
+| Capability | Direct work dependencies | Pre-A4 baseline constraint | Implemented A4 behavior (`ci/dependency-health-recovery`) |
 |---|---|---|---|
-| Fixture search/history | Initialized packaged fixture/catalog | API startup/readiness still requires Mongo + Redis | Keep initialized read capability available during Redis loss only after recovery and routing tests. |
-| Account/session/watchlist | Mongo; initialized market provider for list presentation; in-process auth guards | Same API lifecycle | Fail affected writes/auth checks safely when Mongo is unavailable; Redis is not the auth limiter. |
-| Stored observed/gold reads | Mongo, enabled flag and initialized API | Same API lifecycle; no queue call in the read service | Permit Mongo-backed reads during Redis degradation only after A4 proves behavior. |
-| Internal delivery acceptance/poll | Mongo; configured secret and initialized delivery store; queue enqueue for new work | API Redis failure currently stops the process | Preserve durable accept-before-202 and deferred enqueue/reconciliation. Mongo unavailable must not acknowledge acceptance. |
-| Worker persistence/recovery | Mongo + Redis/BullMQ, initialized stores, running worker, recent reconciliation | Worker already has separate readiness | Pause/fail safely during dependency loss; prove recovery, bounded retry and no identity/order regressions before automation. |
+| Fixture search/history (`/health/ready/fixture`) | Initialized packaged fixture/catalog | API startup/full readiness requires Mongo + Redis | Survives post-startup Redis and MongoDB outages on the same API process; direct HTTP and local Vite `/api` proxy verified. |
+| Account/session/watchlist (`/health/ready/mongo`) | Mongo; initialized market provider for list presentation; in-process auth guards | Same API lifecycle | Survives post-startup Redis outage; fails closed (`503`) during MongoDB outage and automatically recovers on the same PID when MongoDB returns. |
+| Stored observed/gold reads (`/health/ready/mongo`) | Mongo, enabled flag and initialized API | Same API lifecycle; no queue call in the read service | Survives post-startup Redis outage via direct HTTP and Vite `/api` proxy; fails closed (`503`) during MongoDB outage and recovers automatically on MongoDB restore. |
+| Internal delivery acceptance/poll (`/health/ready/ingestion`) | Mongo; configured secret and initialized delivery store; bounded queue enqueue | Pre-A4 Redis failure stopped the API process | Preserves durable MongoDB accept-before-202 during Redis outage, defers failed/timed-out enqueue to outbox, and rejects with `503` (no false `202`) when MongoDB is down. |
+| Worker persistence/recovery (`127.0.0.1:3002`) | Mongo + Redis/BullMQ, initialized stores, running worker, recent non-stale reconciliation | Worker has separate loopback readiness | Reports `503` on Mongo/Redis loss or stale/failed reconciliation; automatically reconnects and reconciles deferred `fixture-market`, `observed-candle`, and `synthetic-gold` outbox rows within `MAX_ATTEMPTS=3`. |
 | Future collection / AI / forecasts | Approved source access, network/model budget or eligible dataset as appropriate | Not implemented | Isolate failures from public read handlers; each task supplies its own evidence and gate. |
 
 `GET /health/live` currently reports process/HTTP liveness without probing stores.
@@ -329,7 +424,7 @@ task may publish a validated report/probability artifact to the app.
 | A2 · ingestion primitives | Shared JSON primitives extracted; domain rules remain local | Existing Node/Python parity, identities/hashes, decimals/microseconds and ingestion tests remain authoritative; local checks, independent GPT-6 Astra review and merged baseline CI passed as recorded above. Revert extraction if parity changes; no bulk migration. |
 | A3 · family dispatch | Explicit internal classification/dispatch of **validated legacy payloads** on the working branch | Preserves all three existing envelopes, digests, delivery IDs, queue IDs and BullMQ job names; tests verify replay/recovery, legacy nonterminal outbox rows without `family`, and invalid-contract isolation. Local checks passed and independent GPT-6 Astra review approved on 20/10/2026 as recorded above; remote CI pending. Revert code without data rewrite. |
 | P2.1 · source research | Decide allowed news fields, purpose-specific rights and retention | Research only; no new collector or automatic jobs. |
-| A4 · dependency health/recovery | Change Redis lifecycle, capability readiness and recovery deliberately | Required before P2.2 or any automated collector; verify dependency loss/restoration, outbox, retries and read/routing claims. Roll back to prior API/worker pair if regression. |
+| A4 · dependency health/recovery | Implemented on `ci/dependency-health-recovery`: post-startup Redis survival + bounded reconnect, capability probes (`/health/ready/fixture`, `/health/ready/mongo`, `/health/ready/ingestion`), worker probe/reconcile guards, and isolated container outage/recovery tests | Verified locally across 193 unit tests, 51 integration tests (including 7 real-process isolated container outage/recovery scenarios), Compose smoke/replay and E2E; independent Codex review and remote CI pending. Roll back to prior API/worker pair if regression; no data migration. |
 
 The classifier inspects a payload only after its existing strict validation,
 yielding an internal family (`fixture-market`, `observed-candle` or
