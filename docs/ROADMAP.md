@@ -1,10 +1,12 @@
 # Lộ trình MarketPulse VN — cập nhật 22/10/2026
 
-**A4 v1.1 candidate · 22/10/2026:** đang kiểm tra theo [requirements](MarketPulse_A4_Architecture_Requirements.md), gồm platform seams/cold Redis-down/Compose routing. Actual Compose đã xác nhận API/web healthy khi Redis chưa tồn tại, nhận durable outbox, tự phục hồi cùng API PID và giữ CLI replay/canonical counts. [Báo cáo mới](A4_IMPLEMENTATION_REPORT.md) ghi checks hiện hành và tách lịch sử Anti. Chưa DONE/review/CI/merge; P2.2 và collector tự động còn đóng.
+**Trạng thái hiện hành · 22/10/2026:** A4 đã merge vào `main` qua [PR #39](https://github.com/Son2110/Market-Pulse/pull/39), baseline `654d177c9fdad148755da08d831748680879f1a0`. Xem [báo cáo A4](A4_IMPLEMENTATION_REPORT.md) và [requirements](MarketPulse_A4_Architecture_Requirements.md) cho bằng chứng triển khai. [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39790104104) và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39790104334) trên baseline này đều thành công theo xác minh của coordinator ngày 22/10/2026; đây không phải lần chạy runtime A4 mới trong task đóng tài liệu P2.1.
+
+**P2.1 · `RESEARCHED_WITH_BLOCKERS` · 22/10/2026:** GPT-6 Astra chấp thuận đóng phần nghiên cứu tài liệu sau khi đọc [audit](P2_NEWS_SOURCE_AUDIT.md) và [14 bằng chứng](P2_NEWS_EVIDENCE_CATALOG.md): ba ứng viên RSS tiếng Việt và hai cổng chính thức bị chặn. Baseline khảo sát vẫn là `eb3a6b2` / 21/10/2026; không fetch nguồn mới. Đây không phải phê duyệt quyền publisher hoặc chứng nhận tuân thủ giới hạn một lượt đọc: catalog giữ nguyên 50 redirect tại SSC và hai lượt đọc chính sách bổ sung. **P2.2 chưa mở**; quyền automated collection, lưu DB, public redisplay, AI và training của cả ba nguồn vẫn `unknown` và đóng. Feature flag hay chấp thuận của chủ dự án không cấp quyền publisher; chỉ xét task kế tiếp sau quyết định quyền theo mục đích hoặc phương án synthetic fixture được chốt riêng. Xem [bàn giao và cổng kế tiếp](P2_NEWS_RESEARCH_HANDOFF.md).
 
 ## Kế hoạch mở rộng hiện hành
 
-**Baseline hiện hành · 21/10/2026:** P1.4, A1, A2 và A3 đã merge vào `main`, mới nhất qua
+**Baseline lịch sử · 21/10/2026:** P1.4, A1, A2 và A3 đã merge vào `main`, mới nhất qua
 [PR #38](https://github.com/Son2110/Market-Pulse/pull/38) tại `eb3a6b2`. Nhánh làm việc
 hiện tại `ci/dependency-health-recovery` triển khai **A4 (dependency health và recovery)**
 trên baseline `eb3a6b2`, tách biệt với bộ tài liệu khảo sát P2.1 đang chờ cổng quyền riêng.
@@ -22,6 +24,8 @@ vàng thật P1.3B, public redisplay và training vẫn đóng. Các dòng “CI
 thái hiện tại; CI baseline trên không tự nghiệm thu nhánh làm việc A3.
 
 ### Foundation A1–A4 — thứ tự đã duyệt
+
+Bảng dưới giữ thứ tự kế hoạch đã duyệt. Tại 22/10/2026, A1–A4 đã merge; P2.1 được đóng ở mức `RESEARCHED_WITH_BLOCKERS` như ghi nhận đầu trang. Thứ tự dự kiến P2.1 → A4 là lịch sử kế hoạch, không có nghĩa A4 còn chờ. P2.2/P2.3 vẫn phải qua task và cổng quyền riêng.
 
 Quyết định tại [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md): modular monolith,
 một codebase Node với API/worker tách process, Python collector và nghiên cứu
@@ -50,6 +54,10 @@ không trừ tùy ý giờ P1 đã làm hay cộng buffer foundation lần hai v
 Đo lại phần còn lại sau A4 và audit P2.1.
 
 ### Ghi nhận có ngày — bằng chứng triển khai và kiểm tra
+
+**Lịch sử candidate trước merge — 22/10/2026:** ghi nhận sau mô tả thời điểm A4 còn đang kiểm tra, được thay thế về trạng thái bởi PR #39 ở đầu trang.
+
+**A4 v1.1 candidate · 22/10/2026:** đang kiểm tra theo [requirements](MarketPulse_A4_Architecture_Requirements.md), gồm platform seams/cold Redis-down/Compose routing. Actual Compose đã xác nhận API/web healthy khi Redis chưa tồn tại, nhận durable outbox, tự phục hồi cùng API PID và giữ CLI replay/canonical counts. [Báo cáo mới](A4_IMPLEMENTATION_REPORT.md) ghi checks hiện hành và tách lịch sử Anti. Chưa DONE/review/CI/merge; P2.2 và collector tự động còn đóng.
 
 **Lịch sử Anti trước v1.1 — A4 dependency health và recovery · 21/10/2026:** các chi tiết cold start và counts sau đây thuộc candidate cũ, không nghiệm thu working tree v1.1. Nhánh `ci/dependency-health-recovery`
 (baseline `eb3a6b2`, PR #38) triển khai quản lý vòng đời dependency, bounded probes giữ
