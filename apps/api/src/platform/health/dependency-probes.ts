@@ -131,7 +131,6 @@ export function createBoundedProbe(
 
   const probe = async (): Promise<boolean> => {
     if (active >= maxInFlight) {
-      options.onResult?.(false);
       return false;
     }
     active += 1;

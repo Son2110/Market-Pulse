@@ -1,8 +1,21 @@
 # A4 v1.1 — bổ sung và xác minh candidate
 
-**Trạng thái:** `LOCAL_VERIFIED_PENDING_CI_MERGE` · 22/10/2026 · baseline `eb3a6b2`, nhánh `ci/dependency-health-recovery`. Local runtime/regression checks đạt với observed-validator command exception và equivalent coverage ghi rõ bên dưới. Review độc lập cuối đã chấp thuận local commit chỉ scope A4; chưa commit/remote CI/push/PR/merge; **A4 chưa DONE**, P2.2/collector tự động vẫn đóng.
+**Trạng thái:** `BASELINE_CI_PASSED_REVIEW_FIXES_PENDING_CI_MERGE` · 22/10/2026 · nhánh `ci/dependency-health-recovery`. Candidate A4 đã commit/push tại [`1e53a63`](https://github.com/Son2110/Market-Pulse/commit/1e53a63); [PR #39](https://github.com/Son2110/Market-Pulse/pull/39) đang mở. [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39748303793) và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39748303688) đều PASS trên baseline này. Local runtime/regression checks và review độc lập đã đạt với observed-validator command exception và equivalent coverage ghi rõ bên dưới. Các sửa review tiếp theo còn ở working tree, chưa commit/push và cần CI trên commit mới; user merge còn chờ. **A4 chưa DONE**, P2.2/collector tự động vẫn đóng.
 
 [Yêu cầu v1.1 nguyên bản](MarketPulse_A4_Architecture_Requirements.md) được sao chép byte-for-byte từ Downloads. Sol bổ sung trên code Anti, giữ ALS raw-settlement/mutex tests, schemas/IDs/digests/auth và ba P2 docs.
+
+## Kiểm tra sửa review PR #39 · 22/10/2026
+
+Đây là kiểm tra mới trên working tree sau baseline `1e53a63`, tách khỏi các bảng runtime/integration lịch sử bên dưới. Saturation vẫn trả `false` nhưng không gọi `onResult(false)` khi không chạy check; regression giữ slot bằng raw operation đã kiểm soát, xác nhận không thêm check/callback sai và probe thành công sau settlement. False result, synchronous throw, rejection và timeout thật vẫn báo failure.
+
+| Check | Kết quả sửa review |
+|---|---|
+| `node --import tsx --test apps/api/tests/dependency-lifecycle.test.ts` | PASS, exit 0, 8/8 tests, 0 skip, 3.9s. |
+| `npm run lint`; `npm run typecheck` | PASS, exit 0. |
+| `npm run test:unit` | PASS, exit 0, 198/198 tests, 0 skip, 4.6s. Thêm một saturation regression so với baseline 197 tests. |
+| `python scripts/check_docs.py`; `python scripts/build_docs.py`; `git diff --check` | PASS, exit 0; 478 local targets tồn tại, bỏ qua 158 external và 36 fragment-only links; portal gồm 24 documents. |
+
+Sandbox hạn chế loopback khiến lần đầu focused suite có 3 lỗi HTTP `fetch failed` và unit suite có 48 lỗi cùng loại; cả hai lệnh chạy lại với quyền loopback đã đạt như bảng. Không chạy lại integration/Compose/E2E cho sửa hẹp này; 54 integration tests cùng các bằng chứng runtime phía dưới thuộc baseline, không phải sửa review. Chưa commit/push hoặc có CI trên commit sửa mới; independent review của sửa này còn chờ coordinator.
 
 ## Thay đổi v1.1
 
@@ -67,7 +80,7 @@ HTTP enqueue có tối đa 4 raw operations, caller deadline 1500ms, slot giữ 
 
 Full503 khi Redis lỗi là expected; Compose read healthy không chứng minh HA/load-balancer production. Rollback đồng bộ API/worker + Compose routing về baseline, không xóa raw/outbox/revision/queue/volume hoặc reset attempts. Commit chỉ sau checks/review, DONE sau merge do user quản lý.
 
-Không có soak/load test hoặc cam kết recovery SLO; thời lượng bên trên là runner/scenario duration, không phải latency percentile production. Windows local Python là 3.10, Node 22; CI Python 3.12 và Linux runner vẫn cần remote evidence trên SHA sau commit/push. Original brief giữ SHA-256 `21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`; diff không thay `apps/web`, lockfile, schemas, contract/identity/digest implementations, auth hay config. Ba P2 documents tiếp tục untracked và không chỉnh sửa trong A4.
+Không có soak/load test hoặc cam kết recovery SLO; thời lượng bên trên là runner/scenario duration, không phải latency percentile production. Windows local Python là 3.10, Node 22; CI Python 3.12 và Linux runner đã PASS trên baseline `1e53a63` như liên kết đầu báo cáo; sửa review sau baseline cần remote evidence riêng trên commit mới. Original brief giữ SHA-256 `21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`; diff không thay `apps/web`, lockfile, schemas, contract/identity/digest implementations, auth hay config. Ba P2 documents tiếp tục untracked và không chỉnh sửa trong A4.
 
 **Cleanup hiện tại · coordinator · 22/10/2026:** lần đầu chưa thể xác minh vì Docker Linux engine đã dừng. Sau khi khởi động lại Docker, coordinator xác minh cả sáu container thuộc project `mp-a4-test-regression`, config file `E:/Project/Market-Pulse/compose.a4-test.yaml` và working directory `E:/Project/Market-Pulse`; năm container có đúng suite label, collector cũ thiếu suite label nhưng khớp chính xác project/config/working directory. Cả hai volume Mongo/Redis của A4 khớp project và suite labels. `docker compose down --remove-orphans` (không `-v`) đã xóa sáu container và network; lệnh xóa riêng hai test volumes đã xác minh ownership thoát `0`. Cleanup project test này đã hoàn tất; bằng chứng cleanup lịch sử bên dưới vẫn giữ nguyên.
 
@@ -146,4 +159,6 @@ Bảng dưới đây ghi lại toàn bộ các lệnh kiểm tra đã thực thi
 
 Finding tài liệu còn lại: bảng health trong `LOCAL_DEVELOPMENT.md` gộp API/worker `/health/live` thành liveness `alive`, trong khi `createWorkerHealthHandler` bỏ qua path và luôn trả readiness `ready`/`not_ready`. Correction giới hạn liveness cho API, ghi rõ worker port `3002` chỉ có readiness trên mọi path, và không hứa HTTP `503` khi shutdown đã đóng listener. Báo cáo lịch sử phía trên từng ghi nhầm worker /health/live là alive; đây là sai sót tài liệu lịch sử, không phải hành vi runtime, và được correction này thay thế.
 
-Final independent review · GPT-6 Astra · 22/10/2026: runbook corrections verified against worker readiness handler and shutdown behavior; historical report error explicitly corrected. No remaining findings in this final review. Approved for A4-only local commit, excluding three P2 documents. Runtime suite results remain attributed to implementation worker; prior 10-test focused verification remains attributed to earlier independent review. Remote CI, push/PR and user merge remain pending; A4 is not DONE.
+Final independent review trước commit · GPT-6 Astra · 22/10/2026: runbook corrections verified against worker readiness handler and shutdown behavior; historical report error explicitly corrected. No remaining findings at that review. Approved for A4-only local commit, excluding three P2 documents. Runtime suite results remain attributed to implementation worker; prior 10-test focused verification remains attributed to earlier independent review.
+
+**Cập nhật acceptance hiện tại · 22/10/2026:** baseline `1e53a63` đã commit/push, PR #39 đang mở và cả Application/Documentation CI trên baseline đều PASS (liên kết đầu báo cáo). Các sửa sau CodeRabbit giữ saturation response `false` nhưng không đánh dấu dependency hỏng khi chưa chạy check mới; regression giữ raw-operation slot và kiểm tra tracker/callback, cùng corrections runbook/architecture/status. Chúng chưa commit/push, CI trên commit sửa mới và user merge còn chờ; A4 chưa DONE. Các bảng kiểm tra lịch sử phía trên giữ nguyên bằng chứng của từng lần chạy.

@@ -246,7 +246,7 @@ flowchart LR
 
 | Area | Code and ownership today | Important limit |
 |---|---|---|
-| Composition | `apps/api/src/server.ts`, `health.ts`, `stores.ts`, `dependency-lifecycle.ts`, `config.ts`; `worker.ts` composes the separate process | Cold start requires both MongoDB and Redis; post-startup Redis loss keeps the API process alive, lowers full readiness (`GET /health/ready` -> 503), preserves fixture/Mongo capability probes and reads, and auto-reconnects with bounded backoff. |
+| Composition | `apps/api/src/server.ts`, `health.ts`, `stores.ts`, `dependency-lifecycle.ts`, `config.ts`; `worker.ts` composes the separate process | API cold start requires MongoDB and required initialization; Redis is optional and reconnects with bounded backoff while initialized reads remain available. Full readiness (`GET /health/ready`) remains 503 during Redis loss. Worker cold start requires both MongoDB and Redis and may need supervised restart after exhausting its startup budget. |
 | Accounts / watchlist | `auth.ts`, `watchlists.ts`; MongoDB `users`, `sessions`, `watchlists` | Auth rate limiting and KDF concurrency guards are in process, **not Redis-backed**. Sessions and ownership are Mongo-backed; this is the bounded local auth slice. |
 | Fixture market reads | `fixture-market-data-provider.ts`, `stock-search.ts`, `daily-history.ts` | Search/history/default web views read the packaged fixture, not ingestion collections. |
 | Ingestion contracts | `ingestion-contract.ts`, `gold-contract.ts`, `packages/schemas`; shared JSON primitives in `platform/contracts/json.ts`; validated-family classifier in `ingestion-contract.ts` on A3; Python validators and shared parity corpora | Strict fixture v1, observed candle v2 and synthetic gold v1 are different payload families; version alone cannot distinguish both v1 families, and wire discriminators are rejected. |
@@ -335,8 +335,8 @@ flowchart TD
 
 ### Dependency and failure matrix
 
-This table identifies the dependency a capability actually uses and the future
-failure boundary to validate; it does not change today's all-dependency gate.
+This table identifies the dependency a capability actually uses, the historical
+pre-A4 constraint and the implemented A4 failure boundary.
 
 | Capability | Direct work dependencies | Pre-A4 baseline constraint | Implemented A4 behavior (`ci/dependency-health-recovery`) |
 |---|---|---|---|
@@ -351,16 +351,17 @@ failure boundary to validate; it does not change today's all-dependency gate.
 `GET /health/ready` currently probes Mongo and Redis plus application initialization;
 the worker has its own loopback readiness listener on port 3002. Keep full readiness
 as **all enabled required dependencies and initialization**, distinct from liveness.
-A4 will define capability-specific readiness for reads, ingestion and worker work,
-with sanitized dependency status and tests for startup, loss and restoration.
-It must also change the current Redis shutdown/reconnect behavior if degraded
-reads are to survive. Do not merely remove a readiness check.
+A4 implements capability-specific readiness for reads, ingestion and worker work,
+sanitized dependency status, and tests for startup, loss and restoration. The API
+survives Redis loss and reconnects automatically; initialized fixture reads also
+remain available when Redis is absent at API startup.
 
-Compose currently uses full API readiness; a deployment/load balancer using that
-same probe may remove the entire instance during Redis loss. Capability readiness
-does not by itself make degraded reads reachable. Validate deployment routing or
-a separate read-serving arrangement before claiming external availability. No
-production load-balancer behavior has been demonstrated by A1.
+Compose uses API `/health/read-ready` (an alias for fixture readiness), and actual
+Compose tests verified direct HTTP and local Vite `/api` proxy reads during cold
+and runtime Redis outages. A production deployment/load balancer using full
+readiness may still remove the entire instance during Redis loss. Validate that
+deployment's routing before claiming external availability; production
+load-balancer behavior remains unverified.
 
 ## Future source, news, AI and forecast flow
 
@@ -424,7 +425,7 @@ task may publish a validated report/probability artifact to the app.
 | A2 · ingestion primitives | Shared JSON primitives extracted; domain rules remain local | Existing Node/Python parity, identities/hashes, decimals/microseconds and ingestion tests remain authoritative; local checks, independent GPT-6 Astra review and merged baseline CI passed as recorded above. Revert extraction if parity changes; no bulk migration. |
 | A3 · family dispatch | Explicit internal classification/dispatch of **validated legacy payloads** on the working branch | Preserves all three existing envelopes, digests, delivery IDs, queue IDs and BullMQ job names; tests verify replay/recovery, legacy nonterminal outbox rows without `family`, and invalid-contract isolation. Local checks passed and independent GPT-6 Astra review approved on 20/10/2026 as recorded above; remote CI pending. Revert code without data rewrite. |
 | P2.1 · source research | Decide allowed news fields, purpose-specific rights and retention | Research only; no new collector or automatic jobs. |
-| A4 · dependency health/recovery | Implemented on `ci/dependency-health-recovery`: post-startup Redis survival + bounded reconnect, capability probes (`/health/ready/fixture`, `/health/ready/mongo`, `/health/ready/ingestion`), worker probe/reconcile guards, and isolated container outage/recovery tests | Verified locally across 193 unit tests, 51 integration tests (including 7 real-process isolated container outage/recovery scenarios), Compose smoke/replay and E2E; independent Codex review and remote CI pending. Roll back to prior API/worker pair if regression; no data migration. |
+| A4 · dependency health/recovery | Implemented on `ci/dependency-health-recovery`: optional Redis at API startup, Redis survival + bounded reconnect, read/capability probes, worker probe/reconcile guards, and isolated container outage/recovery tests | Baseline `1e53a63` evidence: 197 unit and 54 integration tests, Compose smoke/replay and E2E; independent GPT-6 Astra review approved and both baseline remote CI workflows passed. PR #39 remains open; review-fix CI and user merge remain pending. See the [A4 report](A4_IMPLEMENTATION_REPORT.md) for baseline evidence and separately recorded follow-up checks; these counts are not a new full-suite run for the fixes. Roll back to prior API/worker pair if regression; no data migration. |
 
 The classifier inspects a payload only after its existing strict validation,
 yielding an internal family (`fixture-market`, `observed-candle` or

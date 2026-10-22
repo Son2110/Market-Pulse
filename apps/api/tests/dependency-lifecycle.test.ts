@@ -137,6 +137,53 @@ test("capability probes separate liveness, full readiness, fixture, mongo, and i
   );
 });
 
+test("saturated probe preserves healthy dependency state while a successful check holds a raw operation slot", async () => {
+  const tracker = createDependencyHealthTracker({ mongo: true, redis: true });
+  const results: boolean[] = [];
+  let checksStarted = 0;
+  let releaseOperation!: () => void;
+  const heldOperation = new Promise<void>((resolve) => {
+    releaseOperation = resolve;
+  });
+  const boundedProbe = createBoundedProbe(
+    () => {
+      checksStarted += 1;
+      if (checksStarted === 1) {
+        void trackOperation(() => heldOperation);
+      }
+      return true;
+    },
+    {
+      timeoutMs: 1000,
+      maxInFlight: 1,
+      onResult: (ready) => {
+        results.push(ready);
+        tracker.markMongo(ready);
+      },
+    },
+  );
+
+  try {
+    assert.equal(await boundedProbe.probe(), true);
+    assert.equal(boundedProbe.inFlight, 1);
+    assert.deepEqual(results, [true]);
+    assert.equal(await boundedProbe.probe(), false);
+    assert.equal(checksStarted, 1, "saturation must not start another dependency check");
+    assert.deepEqual(results, [true], "saturation must not report a dependency failure");
+    assert.equal(tracker.isMongoHealthy(), true);
+  } finally {
+    releaseOperation();
+  }
+
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(boundedProbe.inFlight, 0);
+  assert.equal(await boundedProbe.probe(), true);
+  assert.equal(checksStarted, 2);
+  assert.deepEqual(results, [true, true]);
+  assert.equal(tracker.isMongoHealthy(), true);
+  assert.equal(boundedProbe.inFlight, 0);
+});
+
 test("bounded probe holds slots across multiple timeout cycles until real settlement, ignores late resolve/reject, and recovers", async () => {
   const baseState = {
     shuttingDown: false,
@@ -156,15 +203,21 @@ test("bounded probe holds slots across multiple timeout cycles until real settle
     false,
   );
 
-  // Synchronous throw in probe check
-  const syncThrowProbe = createBoundedProbe(() => {
-    throw new Error("secret://mongo-internal-uri");
-  });
-  assert.equal(await syncThrowProbe.probe(), false);
-  assert.equal(syncThrowProbe.inFlight, 0);
+  for (const check of [
+    () => false,
+    () => { throw new Error("secret://mongo-internal-uri"); },
+    () => Promise.reject(new Error("dependency rejected")),
+  ]) {
+    const results: boolean[] = [];
+    const failedProbe = createBoundedProbe(check, { onResult: (ready) => results.push(ready) });
+    assert.equal(await failedProbe.probe(), false);
+    assert.deepEqual(results, [false]);
+    assert.equal(failedProbe.inFlight, 0);
+  }
 
   // Multi-cycle timeout regression: slots remain held until real operations settle
   const tracker = createDependencyHealthTracker({ mongo: true, redis: true });
+  const results: boolean[] = [];
   let activeUnderlying = 0;
   let maxConcurrentUnderlying = 0;
   let totalUnderlyingStarted = 0;
@@ -199,7 +252,10 @@ test("bounded probe holds slots across multiple timeout cycles until real settle
     {
       timeoutMs: 30,
       maxInFlight: 2,
-      onResult: (ok) => tracker.markMongo(ok),
+      onResult: (ok) => {
+        results.push(ok);
+        tracker.markMongo(ok);
+      },
     },
   );
 
@@ -207,6 +263,7 @@ test("bounded probe holds slots across multiple timeout cycles until real settle
   const cycle1 = await Promise.all([boundedProbe.probe(), boundedProbe.probe()]);
   assert.deepEqual(cycle1, [false, false]);
   assert.equal(tracker.isMongoHealthy(), false);
+  assert.deepEqual(results, [false, false], "timed-out checks must report dependency failure");
   assert.equal(boundedProbe.inFlight, 2, "slots must NOT be released on timeout before operation settles");
   assert.equal(activeUnderlying, 2);
   assert.equal(totalUnderlyingStarted, 2);
@@ -254,6 +311,7 @@ test("bounded probe holds slots across multiple timeout cycles until real settle
   assert.equal(boundedProbe.inFlight, 0);
   assert.equal(totalUnderlyingStarted, 3);
   assert.equal(maxConcurrentUnderlying, 2);
+  assert.deepEqual(results, [false, false, true]);
 });
 
 test("nested bounded probes and trackOperation hold both outer and inner slots until raw I/O settles and prevent late-resolve races", async () => {

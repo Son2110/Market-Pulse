@@ -307,7 +307,7 @@ The output records fixture source mode, freshness and row counts. Invalid fixtur
 
 ## Run app processes on the host
 
-To run Vite and the API outside containers, start only their dependencies first because the API exits after its bounded startup retries if a dependency is unavailable:
+To run Vite and the API outside containers, start their dependencies first. API startup requires MongoDB and required initialization, and exits after bounded retries if those fail. Redis is optional for API startup: initialized reads remain available while Redis reconnects; full readiness remains unavailable until Redis recovers. Worker startup requires both stores:
 
 ```powershell
 docker compose up -d mongodb redis
