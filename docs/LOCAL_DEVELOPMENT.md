@@ -307,7 +307,7 @@ The output records fixture source mode, freshness and row counts. Invalid fixtur
 
 ## Run app processes on the host
 
-To run Vite and the API outside containers, start their dependencies first. API startup requires MongoDB and required initialization, and exits after bounded retries if those fail. Redis is optional for API startup: initialized reads remain available while Redis reconnects; full readiness remains unavailable until Redis recovers. Worker startup requires both stores:
+To run Vite and the API outside containers, start their dependencies first. API startup requires MongoDB and required initialization. Only the MongoDB connection is retried with a bounded budget; required initialization failures immediately fail closed without retrying initialization. Redis is optional for API startup: initialized reads remain available while Redis reconnects; full readiness remains unavailable until Redis recovers. Worker startup requires both stores:
 
 ```powershell
 docker compose up -d mongodb redis
@@ -322,7 +322,7 @@ If the full Compose stack is already running, stop its API and web containers fi
 
 ### Health, capability readiness and dependency recovery (A4 v1.1 · 22/10/2026)
 
-On the A4 v1.1 candidate, API startup requires Mongo and required initialization, with bounded fail-closed retry, but serves initialized fixture reads while Redis reconnects. Worker startup still needs both stores and may require supervised retry. `/health/read-ready` aliases fixture readiness. `/health/capabilities` returns sanitized ready/unavailable/disabled labels; worker is unknown here, use worker readiness. See [candidate evidence](A4_IMPLEMENTATION_REPORT.md).
+On the A4 v1.1 candidate, API startup requires Mongo and required initialization. Only the MongoDB connection is retried with a bounded budget; required initialization failures immediately fail closed without retrying initialization. The API serves initialized fixture reads while Redis reconnects. Worker startup still needs both stores and may require supervised retry. `/health/read-ready` aliases fixture readiness. `/health/capabilities` returns sanitized ready/unavailable/disabled labels; worker is unknown here, use worker readiness. See [candidate evidence](A4_IMPLEMENTATION_REPORT.md).
 
 The API starts Redis health recovery and the optional BullMQ producer only after Mongo and required indexes/catalogs initialize. This ordering keeps a missing Redis hostname from delaying Mongo startup through concurrent DNS resolution. The isolated Compose regression starts API/web with Redis absent, verifies read health/routing and durable acceptance, then restores Redis/worker without restarting the API.
 
