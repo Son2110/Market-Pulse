@@ -1,17 +1,40 @@
 import { timingSafeEqual } from "node:crypto";
 import express from "express";
+import { isMongoDependencyError } from "./platform/dependencies/dependency-status.js";
+import { withinTimeout } from "./platform/health/dependency-probes.js";
 import { classifyPayload } from "./ingestion-contract.js";
 import { ContractError, digest, strictJson } from "./platform/contracts/json.js";
 import { DeliveryConflict, IngestionStore, receipt } from "./ingestion-store.js";
 
-async function boundedEnqueue(operation: Promise<void>): Promise<void> {
-  let timer: NodeJS.Timeout | undefined;
-  try { await Promise.race([operation, new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("enqueue_timeout")), 1500); })]); }
-  finally { clearTimeout(timer); }
+export function createBoundedEnqueue(enqueue: (id: string, digest: string, signal: AbortSignal) => Promise<void>, timeoutMs = 1500, maxInFlight = 4) {
+  let active = 0;
+  return async (id: string, digest: string) => {
+    if (active >= maxInFlight) throw new Error("enqueue_capacity");
+    active += 1;
+    const controller = new AbortController();
+    const operation = Promise.resolve().then(() => enqueue(id, digest, controller.signal)).finally(() => { active -= 1; });
+    try { await withinTimeout(() => operation, timeoutMs, "enqueue_timeout"); }
+    finally { controller.abort(); }
+  };
 }
 
-export function createIngestionApi({ store, secret, isReady, enqueue }: { store: IngestionStore; secret?: string; isReady: () => boolean; enqueue: (id: string, digest: string) => Promise<void> }) {
+export function createIngestionApi({
+  store,
+  secret,
+  isReady,
+  enqueue,
+  enqueueTimeoutMs = 1500,
+  onMongoResult,
+}: {
+  store: IngestionStore;
+  secret?: string;
+  isReady: () => boolean;
+  enqueue: (id: string, digest: string, signal: AbortSignal) => Promise<void>;
+  enqueueTimeoutMs?: number;
+  onMongoResult?: (ready: boolean) => void;
+}) {
   const router = express.Router();
+  const boundedEnqueue = createBoundedEnqueue(enqueue, enqueueTimeoutMs);
   router.use((_request, response, next) => { response.set("Cache-Control", "no-store"); next(); });
   router.use((request, response, next) => {
     if (!secret) { response.status(503).json({ error: "ingestion_disabled" }); return; }
@@ -25,8 +48,12 @@ export function createIngestionApi({ store, secret, isReady, enqueue }: { store:
     if (!/^[a-zA-Z0-9_-]{1,100}$/.test(request.params.id)) { response.status(400).json({ error: "invalid_delivery_id" }); return; }
     try {
       const delivery = await store.deliveries.findOne({ _id: request.params.id });
+      onMongoResult?.(true);
       response.status(delivery ? 200 : 404).json(delivery ? receipt(delivery) : { error: "not_found" });
-    } catch { response.status(503).json({ error: "ingestion_unavailable" }); }
+    } catch (error) {
+      if (isMongoDependencyError(error)) onMongoResult?.(false);
+      response.status(503).json({ error: "ingestion_unavailable" });
+    }
   });
   router.post("/deliveries", (request, response, next) => {
     if (!/^application\/json(?:\s*;\s*charset=utf-8)?$/i.test(request.headers["content-type"] ?? "") || (request.headers["content-encoding"] && request.headers["content-encoding"] !== "identity")) { response.status(415).json({ error: "unsupported_media_type" }); return; }
@@ -43,13 +70,22 @@ export function createIngestionApi({ store, secret, isReady, enqueue }: { store:
       const classified = classifyPayload(payload);
       if (digest(payload) !== payloadDigest) throw new ContractError();
       const delivery = await store.accept(deliveryId, payloadDigest, classified.payload);
+      onMongoResult?.(true);
       console.info(JSON.stringify({ event: "ingestion_receipt", deliveryId, provider: delivery.provider, status: delivery.status, attempt: delivery.attempts, counts: delivery.counts }));
-      if (["accepted", "queued", "running"].includes(delivery.status)) { try { await boundedEnqueue(enqueue(deliveryId, payloadDigest)); } catch { console.warn(JSON.stringify({ event: "ingestion_enqueue_deferred", deliveryId, provider: delivery.provider, status: delivery.status })); } }
-      const current = await store.deliveries.findOne({ _id: deliveryId });
+      if (["accepted", "queued", "running"].includes(delivery.status)) {
+        try {
+          await boundedEnqueue(deliveryId, payloadDigest);
+        } catch {
+          console.warn(JSON.stringify({ event: "ingestion_enqueue_deferred", deliveryId, provider: delivery.provider, status: delivery.status }));
+          console.warn(JSON.stringify({ event: "queue_dispatch_deferred", role: "api", service: "redis", deliveryId }));
+        }
+      }
+      const current = await store.deliveries.findOne({ _id: deliveryId }).catch(() => null);
       response.status(202).json(receipt(current ?? delivery));
     } catch (error) {
       if (error instanceof DeliveryConflict) { response.status(409).json({ error: "delivery_identity_conflict" }); return; }
       if (error instanceof ContractError || error instanceof SyntaxError || error instanceof TypeError) { response.status(400).json({ error: "invalid_contract" }); return; }
+      if (isMongoDependencyError(error)) onMongoResult?.(false);
       response.status(503).json({ error: "ingestion_unavailable" });
     }
   });

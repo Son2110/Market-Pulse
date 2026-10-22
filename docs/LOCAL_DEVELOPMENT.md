@@ -307,7 +307,7 @@ The output records fixture source mode, freshness and row counts. Invalid fixtur
 
 ## Run app processes on the host
 
-To run Vite and the API outside containers, start only their dependencies first because the API exits after its bounded startup retries if a dependency is unavailable:
+To run Vite and the API outside containers, start their dependencies first. API startup requires MongoDB and required initialization. Only the MongoDB connection is retried with a bounded budget; required initialization failures immediately fail closed without retrying initialization. Redis is optional for API startup: initialized reads remain available while Redis reconnects; full readiness remains unavailable until Redis recovers. Worker startup requires both stores:
 
 ```powershell
 docker compose up -d mongodb redis
@@ -318,7 +318,37 @@ npm run dev:api
 
 If the full Compose stack is already running, stop its API and web containers first to free ports 3001 and 5173. In a second terminal, run `npm run dev:web`. Host processes default to loopback. Vite proxies `/api` to `http://127.0.0.1:3001` by default; if the host API uses another port, set `$env:API_PROXY_TARGET="http://127.0.0.1:3002"` in the web terminal before starting Vite. This variable configures the development server, is not a `VITE_*` client value, and contains no credential. No broad CORS policy or production hosting is introduced. The API reads `MONGODB_URL`, `REDIS_URL`, `PORT`, `HOST`, and the `AUTH_*` settings from the process environment; Node scripts do not load `.env` automatically, and the default URLs match the Compose database ports. Stop each foreground process with Ctrl+C. If the API exhausts startup retries, check the database containers and start the API again.
 
-After Redis disconnects, the API exits and Compose attempts up to five restarts. MongoDB readiness failures return 503 while `/health/live` remains available. If the Redis restart limit is exhausted, recover the API with `docker compose up -d --force-recreate api`; the database volumes remain untouched.
+**Pre-A4 historical note:** prior to A4, after Redis disconnected, the API exited and Compose attempted up to five restarts.
+
+### Health, capability readiness and dependency recovery (A4 v1.1 · 22/10/2026)
+
+On the A4 v1.1 candidate, API startup requires Mongo and required initialization. Only the MongoDB connection is retried with a bounded budget; required initialization failures immediately fail closed without retrying initialization. The API serves initialized fixture reads while Redis reconnects. Worker startup still needs both stores and may require supervised retry. `/health/read-ready` aliases fixture readiness. `/health/capabilities` returns sanitized ready/unavailable/disabled labels; worker is unknown here, use worker readiness. See [candidate evidence](A4_IMPLEMENTATION_REPORT.md).
+
+The API starts Redis health recovery and the optional BullMQ producer only after Mongo and required indexes/catalogs initialize. This ordering keeps a missing Redis hostname from delaying Mongo startup through concurrent DNS resolution. The isolated Compose regression starts API/web with Redis absent, verifies read health/routing and durable acceptance, then restores Redis/worker without restarting the API.
+
+All health endpoints return sanitized JSON with `Cache-Control: no-store` and bound each dependency check to `DEPENDENCY_TIMEOUT_MS` (default `1000` ms) and at most 4 concurrent in-flight probes (retaining each in-flight slot until the underlying operation and any tracked child operations settle, and ignoring late completions after a timeout):
+
+| Endpoint | Process / port | Ready (`200`) condition | Not ready (`503`) condition |
+|---|---|---|---|
+| `GET /health/live` | API (`3001`) | `{"status":"alive"}` while the API HTTP server accepts the request. | No dependency readiness check; a stopped process or closed listener does not guarantee an HTTP `503`. |
+| `GET /health/ready` | API (`3001`) | `{"status":"ready"}` when fixture market data, stock search, auth, watchlists, optional `IngestionStore` (when `INGESTION_SECRET` is set), live MongoDB ping and live Redis ping all succeed. | `{"status":"not_ready"}` if any required initialization, live MongoDB check or live Redis check fails. |
+| `GET /health/ready/fixture` | API (`3001`) | `{"status":"ready"}` when packaged fixture market data and the 10-equity search catalog are initialized (independent of MongoDB and Redis). | `{"status":"not_ready"}` if fixture initialization failed or the server is shutting down. |
+| `GET /health/ready/mongo` | API (`3001`) | `{"status":"ready"}` when auth, watchlists and fixture catalog are initialized and the live MongoDB probe succeeds (independent of Redis). | `{"status":"not_ready"}` if initialization failed, MongoDB is unreachable/timed out, or the server is shutting down. |
+| `GET /health/ready/ingestion` | API (`3001`) | `{"status":"ready"}` only when `INGESTION_SECRET` is configured, `IngestionStore` is initialized, and the live MongoDB probe succeeds (independent of Redis). | `{"status":"not_ready"}` when `INGESTION_SECRET` is unset, `IngestionStore` is uninitialized, MongoDB is down, or the server is shutting down. |
+| Any path, including `GET /`, `GET /health/ready` and `GET /health/live` (worker readiness) | Worker loopback (`127.0.0.1:3002`) | `{"status":"ready"}` when `IngestionStore` is initialized, the BullMQ worker is running, live MongoDB and worker/producer Redis pings succeed, and outbox reconciliation succeeded within `reconcileIntervalMs * 3`. | `{"status":"not_ready"}` on dependency loss, probe timeout/throw, stopped worker, or stale/failed reconciliation. |
+
+The worker health handler ignores the request path: port `3002` exposes readiness only, including at `/health/live`; it has no separate liveness response. Shutdown closes the API and worker HTTP listeners, so a connection failure or reset may occur instead of an HTTP `503`.
+
+After a healthy startup:
+- **Redis loss and automatic recovery:** the API process stays alive on the same PID. `GET /health/live`, `GET /health/ready/fixture`, `GET /health/ready/mongo` and `GET /health/ready/ingestion` remain `200` (when `INGESTION_SECRET` is set and MongoDB is up), while full `GET /health/ready` reports `503`. Fixture reads, stored observed/gold reads, auth/watchlist routes (both directly and through the real Vite `/api` proxy), and durable ingestion acceptance (`202` after MongoDB write, deferring queue work to the outbox) remain operational. Health, API producer, and worker producer Redis clients disable offline command queueing (`disableOfflineQueue: true`) and reconnect automatically with bounded linear step backoff (`100ms, 200ms, ..., 1000ms` cap), restoring `GET /health/ready` and worker outbox processing without restarting the API or worker process.
+- **MongoDB loss and automatic recovery:** `GET /health/ready`, `GET /health/ready/mongo`, `GET /health/ready/ingestion` and worker health return `503`, and auth/watchlist/stored-read/ingestion routes fail closed with `503` (never acknowledging `202` before a durable MongoDB write), while `GET /health/ready/fixture` and fixture routes continue to return `200`. When MongoDB returns, live re-probing automatically restores both the health probes and real route requests on the same PID.
+- **Local routing limit:** Vite (`apps/web/vite.config.ts`) proxies only `/api` (health probes must be queried directly on the API/worker ports because `/health/*` on Vite returns the SPA HTML shell), and `compose.yaml` now uses fixture-only `GET /health/read-ready` for API health, with no Redis health startup gate; full readiness remains a separate monitoring signal. Local direct and Vite proxy verification do not prove that an external production load balancer will continue routing traffic to an instance whose full readiness probe is `503`.
+
+To run the isolated real-process and container outage/recovery integration suite (which provisions its own `mp-a4-test-*` Docker Compose stack via `compose.a4-test.yaml` without touching the default `marketpulse` stack or user volumes):
+
+```powershell
+npm run test:recovery:integration
+```
 
 ## Checks
 

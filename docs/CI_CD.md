@@ -65,8 +65,9 @@ phủ gold UI (chưa có), news/AI, outage Redis, nguồn live hoặc production
 Task runtime mới chạy các check hiện có phù hợp và bổ sung coverage cho hành vi
 mới khi cần; giữ core E2E search → chart → watchlist, negative ownership và
 integration replay/retry. [A4 trong roadmap](ROADMAP.md) phải kiểm tra dependency
-health/recovery trước P2.2 hoặc collector tự động. Redis mất kết nối hiện làm API
-shutdown; CI baseline không chứng minh degraded reads hoặc load-balancer routing.
+health/recovery trước P2.2 hoặc collector tự động. Candidate A4 v1.1 thêm recovery suite cô lập trong `test:integration` (file serial),
+gồm Compose API/web cold Redis-down và read health/routing. CI baseline không
+nghiệm thu candidate mới hoặc chứng minh load-balancer production.
 Vercel Preview là hướng triển khai tương lai, không phải check đang hoạt động;
 chỉ dùng dữ liệu có quyền và không đưa khóa provider vào preview.
 

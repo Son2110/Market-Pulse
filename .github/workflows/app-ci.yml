@@ -64,6 +64,7 @@ jobs:
       - name: Validate Compose configuration and build services
         run: |
           docker compose config --quiet
+          docker compose -f compose.a4-test.yaml config --quiet
           docker compose --profile collector build
       - name: Start local stack and wait for healthy services
         run: docker compose up --build --detach --wait
@@ -73,6 +74,9 @@ jobs:
           const checks = [
             ["http://127.0.0.1:3001/health/live", '"status":"alive"'],
             ["http://127.0.0.1:3001/health/ready", '"status":"ready"'],
+            ["http://127.0.0.1:3001/health/ready/fixture", '"status":"ready"'],
+            ["http://127.0.0.1:3001/health/ready/mongo", '"status":"ready"'],
+            ["http://127.0.0.1:3001/health/ready/ingestion", '"status":"ready"'],
             ["http://127.0.0.1:5173/", '<div id="root"></div>'],
             ["http://127.0.0.1:5173/stocks/FPT", '<div id="root"></div>'],
             ["http://127.0.0.1:5173/market", '<div id="root"></div>'],
