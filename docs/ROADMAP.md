@@ -1,10 +1,34 @@
-# Lộ trình MarketPulse VN — cập nhật 22/10/2026
+# Lộ trình MarketPulse VN — cập nhật 26/10/2026
+
+## Kế hoạch hiện hành — chiều sâu core với dữ liệu thật
+
+**Quyết định chủ dự án · 26/10/2026:** hủy toàn bộ dự đoán giá AI/ML và nghiên cứu P5, gồm xác suất, training/backtest, holdout/calibration và shadow. Không đổi tên forecast thành một task khác. AI phân loại/tóm tắt không dự báo là tùy chọn hoãn, không là điều kiện hoàn tất app. Giữ modular monolith và foundation A1–A4 đã merge. Baseline tài liệu hiện tại là [PR #40](https://github.com/Son2110/Market-Pulse/pull/40) tại `ce7c181`; không có xác minh CI mới trong lần sửa scope này.
+
+**Nghiệm thu sản phẩm phải dùng dữ liệu thật.** EOD hoặc dữ liệu trễ được chấp nhận nếu ghi đúng nguồn, đơn vị/tiền tệ, timezone, source as-of, collectedAt, freshness, coverage và giới hạn. Không cam kết realtime. Fixture/synthetic chỉ dùng kiểm thử và demo kỹ thuật có nhãn; không là fallback, không đổi nhãn thành dữ liệu thật và không hoàn tất sản phẩm khi nguồn chưa đạt. Bằng chứng fixture/P0 trước đây giữ nguyên phạm vi kỹ thuật của nó.
+
+Làm một task tại một thời điểm với một worker; kiểm tra và review độc lập xong trước task tiếp. Đây là thứ tự thay thế lịch P0–P6 bên dưới:
+
+| Thứ tự | Task serial | Cổng kết thúc trước bước kế tiếp |
+|---|---|---|
+| 1 — kế tiếp | Audit dữ liệu thật có giới hạn cho **FPT + VNINDEX** qua đường Vnstock/KBS hiện có | Bằng chứng truy cập có ngày; đơn vị/precision, ngữ nghĩa timestamp/timezone/lịch phiên, adjustment, volume, freshness/cadence và coverage/gap. Lập ma trận quyền riêng cho truy cập tự động, lưu, hiển thị local/public, history/backfill và retention/xóa; allow/deny/unknown phải có evidence, unknown đóng đúng mục đích. Probe 06/10 chỉ là lịch sử, không chứng minh trạng thái hiện tại. Task audit phải định rõ phạm vi truy cập được phép trước mọi probe, không tự quét hoặc mở rộng rổ mã. |
+| 2 | Correctness và persistence cho dữ liệu thật đã qua cổng | Đối chiếu normalization/decimal/time, identity, revision/replay và ordering; kiểm tra restart/recovery cùng partial/failed batch. Stored reads phải nêu rõ có thể trộn delivery, không suy completeness/freshness từ latest hay receipt success; sửa vấn đề được chứng minh trong task riêng có giới hạn. |
+| 3 | Vận hành thu thập hằng ngày — chỉ mở sau cổng nguồn và bước 2 | Chốt cadence EOD/trễ, rate budget/quota, retry/backoff hữu hạn và dừng khi deny/challenge/rate-limit theo điều kiện nguồn; ghi lần thành công cuối, freshness/gap và lỗi, recovery/replay sau gián đoạn. A4 đã merge là nền tảng, không tự chứng minh collector có quyền hoặc scheduler sẵn sàng. |
+| 4 | Search → detail → overview → watchlist, từng trang một | Cùng catalog và dữ liệu thật đã lưu; không gọi provider trong public reads. Mỗi trang dùng UI/component/styles hiện có, QA responsive, loading/empty/error/retry, keyboard/focus/labels; giữ phân quyền watchlist và không fallback fixture. Chỉ hiện số liệu/returns có đủ ngữ nghĩa và bằng chứng. |
+| 5 | Nghiệm thu xuyên suốt bằng dữ liệu thật | Luồng search → detail/chart → overview → đăng nhập/watchlist/reload, đối chiếu nguồn/đơn vị/thời gian/freshness/coverage và revision; thử thiếu/stale/lỗi cùng recovery. Dùng checks hiện có phù hợp và review độc lập; test fixture trước đó không thay bằng chứng nghiệm thu này. |
+
+Chỉ mở thêm mã sau bằng chứng quyền, coverage, quota và chất lượng của rổ hiện tại; không mặc định hứa 10–20 mã hay toàn thị trường. News tiếng Việt và vàng SJC/nhẫn thật là các task **sau core**, có cổng nguồn riêng; blocker của chúng không chặn core cổ phiếu/chỉ số. P2.1 giữ `RESEARCHED_WITH_BLOCKERS`, P2.2 chưa mở. Rút đề xuất synthetic news làm tính năng kế tiếp; audit/catalog và mọi kết quả nguồn lịch sử giữ nguyên, xem [handoff](P2_NEWS_RESEARCH_HANDOFF.md).
+
+**Ước lượng:** các tổng cũ 174–266 giờ, 218–333 giờ / 15–34 tuần, ngân sách P0–P6 và ước lượng trao đổi 12–27 tuần đã bị thay thế, không là ước lượng còn lại hiện hành. Chỉ lập lại ước lượng sau audit dữ liệu thật đầu tiên, dựa trên khoảng trống thực tế và điều kiện nguồn; chưa chốt tổng giờ hoặc ngày hoàn thành mới.
+
+## Baseline và kế hoạch 13–22/10/2026 — lịch sử đã được thay thế
+
+Các bằng chứng triển khai/CI có ngày dưới đây giữ giá trị tại baseline được nêu. Thứ tự “kế tiếp”, cam kết pha bắt buộc, forecast/P5 và ước lượng trong kế hoạch cũ không còn hiệu lực; mục 26/10 phía trên quyết định công việc tiếp theo. Việc hủy forecast không sửa quan sát hoặc lệnh kiểm tra lịch sử. Đề xuất synthetic news ngày 22/10 bên dưới đã được rút theo sửa đổi 26/10; nó không còn là lựa chọn mở P2.2.
 
 **Trạng thái hiện hành · 22/10/2026:** A4 đã merge vào `main` qua [PR #39](https://github.com/Son2110/Market-Pulse/pull/39), baseline `654d177c9fdad148755da08d831748680879f1a0`. Xem [báo cáo A4](A4_IMPLEMENTATION_REPORT.md) và [requirements](MarketPulse_A4_Architecture_Requirements.md) cho bằng chứng triển khai. [Application CI](https://github.com/Son2110/Market-Pulse/actions/runs/39790104104) và [Documentation CI](https://github.com/Son2110/Market-Pulse/actions/runs/39790104334) trên baseline này đều thành công theo xác minh của coordinator ngày 22/10/2026; đây không phải lần chạy runtime A4 mới trong task đóng tài liệu P2.1.
 
 **P2.1 · `RESEARCHED_WITH_BLOCKERS` · 22/10/2026:** GPT-6 Astra chấp thuận đóng phần nghiên cứu tài liệu sau khi đọc [audit](P2_NEWS_SOURCE_AUDIT.md) và [14 bằng chứng](P2_NEWS_EVIDENCE_CATALOG.md): ba ứng viên RSS tiếng Việt và hai cổng chính thức bị chặn. Baseline khảo sát vẫn là `eb3a6b2` / 21/10/2026; không fetch nguồn mới. Đây không phải phê duyệt quyền publisher hoặc chứng nhận tuân thủ giới hạn một lượt đọc: catalog giữ nguyên 50 redirect tại SSC và hai lượt đọc chính sách bổ sung. **P2.2 chưa mở**; quyền automated collection, lưu DB, public redisplay, AI và training của cả ba nguồn vẫn `unknown` và đóng. Feature flag hay chấp thuận của chủ dự án không cấp quyền publisher; chỉ xét task kế tiếp sau quyết định quyền theo mục đích hoặc phương án synthetic fixture được chốt riêng. Xem [bàn giao và cổng kế tiếp](P2_NEWS_RESEARCH_HANDOFF.md).
 
-## Kế hoạch mở rộng hiện hành
+## Kế hoạch mở rộng 13–22/10 — lịch sử
 
 **Baseline lịch sử · 21/10/2026:** P1.4, A1, A2 và A3 đã merge vào `main`, mới nhất qua
 [PR #38](https://github.com/Son2110/Market-Pulse/pull/38) tại `eb3a6b2`. Nhánh làm việc
@@ -23,7 +47,7 @@ vàng thật P1.3B, public redisplay và training vẫn đóng. Các dòng “CI
 “P1.4/A3 chưa triển khai” có ngày cũ bên dưới là bằng chứng lịch sử, không là trạng
 thái hiện tại; CI baseline trên không tự nghiệm thu nhánh làm việc A3.
 
-### Foundation A1–A4 — thứ tự đã duyệt
+### Foundation A1–A4 — thứ tự đã duyệt trong lịch sử
 
 Bảng dưới giữ thứ tự kế hoạch đã duyệt. Tại 22/10/2026, A1–A4 đã merge; P2.1 được đóng ở mức `RESEARCHED_WITH_BLOCKERS` như ghi nhận đầu trang. Thứ tự dự kiến P2.1 → A4 là lịch sử kế hoạch, không có nghĩa A4 còn chờ. P2.2/P2.3 vẫn phải qua task và cổng quyền riêng.
 
@@ -207,7 +231,7 @@ khai collector, ingestion/storage P1.3A, read API P1.4 hoặc UI; cổng nguồn
 P1.3B vẫn đóng. Quy tắc định danh được làm rõ trong
 [thiết kế P1](GOLD_DATA_DESIGN_P1.md#p12-contract-implementation--16102026).
 
-Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba tuần cho công việc tiếp theo. Bản kế hoạch **24/09–14/10/2026, 21 ngày / 42 giờ** và mọi bằng chứng tiến độ bên dưới được giữ làm baseline lịch sử; ngày cũ không phải cam kết hoàn thành phạm vi mới. Xem [PRD mở rộng](PRD.md) và [nghiên cứu nguồn, AI và dự báo](PRODUCT_EXPANSION_RESEARCH.md). Các cập nhật triển khai có ngày ở trên là trạng thái hiện hành; baseline lịch sử bên dưới không tự đánh dấu hoàn tất các hạng mục mở rộng.
+Phần kế hoạch ưu tiên dưới đây từng thay lịch ba tuần, nay đã được thay thế bởi scope 26/10 ở đầu trang. Bản kế hoạch **24/09–14/10/2026, 21 ngày / 42 giờ** và mọi bằng chứng tiến độ được giữ làm baseline lịch sử; ngày cũ không phải cam kết hoàn thành phạm vi hiện hành. Xem [PRD](PRD.md) và [nghiên cứu nguồn, AI và dự báo lịch sử](PRODUCT_EXPANSION_RESEARCH.md). Không dùng các kế hoạch cũ để tự đánh dấu hoàn tất sản phẩm dữ liệu thật.
 
 **Baseline đã xác minh 13/10:** `origin/main` tại `1fc81a3b2e5e0c663cec8b8985c0435aefd8e3ee`; [PR #28](https://github.com/Son2110/Market-Pulse/pull/28) đã merge lúc 08:05:12 UTC. FR-04 FPT collection-status UI đã nằm trên main, nhưng MP-11/MP-12 và các FR gốc vẫn một phần; source as-of/freshness/completeness và quyền upstream public redisplay/deployment chưa được xác minh. MP-14 còn cần E2E được commit; MP-15 demo tái tạo vẫn cần nghiệm thu. Không suy ra hoàn tất core từ merge một lát cắt.
 
@@ -227,7 +251,9 @@ Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba 
 
 **Nhịp và ước lượng:** giả định một người làm **5 ngày/tuần × 2–3 giờ = 10–15 giờ/tuần**, một worker, các task nối tiếp. Sau nghiệm thu core fixture P0 ở trên, công sức kế hoạch còn lại cho P1–P6 là **174–266 giờ** triển khai và kiểm tra thông thường; cộng **25% buffer** cho review độc lập, sửa finding và dao động nhỏ thành khoảng **218–333 giờ**, tương đương **15–34 tuần công sức**. Đây chỉ là phép trừ ước lượng P0 cũ 24–36 giờ khỏi tổng trước cổng 198–302 giờ, không là đo năng suất mới hoặc deadline. Chờ quyền dữ liệu, mua/thu thập lịch sử, credential và shadow observation không nằm trong phép tính; shadow 8–12 tuần có thể kéo dài thời gian lịch. Đo lại sau mỗi cổng, không dùng 42 giờ cũ cho phạm vi mới.
 
-| Pha / ưu tiên | Công sức | Các task nhỏ làm serial | Cổng bàn giao và phụ thuộc |
+### P0–P6 và ước lượng — lịch sử, P5 đã hủy toàn bộ
+
+| Pha / ưu tiên | Công sức lịch sử | Các task nhỏ trong kế hoạch cũ | Cổng bàn giao và phụ thuộc lịch sử |
 |---|---|---|---|
 | P0 · Core local — đã qua GATE-5 trong scope fixture | Ước lượng trước gate: 24–36 giờ; không cộng vào phần còn lại | P0.1 giới hạn MP-12; P0.2 MP-14 E2E fixture và CI; P0.3 MP-15 startup/demo, GATE-5 | Core fixture có bằng chứng trên; review độc lập/CI nhánh tài liệu là bước riêng. MP-11/12 và nguồn live vẫn một phần/chưa xác minh. Không bắt buộc cache nếu chưa có nhu cầu và kiểm tra invalidation/expiry. |
 | P1 · Bắt buộc — dữ liệu vàng Việt Nam | 32–48 giờ (trong đó 16–24 giờ cho P1.2–P1.4 kỹ thuật local) | P1.1 nghiên cứu & khảo sát 3 nguồn; P1.2 contract + synthetic fixture; P1.3A ingestion pipeline & storage MongoDB; P1.4 API đọc dữ liệu đã lưu; P1.3B collector nguồn thật (có điều kiện mở lại) | Sau P0. Nghiên cứu & thiết kế P1.1–P1.4 hoàn tất tại [Thiết kế dữ liệu vàng P1](GOLD_DATA_DESIGN_P1.md). Cổng live source vẫn **TẠM CHẶN**; các task kỹ thuật P1.2–P1.4 thực hiện trên synthetic fixture có nhãn; collector thật P1.3B chỉ mở khi có văn bản thỏa thuận cấp phép. |
@@ -240,7 +266,7 @@ Phần này là kế hoạch ưu tiên hiện hành, thay lịch mục tiêu ba 
 
 P1 chỉ bắt đầu lưu quan sát thực khi cổng quyền, contract **và A4 dependency health/recovery** đạt; collector đã nghiệm thu có thể tự tích lũy dữ liệu khi người phát triển làm các pha sau. Đây là vận hành thu thập tự động, không là triển khai song song hoặc cho phép bỏ qua review. Không đảm bảo lịch sử thu mới sẽ đủ cho P5; thử khả năng mua/nhận lịch sử có quyền ngay ở P1.
 
-### Phạm vi cam kết và tiêu chí dừng
+### Phạm vi cam kết và tiêu chí dừng — lịch sử đã được thay thế
 
 News tiếng Việt, AI phân tích có nguồn và vàng **SJC + nhẫn trơn 9999** là các pha tương lai đã đưa vào kế hoạch, không còn là hạng mục hoãn vô thời hạn. “Bắt buộc” là cam kết bàn giao lát cắt và bằng chứng của pha, không cam kết nguồn sẽ cấp quyền hoặc mô hình sẽ dự báo tốt. Mỗi pha có thể tách thành PR nhỏ serial theo FR hiện có; P0–P6 là nhãn kế hoạch, không là FR mới hoặc tuyên bố hoàn tất FR gốc. Giữ quy trình branch/review/push và PR/merge do user quản lý trong [CODEX_WORKFLOW.md](CODEX_WORKFLOW.md).
 
@@ -249,7 +275,7 @@ News tiếng Việt, AI phân tích có nguồn và vàng **SJC + nhẫn trơn 9
 - Nếu AI gate chưa đạt: giữ tin gốc và dữ liệu deterministic, sửa lỗi rồi đánh giá lại trên tập độc lập; event chưa duyệt không public.
 - Nếu lịch sử/coverage/quyền training, chống leakage hoặc edge/calibration chưa đạt: P5 trả **insufficient evidence** và điều kiện mở lại; không đưa xác suất vào app. Thời gian shadow một mình không đủ.
 
-### Mở rộng kế tiếp — xếp theo giá trị và phụ thuộc
+### Mở rộng kế tiếp — xếp hạng lịch sử đã được thay thế
 
 | Thứ tự | Mức | Hạng mục | Điều kiện mở task |
 |---|---|---|---|

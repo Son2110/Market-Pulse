@@ -1,5 +1,15 @@
 # Nghiên cứu mở rộng — vàng Việt Nam, news và AI
 
+## Quyết định hiện hành · 26/10/2026
+
+Tài liệu nghiên cứu 13/10 dưới đây được giữ nguyên làm lịch sử, không là backlog triển khai hiện hành. Chủ dự án đã **hủy toàn bộ nghiên cứu và tính năng dự đoán giá AI/ML/P5**, gồm xác suất, training, backtest, holdout/calibration và shadow; không còn báo cáo forecast bắt buộc hoặc gate forecast để hoàn tất app. Các thiết kế/ước lượng đó không được đổi tên để tiếp tục triển khai.
+
+Ưu tiên chiều sâu core cổ phiếu/chỉ số với dữ liệu thật theo [PRD](PRD.md) và [roadmap](ROADMAP.md): audit FPT/VNINDEX qua Vnstock/KBS, correctness/lưu trữ, vận hành hằng ngày có cổng, từng trang dùng dữ liệu thật và nghiệm thu xuyên suốt. News/vàng thật chỉ mở sau core với cổng nguồn riêng, không chặn core. AI phân loại/tóm tắt không dự báo là tùy chọn hoãn, không là điều kiện của news/vàng. Các phát hiện nguồn và hạn chế có ngày bên dưới không được cập nhật thành bằng chứng truy cập/quyền/coverage hiện tại.
+
+Fixture chỉ dùng kiểm thử hoặc demo kỹ thuật có nhãn; không thay dữ liệu thật để hoàn tất tính năng. P2.1 giữ `RESEARCHED_WITH_BLOCKERS`, P2.2 chưa mở; đề xuất synthetic news trong audit lịch sử đã được rút tại [handoff hiện hành](P2_NEWS_RESEARCH_HANDOFF.md). Chưa khảo sát nguồn mới hoặc thay đổi quyết định quyền. Chưa có ước lượng thời gian hiện hành; chỉ ước lượng lại sau audit dữ liệu thật đầu tiên.
+
+## Bản nghiên cứu 13/10/2026 — lịch sử đã được thay thế
+
 **Ngày nghiên cứu:** 13/10/2026. **Phạm vi:** kế hoạch tài liệu cho một người phát triển, news tiếng Việt, AI phân tích có nguồn, vàng SJC và nhẫn trơn 9999, nghiên cứu dự báo xác suất vàng nội địa. Không triển khai collector/model/API trong task này. [PRD](PRD.md) ghi sửa đổi phạm vi theo yêu cầu chủ dự án; [roadmap](ROADMAP.md) là thứ tự công việc hiện hành. Tài liệu gốc giữ nguyên.
 
 ## Kết luận và ranh giới bằng chứng
@@ -53,7 +63,7 @@ Chuẩn bị **ít nhất 50 case tiếng Việt held-out**, người đánh gi�
 
 Chưa đạt gate thì app giữ news và market calculations gốc, không mở AI brief public. Trợ lý research có citation chỉ là bước kế tiếp sau gate này, chưa có implementation.
 
-## Thiết kế nghiên cứu dự báo vàng nội địa
+## Thiết kế nghiên cứu dự báo vàng nội địa — lịch sử, toàn bộ P5 đã hủy 26/10
 
 ### Target và label khóa trước
 
@@ -83,7 +93,7 @@ Bàn giao P5 luôn có target definition, data/right audit, sample/coverage repo
 
 Nếu thiếu quyền/lịch sử, split không an toàn, không có edge, calibration kém hoặc shadow chưa đủ thì báo **insufficient evidence** và giữ dashboard mô tả. Ghi điều kiện mở lại cụ thể: nguồn có quyền/backfill được xác minh, thêm mature observations/regimes, sửa lỗi leakage/quality, hypothesis mới với evaluation độc lập. Đây là một kết quả nghiên cứu hợp lệ, không được đổi thành xác suất bịa để hoàn tất demo.
 
-## Xếp hạng tính năng mở rộng
+## Xếp hạng tính năng mở rộng — thứ tự lịch sử, không còn hiện hành
 
 | Ưu tiên | Giá trị / mức | Phụ thuộc và giới hạn |
 |---|---|---|

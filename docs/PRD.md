@@ -1,6 +1,20 @@
 # Yêu cầu sản phẩm — scope hiện hành và baseline lịch sử
 
-## Bổ sung phạm vi theo yêu cầu chủ dự án · 13/10/2026
+## Phạm vi hiện hành · 26/10/2026 — chiều sâu sản phẩm và dữ liệu thật
+
+Theo yêu cầu chủ dự án, ưu tiên hoàn thiện chiều sâu app trên **dữ liệu thị trường thật**. Loại toàn bộ dự đoán giá bằng AI/ML và nghiên cứu P5 khỏi scope: không xác suất tăng/đi ngang/giảm, training, backtest mô hình dự báo, holdout/calibration, shadow forecast hoặc phục vụ dự báo. Đây là hủy phạm vi, không đổi tên P5 thành một pha nghiên cứu khác. AI phân loại/tóm tắt không dự báo là tùy chọn hoãn; không là điều kiện để hoàn tất core, news hoặc vàng.
+
+**Nghiệm thu sản phẩm bắt buộc dùng dữ liệu thật** có nguồn và quyền phù hợp với từng mục đích. Chấp nhận dữ liệu cuối ngày (EOD) hoặc trễ với nhãn đúng; không cam kết realtime. Mỗi màn hình cần source/provider, tiền tệ/đơn vị, timezone, thời điểm dữ liệu nguồn (`sourceAsOf` nếu xác minh được), thời điểm thu thập (`collectedAt`), độ mới, độ phủ và giới hạn. Không thay source as-of bằng collectedAt, không suy freshness từ receipt success, không nội suy dữ liệu thiếu hoặc tính return khi adjustment chưa đủ căn cứ.
+
+Fixture/synthetic chỉ phục vụ kiểm thử và demo kỹ thuật có nhãn rõ. Bằng chứng demo fixture trước đây vẫn hợp lệ trong phạm vi đó, nhưng không nghiệm thu sản phẩm dữ liệu thật. Khi nguồn bị lỗi, thiếu quyền hoặc chưa có dữ liệu, hiện empty/error/stale/unknown đúng bằng chứng; không fallback sang fixture, đổi nhãn fixture thành observed hoặc tuyên bố tính năng hoàn tất nhờ synthetic. Quyết định này chưa đổi app, default/flag hay dữ liệu hiện có.
+
+Thứ tự hiện hành làm serial: (1) audit có giới hạn đường Vnstock/KBS hiện có cho **FPT và VNINDEX** về truy cập, ngữ nghĩa/đơn vị, thời gian/lịch phiên, adjustment, volume, freshness/coverage và quyền theo mục đích; (2) kiểm chứng correctness, persistence/revision/replay và partial batch; (3) chỉ mở thu thập hằng ngày sau các cổng nguồn/vận hành; (4) search → detail → overview → watchlist lần lượt dùng cùng dữ liệu thật đã lưu; (5) nghiệm thu xuyên suốt bằng dữ liệu thật. Chi tiết cổng nằm trong [roadmap hiện hành](ROADMAP.md). Chỉ mở rộng rổ mã khi có bằng chứng coverage/quota/quyền, không mặc định đã có 10–20 mã.
+
+News tiếng Việt và vàng SJC/nhẫn trơn 9999 dùng dữ liệu thật sau core, mỗi nguồn có cổng riêng; quyền của chúng còn mở không chặn core cổ phiếu/chỉ số. P2.1 giữ `RESEARCHED_WITH_BLOCKERS`, P2.2 chưa mở; rút đề xuất dùng synthetic news làm tính năng kế tiếp. Modular monolith và foundation A1–A4 được giữ. Baseline tài liệu là PR #40 đã merge tại `ce7c181`; không suy ra kết quả CI mới từ việc merge.
+
+## Bổ sung phạm vi · 13/10/2026 — lịch sử đã được thay thế
+
+**Toàn bộ phần bổ sung 13/10 dưới đây giữ làm lịch sử.** Cam kết forecast/P5 đã hủy ngày 26/10; tính bắt buộc và thứ tự news/AI/gold cũ không còn hiện hành. Gate AI chỉ là tham khảo nếu một task tùy chọn không dự báo được mở lại, không là điều kiện nghiệm thu core. Phạm vi và tiêu chí ở mục 26/10 phía trên được ưu tiên.
 
 Phạm vi hiện hành bổ sung news tiếng Việt, AI phân tích thị trường có nguồn, vàng Việt Nam **SJC và nhẫn trơn 9999**, cùng nghiên cứu dự báo xác suất vàng nội địa. Đây là kế hoạch phát triển sau đóng core local, không là tuyên bố đã triển khai. Thứ tự, công sức và cổng nằm trong [ROADMAP.md](ROADMAP.md); nguồn, hạn chế và thiết kế đánh giá ở [PRODUCT_EXPANSION_RESEARCH.md](PRODUCT_EXPANSION_RESEARCH.md).
 
@@ -25,7 +39,7 @@ Phạm vi hiện hành bổ sung news tiếng Việt, AI phân tích thị trư�
 
 ## Baseline ba tuần và tiến độ lịch sử
 
-Những ghi nhận và bảng FR dưới đây giữ phạm vi demo ban đầu cùng trạng thái tại ngày nêu. “Hoãn” nghĩa là ngoài baseline ba tuần, không loại news/AI/gold khỏi roadmap hiện hành. Các yêu cầu frontend qua Stitch trước 12/10 chỉ là lịch sử; công việc mới dùng design system app hiện có. Không ghi đè tiến độ hoặc gọi một pha mở rộng là hoàn tất FR gốc.
+Những ghi nhận và bảng FR dưới đây giữ phạm vi demo ban đầu cùng trạng thái tại ngày nêu; không là tiêu chí nghiệm thu sản phẩm hiện hành. Quy tắc dùng fixture dự phòng chỉ mô tả demo lịch sử và đã được thay thế bởi yêu cầu dữ liệu thật ngày 26/10. News/gold sau core có cổng nguồn riêng; AI không dự báo là tùy chọn hoãn. Các yêu cầu frontend qua Stitch trước 12/10 chỉ là lịch sử; công việc mới dùng design system app hiện có. Không ghi đè tiến độ hoặc gọi một pha mở rộng là hoàn tất FR gốc.
 
 **MP-12 / FR-04 FPT collection-status UI · 13/10/2026:** trang FPT observed có card trạng thái độc lập sau range selector, sáu bucket đếm theo quan sát và thông báo lần đọc có thể khác history. Loading/empty/error/retry riêng; retry chỉ đọc status, không gọi provider/ingestion. Counts/ranges/raw collected timestamps thuộc lần đọc status; source as-of/freshness/completeness vẫn unknown, calendar unverified. Chỉ FPT hợp lệ có request, không mở VNINDEX status UI hoặc cache/scheduler. Dùng UI hiện có, không tạo Stitch. [Bàn giao FR-04](FR04_DETAIL_DESIGN.md#mp-12--fr-04--trạng-thái-thu-thập-fpt--13102026) ghi checks/QA; review/push/CI là bằng chứng riêng. Lát cắt API-only dưới đây là lịch sử trước UI này; FR-04/MP-12 vẫn một phần.
 
@@ -94,7 +108,7 @@ Không FR nào được xem là hoàn tất theo toàn bộ mô tả gốc. Tr�
 | FR-17 Data Source Management | Hoãn | Chỉ có log cục bộ và kiểm tra độ mới trong lúc phát triển; không có UI admin. | Danh mục nguồn, dashboard độ trễ/rate-limit, usage và điều khiển nhiều provider. |
 | FR-18 Data Ingestion Monitoring | Một phần | Log phát triển cho biết queued/running/success/failure và đủ ngữ cảnh để chẩn đoán sync cục bộ. | UI job admin, retry tùy ý, phân tích thời lượng đầy đủ và dashboard vận hành production. |
 
-## Ràng buộc dữ liệu và kiến trúc
+## Ràng buộc dữ liệu và kiến trúc — baseline lịch sử
 
 - Hướng tích hợp được chọn ngày 26/09/2026 là Vnstock qua provider adapter; giữ fixture xác định trước cho tới khi xác minh upstream, khả năng truy cập, coverage, đơn vị/ngữ nghĩa thời gian, điều khoản và quyền sử dụng. Credential chỉ cần nếu đường Vnstock/upstream được chọn thực sự yêu cầu; lựa chọn connector không xác minh nguồn live.
 - Lưu tách payload thô và bản ghi canonical đã chuẩn hóa; giữ provider và thời điểm ingest.
@@ -104,10 +118,10 @@ Không FR nào được xem là hoàn tất theo toàn bộ mô tả gốc. Tr�
 - Phân tích sự kiện phải căn theo phiên giao dịch thực tế, ghi rõ cửa sổ so sánh và dùng “biến động liên quan theo thời điểm”, không tuyên bố quan hệ nhân quả.
 - Redis và BullMQ là hạ tầng local dự kiến. Phát lại fixture nếu chưa có nguồn được xác minh.
 
-## Nghiệm thu phi chức năng
+## Nghiệm thu phi chức năng — demo lịch sử
 
 Demo cục bộ có hướng dẫn khởi động lặp lại được, fixture xác định trước, validation input, log kèm request/job, provider, status, thời lượng và lỗi; kiểm tra normalization, dedup/replay, API lõi, quyền sở hữu watchlist âm tính (user B không sửa được watchlist user A), retry/crash ingestion và một E2E từ tìm mã đến mở chart rồi thêm watchlist. Không commit secret. SLO production để giai đoạn sau.
 
 ## Không phải lời khuyên đầu tư
 
-MarketPulse VN phục vụ minh họa và nghiên cứu. Sản phẩm không đưa ra tư vấn đầu tư cá nhân, khuyến nghị mua/bán hoặc thực hiện lệnh môi giới. Baseline ba tuần không có dự báo giá; bổ sung ngày 13/10 cho phép nghiên cứu xác suất vàng nội địa và chỉ hiển thị sau các cổng trên, kèm target/horizon/as-of/uncertainty/coverage và phiên bản mô hình. Giá bán niêm yết tăng không đồng nghĩa lợi nhuận sau spread/chi phí. Trang sự kiện không được hàm ý quan hệ nhân quả.
+MarketPulse VN phục vụ thông tin và nghiên cứu. Sản phẩm không đưa ra tư vấn đầu tư cá nhân, khuyến nghị mua/bán hoặc thực hiện lệnh môi giới. Phạm vi hiện hành ngày 26/10 không có dự đoán giá; cho phép nghiên cứu xác suất ngày 13/10 đã được hủy toàn bộ. Giá bán niêm yết tăng không đồng nghĩa lợi nhuận sau spread/chi phí. Trang sự kiện không được hàm ý quan hệ nhân quả.

@@ -1,5 +1,26 @@
 # System architecture — MarketPulse VN
 
+## Current scope amendment · 26/10/2026
+
+Keep the **modular monolith and merged A1–A4 foundation**. The documentation baseline is PR #40 at `ce7c181`; this scope update makes no new runtime or CI claim. Prior dated baseline/review records below remain historical evidence. Cancel the entire AI/ML price-forecast/P5 scope, including probability output, training, forecast backtests, holdout/calibration, shadow evaluation and model serving. Optional nonforecast classification/summary is deferred and is not a dependency of the core, news or gold product.
+
+The active target is real-data correctness and product depth, starting with a bounded FPT/VNINDEX audit of the existing Vnstock/KBS path. Only purpose-approved collection, storage and display may advance; source access, units/time/calendar, adjustment/volume, freshness/coverage and rights remain evidence gates. The [roadmap](ROADMAP.md) sequences audit → correctness/persistence → gated daily operation → each core page → actual-data acceptance. EOD/delayed data is acceptable with explicit labels, without a realtime promise. Existing fixtures/synthetic families stay technical test/demo capabilities; they cannot complete the product or become a fallback/relabeling path. No defaults or flags change in this document.
+
+```mermaid
+flowchart LR
+  Source["Purpose-approved provider\nFPT / VNINDEX audit first"] --> Collector["Bounded Python collector\nrate and retry budget"]
+  Collector --> Accept["Authenticated API\nvalidation + durable Mongo outbox"]
+  Accept --> Queue["BullMQ transport / reconciliation"]
+  Queue --> Worker["Node worker\nimmutable revisions + latest projection"]
+  Worker --> Store["Mongo stored real observations\nprovenance / gaps / partial-batch limits"]
+  Store --> Read["Bounded stored-read API"]
+  Read --> UI["Search → detail → overview → watchlist\nshared data / existing app design"]
+```
+
+This is the gated target flow, not a claim that daily collection or shared real-data pages already exist. A durable receipt is not worker completion, source freshness or complete coverage. Projection presence does not prove batch atomicity; partial/failed deliveries and revision ordering must be verified before product acceptance. Reads never collect providers or silently substitute fixture data. Daily operations need source-specific cadence/rate limits, bounded stop/retry behavior, last success, freshness/gap reporting and outage/replay recovery; A4 alone does not grant those capabilities. News/gold real-data extensions follow the core with independent source gates; P2.1 remains `RESEARCHED_WITH_BLOCKERS` and P2.2 is unopened.
+
+## A1 decision and dated implementation record — historical baselines
+
 **Decision date:** 18/10/2026 · **Scope:** A1 architecture decision, with A2, A3 and A4 implementation evidence below.
 **Merged baseline:** [PR #38](https://github.com/Son2110/Market-Pulse/pull/38),
 `main` at `eb3a6b2` (A3 family dispatch), following [PR #37](https://github.com/Son2110/Market-Pulse/pull/37) at `f51dbd3958dc0d4db6410d13c2a28085dcb02853` (A2 ingestion primitives, where
@@ -218,7 +239,7 @@ for full runtime and outage evidence.
 
 Keep a **modular monolith**: one Node API/worker codebase, built from `apps/api`,
 with separate HTTP API and BullMQ worker processes. Keep Python for bounded
-provider collection and later offline forecast research. React calls the API;
+provider collection. React calls the API;
 it never calls Python, a data provider or an AI provider directly. MongoDB owns
 durable delivery and domain records; Redis transports jobs. No market cache,
 time-series projection, microservice split or general plugin framework is needed
@@ -227,8 +248,8 @@ for this foundation.
 Modules will be extracted incrementally where a concrete task needs a boundary.
 Keep existing route shapes, defaults, collection identities, hashes, decimal
 precision, timestamp semantics, replay and E2E behavior. A1 creates no runtime
-directory structure or new collection. The [roadmap](ROADMAP.md) sequences A2,
-A3, P2.1 research and A4 before news ingestion or automated collection.
+directory structure or new collection. A1–A4 are now merged; the [current roadmap](ROADMAP.md)
+sets the next real-data audit and operation gates before automated collection.
 
 ## Implemented baseline
 
@@ -318,8 +339,6 @@ flowchart TD
   Lifecycle --> Infra["Mongo / BullMQ adapters"]
   Domain --> Infra
   Policy["Future source policy"] -.-> Ingest
-  Policy -.-> AI["Future AI analysis jobs"]
-  AI -.-> Domain
 ```
 
 | Boundary | Owns | Allowed dependencies / exclusions |
@@ -330,8 +349,7 @@ flowchart TD
 | Market / gold / future news domains | Family identity, revisions, ordering, projections and bounded query services | Contracts and own persistence adapters; no HTTP response objects or collector execution. Family rules stay explicit. |
 | Identity / watchlists | Session authentication, account records and owner-scoped lists | Mongo repository and fixture query capability as today; no ingestion credentials or background AI dependency. |
 | Source policy (future P2) | Purpose-specific rights decisions and provenance of evidence | Queried at collection/storage/redisplay/AI/training boundaries; cannot grant rights merely because a URL or feed is public. |
-| AI analysis (future P3) | Bounded analysis jobs, evidence links, versions, budget, abstention | Approved content revisions and source policy; no direct market-price arithmetic or synchronous model call in public GET handlers. |
-| Forecast research (future P5) | Offline dataset manifest, training/evaluation and go/no-go artifact | Approved snapshots/revisions and point-in-time evidence; no live DB writes or training inside HTTP requests. |
+| Optional nonforecast AI analysis — deferred | Only a separately approved classification/summary task may define jobs, evidence links, versions, budget and abstention | Approved content revisions and purpose-specific rights; not a prerequisite for core/news/gold. No price prediction or synchronous model call in public GET handlers. |
 
 ### Dependency and failure matrix
 
@@ -345,7 +363,7 @@ pre-A4 constraint and the implemented A4 failure boundary.
 | Stored observed/gold reads (`/health/ready/mongo`) | Mongo, enabled flag and initialized API | Same API lifecycle; no queue call in the read service | Survives post-startup Redis outage via direct HTTP and Vite `/api` proxy; fails closed (`503`) during MongoDB outage and recovers automatically on MongoDB restore. |
 | Internal delivery acceptance/poll (`/health/ready/ingestion`) | Mongo; configured secret and initialized delivery store; bounded queue enqueue | Pre-A4 Redis failure stopped the API process | Preserves durable MongoDB accept-before-202 during Redis outage, defers failed/timed-out enqueue to outbox, and rejects with `503` (no false `202`) when MongoDB is down. |
 | Worker persistence/recovery (`127.0.0.1:3002`) | Mongo + Redis/BullMQ, initialized stores, running worker, recent non-stale reconciliation | Worker has separate loopback readiness | Reports `503` on Mongo/Redis loss or stale/failed reconciliation; automatically reconnects and reconciles deferred `fixture-market`, `observed-candle`, and `synthetic-gold` outbox rows within `MAX_ATTEMPTS=3`. |
-| Future collection / AI / forecasts | Approved source access, network/model budget or eligible dataset as appropriate | Not implemented | Isolate failures from public read handlers; each task supplies its own evidence and gate. |
+| Future approved collection / optional nonforecast AI | Purpose-approved source access and bounded network budget; separate AI permission/budget only if reopened | Not implemented | Isolate failures from public read handlers; each task supplies its own evidence and gate. Forecast scope is canceled. |
 
 `GET /health/live` currently reports process/HTTP liveness without probing stores.
 `GET /health/ready` currently probes Mongo and Redis plus application initialization;
@@ -363,7 +381,9 @@ readiness may still remove the entire instance during Redis loss. Validate that
 deployment's routing before claiming external availability; production
 load-balancer behavior remains unverified.
 
-## Future source, news, AI and forecast flow
+## Historical source, news, AI and forecast proposal — superseded 26/10
+
+The diagram and prose in this section preserve the original A1 proposal for traceability. **All P5/forecast commitments are canceled**, including offline evaluation/training, shadow reports and publishing probabilities; they are not deferred tasks. P3/nonforecast AI is optional and deferred. P2.1 has closed as research with blockers, A4 has merged, P2.2 has not opened and synthetic news as the next product feature has been withdrawn. Use the active real-data flow and current roadmap above for implementation; no historical edge or imperative below authorizes work.
 
 ```mermaid
 flowchart LR
@@ -450,7 +470,7 @@ by Application CI. Do not invent a runtime acceptance result for this docs task.
 ## ADR-001 — why this foundation
 
 **Accepted decision, 18/10/2026:** incremental modular monolith, two Node process
-roles and specialist Python commands/offline research. A single developer and
+roles and specialist Python collector commands. A single developer and
 serial workflow benefit from one contract and deployment lineage; existing
 outbox and family stores already provide the key ingestion seam. Separate worker
 execution keeps background work out of request handling without requiring network
@@ -470,7 +490,9 @@ measured query demand plus rebuild/invalidation evidence. Revisit these decision
 when measured workload, operational ownership or isolation requirements justify
 them, rather than treating the original conceptual diagram as implemented code.
 
-**Open decisions:** source rights/retention in P2.1 and the gold gate, concrete A4
-readiness/routing contract, news identity/revision semantics, AI provider/budget,
-forecast-eligible history and production backup/network/cost. None is silently
-resolved by this architecture document.
+**Current open decisions · 26/10/2026:** FPT/VNINDEX access/semantic/rights audit,
+real-data freshness/coverage and daily operation gates, news/gold rights and
+retention, future news identity/revision semantics and production backup/network/cost.
+A4 is merged, as recorded above. Optional nonforecast AI provider/budget stays
+deferred; forecast-eligible history is no longer a product requirement. None of
+the remaining decisions is silently resolved by this architecture document.
