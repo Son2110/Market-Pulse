@@ -15,6 +15,7 @@ import { collectedOrder, digest, strictJson, validatePayload, type Json, type Ob
 import { createIngestionQueue, DeliveryQueue, jobId } from "../src/ingestion-queue.js";
 import { IngestionStore } from "../src/ingestion-store.js";
 import { startIngestionWorker } from "../src/ingestion-worker.js";
+import { ObservedHistoryService } from "../src/observed-history.js";
 import { observed, rehash } from "./observed-test-data.js";
 
 const execute = promisify(execFile);
@@ -99,6 +100,71 @@ test("observed raw outbox acceptance survives enqueue loss, and exhausted partia
   await c.terminal("partial", "failure"); const raw = await c.store.deliveries.findOne({ _id: "partial" }); assert.equal(raw?.attempts, 3); assert.deepEqual(raw?.counts, { assets: 1, observations: 1 });
   assert.equal(await c.store.observed.revisions.countDocuments(), 1); assert.equal(await c.store.observed.latest.countDocuments(), 1); assert.deepEqual((await c.store.observed.latest.findOne({ _id: payload.candles[0]!.barId }))?.record, payload.candles[0]);
   await c.deliveries.reconcile(); assert.equal((await c.store.deliveries.findOne({ _id: "partial" }))?.status, "failure");
+});
+test("interrupted multi-bar observed replay repairs missing projections without regressing a newer overlapping delivery", async t => {
+  const c = await setup(); t.after(c.close);
+  const older = observed();
+  for (const date of ["2026-10-03", "2026-10-04"]) {
+    const row = structuredClone(older.candles[0]!); row.tradingDate = date; row.providerTimeLabel = `${date} 07:00`;
+    row.barId = digest(["KBS", row.assetId, row.interval, date, row.adjustmentBasis]); older.candles.push(row);
+  }
+  rehash(older);
+  await c.accept("older-interrupted", older);
+  const interrupted = await c.store.deliveries.findOneAndUpdate({ _id: "older-interrupted" }, { $set: { status: "running", attempts: 1 } }, { returnDocument: "after" }); assert(interrupted);
+  let revisions = 0;
+  await assert.rejects(c.store.persist(interrupted, undefined, async () => {
+    if (++revisions === 2) throw new Error("synthetic interruption before second projection");
+  }), /synthetic interruption/);
+  assert.equal(await c.store.observed.revisions.countDocuments(), 2); assert.equal(await c.store.observed.latest.countDocuments(), 1);
+  assert.deepEqual((await c.store.deliveries.findOne({ _id: interrupted._id }))?.counts, { assets: 1, observations: 1 });
+
+  const newer = version("1350", "2026-10-06T08:00:00.123457Z");
+  const extra = structuredClone(newer.candles[0]!); extra.tradingDate = "2026-10-05"; extra.providerTimeLabel = `${extra.tradingDate} 07:00`;
+  extra.barId = digest(["KBS", extra.assetId, extra.interval, extra.tradingDate, extra.adjustmentBasis]); newer.candles.push(extra); rehash(newer);
+  const completed = await c.accept("newer-success", newer);
+  await c.store.terminal(completed._id, "success", await c.store.persist(completed));
+  const service = new ObservedHistoryService(c.store.db); const bounds = { from: "2026-10-01", to: "2026-10-06" };
+  const before = await service.read("FPT", bounds); assert(before); assert.deepEqual(before.data.candles, newer.candles);
+  assert.equal((await c.store.deliveries.findOne({ _id: interrupted._id }))?.status, "running");
+  assert.equal((await c.store.deliveries.findOne({ _id: completed._id }))?.status, "success");
+
+  const runtime = await startIngestionWorker(c.store, redisUrl, { name: c.name, reconcileMs: 100 }); t.after(() => runtime.close());
+  await c.terminal(interrupted._id);
+  const after = await service.read("FPT", bounds); assert(after);
+  assert.deepEqual(after.data.candles, [newer.candles[0], older.candles[1], older.candles[2], extra]);
+  for (const row of newer.candles) assert.deepEqual(await c.store.observed.latest.findOne({ _id: row.barId }), {
+    _id: row.barId, barId: row.barId, contentDigest: row.contentDigest, record: row, dataset: newer.dataset, schemaVersion: newer.schemaVersion,
+    collectedAt: row.collectedAt, collectedOrder: collectedOrder(row.collectedAt), deliveryId: completed._id,
+  });
+  for (const row of older.candles.slice(1)) assert.equal((await c.store.observed.latest.findOne({ _id: row.barId }))?.deliveryId, interrupted._id);
+  assert.equal(await c.store.observed.revisions.countDocuments(), 5); assert.equal(await c.store.observed.latest.countDocuments(), 4);
+  assert.equal(await c.store.observed.assets.countDocuments(), 1); assert.equal(await c.store.deliveries.countDocuments(), 2);
+  const recovered = await c.store.deliveries.findOne({ _id: interrupted._id }); assert.equal(recovered?.attempts, 2); assert.deepEqual(recovered?.counts, { assets: 1, observations: 3 });
+  const status = await service.collectionStatus("FPT", bounds); assert(status); assert.equal(status.meta.selectedCandleCount, 4);
+  assert.deepEqual(status.meta.candleCountsByDeliveryStatus, { accepted: 0, queued: 0, running: 0, success: 4, failure: 0, unknown: 0 });
+  assert.equal(status.meta.completeness, "unknown"); assert.equal(await c.store.observations.countDocuments(), 0);
+});
+test("equivalent observed deliveries retain the first failed receipt reference after a distinct delivery succeeds", async t => {
+  const c = await setup(); t.after(c.close);
+  const payload = observed(); await c.accept("first-failed", payload);
+  const runtime = await startIngestionWorker(c.store, redisUrl, { name: c.name, reconcileMs: 100, hooks: {
+    afterWrite: async (count, id) => { if (id === "first-failed" && count === 2) throw new Error("synthetic failure after projection"); },
+  } }); t.after(() => runtime.close());
+  await c.terminal("first-failed", "failure");
+  const first = await c.store.observed.latest.findOne({ _id: payload.candles[0]!.barId }); assert(first); assert.equal(first.deliveryId, "first-failed");
+  const service = new ObservedHistoryService(c.store.db); const bounds = { from: "2026-10-01", to: "2026-10-06" };
+  const history = await service.read("FPT", bounds); assert(history);
+  const second = await c.accept("second-success", payload); await c.deliveries.enqueue(second._id, second.payloadDigest); await c.terminal(second._id);
+  assert.deepEqual(await c.store.observed.latest.findOne({ _id: first._id }), first);
+  assert.deepEqual(await service.read("FPT", bounds), history);
+  const failed = await c.store.deliveries.findOne({ _id: "first-failed" }); const succeeded = await c.store.deliveries.findOne({ _id: second._id }); assert(failed && succeeded);
+  assert.equal(failed.status, "failure"); assert.equal(failed.attempts, 3); assert.equal(succeeded.status, "success"); assert.equal(succeeded.attempts, 1);
+  assert.equal(failed.payloadDigest, succeeded.payloadDigest); assert.deepEqual(failed.counts, { assets: 1, observations: 1 }); assert.deepEqual(succeeded.counts, failed.counts);
+  assert.equal(await c.store.deliveries.countDocuments(), 2); assert.equal(await c.store.observed.revisions.countDocuments(), 1); assert.equal(await c.store.observed.latest.countDocuments(), 1);
+  const revision = await c.store.observed.revisions.findOne({ contentDigest: first.contentDigest }); assert.equal(revision?.firstDeliveryId, failed._id);
+  const status = await service.collectionStatus("FPT", bounds); assert(status); assert.equal(status.meta.selectedCandleCount, 1);
+  assert.deepEqual(status.meta.candleCountsByDeliveryStatus, { accepted: 0, queued: 0, running: 0, success: 0, failure: 1, unknown: 0 });
+  assert.equal(status.meta.completeness, "unknown"); assert(!/(first-failed|second-success|deliveryId|payload|Digest|collectedOrder|_id|"close")/.test(JSON.stringify(status)));
 });
 for (const boundary of ["revision", "observed-write", "success"]) test(`observed worker killed at ${boundary} repairs revision/projection and respects durable terminal success`, async t => {
   const c = await setup(); t.after(c.close); const payload = observed(); await c.accept("crash", payload);

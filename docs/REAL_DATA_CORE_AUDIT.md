@@ -97,4 +97,39 @@ Existing offline checks were run after the probes; they make no provider calls:
 
 No Node runtime, database, browser or real-source replay checks were run for this documentation-only task. No claim of new CI, independent coordinator approval, commit or push is made. The portal builder has an existing 24-document allowlist; this new audit is available in the repository but is not added to that published bundle within this three-document write scope.
 
-**Next task:** an offline correctness/persistence audit of the existing partial-batch and revision/replay boundaries, using current synthetic test material and actual code/tests. Specify expected per-bar versus batch behavior, inspect exact decimal/time/hash ordering, A→B→A/refetch identity, mixed deliveries, failed/incomplete rows and restart/replay recovery. Record verified behavior and reproduce any suspected defect before proposing a bounded fix. This does not authorize fresh source calls, real-data persistence, rights expansion, scheduler or UI work. Source evidence for currently closed purposes remains a separate prerequisite before real-data storage, daily operation and product display can open. There is insufficient evidence to re-estimate the full remaining product schedule.
+**Next task recorded by the probe audit:** an offline correctness/persistence audit of the existing partial-batch and revision/replay boundaries, using current synthetic test material and actual code/tests. The follow-up below records its bounded execution. Source evidence for currently closed purposes remains a separate prerequisite before real-data storage, daily operation and product display can open. There is insufficient evidence to re-estimate the full remaining product schedule.
+
+## Offline correctness and recovery verification · 02/11/2026
+
+**Baseline:** merged PR #42, `952c5d6`; branch `feat/fr-18-observed-recovery-verification`. This follow-up inspected the existing contract, observed store, ingestion worker/outbox, stored-history/status readers and their synthetic tests. No defect was reproduced in the audited boundaries, so production code, contracts, dependencies and flags were unchanged. Two integration regressions were added to [the existing observed ingestion test file](../apps/api/tests/observed-ingestion.integration.test.ts). This is bounded local verification, not source-data acceptance, exhaustive correctness proof or permission to collect/store/display real observations.
+
+| Boundary | Verified behavior and evidence |
+|---|---|
+| Exact values and identity | The existing observed unit tests recheck the shared negative contract corpus, canonical decimal strings, hashes and UTC microsecond ordering. Existing integration tests recheck concurrent/out-of-order writes, offset-equivalent instants, equal-time digest ordering, refetch and A→B→A with immutable revision reuse. These are synthetic cases, not independent reconciliation of provider values or wire precision. |
+| Partial batches and reads | Revision insertion precedes per-bar projection, without a batch transaction. Earlier rows remain readable during interruption or exhausted failure; history may mix deliveries. The existing partial-batch and stored-read tests passed. Receipt counts describe processed records, not newly inserted revisions; success does not establish source freshness or complete session coverage. |
+| Interrupted older delivery after newer success — new regression | A three-bar synthetic delivery is interrupted by a test hook after its second revision, leaving two revisions, one projection and a running receipt with counts 1 asset/1 observation. A newer two-bar delivery is persisted and marked successful through the store, overlapping the first date and adding a different date. A real BullMQ worker then reconciles/replays the older receipt: both missing older projections appear, both complete newer rows retain their metadata and delivery reference, and the older receipt succeeds on attempt 2 with counts 1/3. Final history mixes both deliveries, with five revisions and four latest bars; completeness stays unknown. This new interruption is a thrown test hook plus worker recovery, not a newly added killed-process test. |
+| Equivalent distinct delivery IDs — new regression | A real worker fails the first delivery after its projection on all three attempts. A distinct ID with identical payload/time/content then succeeds on attempt 1, retaining one revision and the entire first selected projection/reference. History stays identical; collection status counts one failed selected receipt and zero successful selected receipts, despite the second receipt's success. This matches the existing [equivalent-retrieval semantics](INGESTION.md): status describes selected references, not the best status among all equivalent deliveries. Neither IDs nor prices leak into the status response. |
+| Actual process death — existing regressions rerun | The three existing child-process tests kill a worker after revision insertion, after projection write and after durable success before queue completion. All passed unchanged, including repair/replay, immutable counts and the success boundary's single attempt. This evidence is distinct from the two new scenarios above. |
+
+Worker checks passed:
+
+```powershell
+npm run lint
+npm run typecheck
+node --import tsx --test apps/api/tests/observed-ingestion.test.ts apps/api/tests/observed-history.test.ts apps/api/tests/observed-collection-status.test.ts
+$env:MONGODB_URL = 'mongodb://127.0.0.1:54109/marketpulse'
+$env:REDIS_URL = 'redis://127.0.0.1:54110'
+node --import tsx --test --test-concurrency=1 apps/api/tests/observed-collection-status.integration.test.ts apps/api/tests/observed-history.integration.test.ts apps/api/tests/observed-ingestion.integration.test.ts
+python scripts/check_docs.py
+python scripts/build_docs.py
+git diff --check
+Get-FileHash MarketPulse_VN_Project_Documentation.md -Algorithm SHA256
+```
+
+Focused unit results: **12 passed**, all existing. Focused integration results: **12 passed** (10 existing, two new), zero failures/skips, using real MongoDB 8.0 and Redis 7.4 from installed Docker images. The local ports above were dynamically allocated for this run. The installed Docker Desktop was started hidden; only uniquely named disposable test containers and test-created databases/queues were used, with no shared application volumes. An initial restricted unit run passed 10 and failed two HTTP tests with `fetch failed`; the approved loopback rerun passed all 12. No provider calls, new real-data persistence, installations or upgrades occurred. Full application suites, browser QA, remote CI and production operation were not rerun. Independent coordinator review and branch publication remain separate from worker evidence.
+
+Documentation checks passed for **504 local targets** (external links and fragments were not validated); the existing portal built **24 source documents**. Diff whitespace passed. The original brief's SHA-256 still matches `21E98449A2A0BAA9B716F6720863A9902EBF605700D9B5229181C9121B2847F8`. The audit remains outside the existing portal allowlist.
+
+**Independent review · 02/11/2026:** GPT-6 Astra approved the bounded changes with no findings after inspecting the implementation, verification evidence and diff; the reviewer did not rerun runtime tests. Branch publication and remote CI remain unverified here. After review, the worker verified the exact test-container names, ownership labels, ports and exclusive anonymous-volume attachments, then removed only those two containers and their three image-created anonymous volumes. No shared application volumes were removed.
+
+**Next serial gate:** obtain purpose-specific upstream evidence for storage, daily collection, display and retention, together with adjustment/units/calendar/freshness evidence required for the intended product use. Unknown purposes stay closed. This verification does not open a scheduler, real-data writes or UI migration; any newly suspected correctness issue must first be reproduced and scoped. The full remaining schedule is still unestimated.
