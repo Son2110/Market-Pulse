@@ -1,5 +1,9 @@
 # Optional Vnstock/KBS adapter — FR-18
 
+## Bounded audit update · 02/11/2026
+
+The [FPT/VNINDEX core audit](REAL_DATA_CORE_AUDIT.md) records two owner-authorized serial manual probes for 26–30/10/2026 through installed vnstock 4.0.8/vnai 2.6.2, without submission: each returned five validated candles. This establishes technical access for those samples only. Adjustment, volume semantics, source as-of, calendar, freshness and purpose-specific upstream rights remain open; automation, storage, local/public product display, backfill and retention stay closed where rights are unknown. The installed license summary is 2026.09; the website now shows 2026.11 **effective 30/11**, not current on 02/11, and current market documentation describes v5 rather than this installed path. No app/default/flag/dependency changed. The next serial task is an offline partial-batch/revision/replay correctness audit; reproduce any defect before a separate bounded fix.
+
 ## Current direction · 26/10/2026
 
 The existing FPT/VNINDEX path is the starting point for the next **bounded real-data audit**, not evidence of current production coverage. The 06/10 probes and later dated ingestion/read observations below are historical technical evidence only: they do not establish present access, freshness, session completeness, adjustment/volume semantics, quota stability or purpose-specific rights. No provider call, credential, flag, scheduler or runtime change is authorized by this documentation update. The old Stitch/next-slice wording below is historical; new frontend work follows the existing app design.
