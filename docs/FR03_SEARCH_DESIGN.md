@@ -1,3 +1,43 @@
+# FR-03 — stored observed catalog search · 04/11/2026
+
+## Current slice and design references
+
+This slice adds a separate, opt-in **stored asset catalog** to the existing root search. It uses the current [App.tsx](../apps/web/src/App.tsx), [SiteHeader.tsx](../apps/web/src/SiteHeader.tsx), [styles.css](../apps/web/src/styles.css), observed source tabs from [observed-detail.css](../apps/web/src/observed-detail.css) and existing [FR-04 handoff](FR04_DETAIL_DESIGN.md). The historical MP-06 Stitch handoff below remains evidence of the original design; no new Stitch design is created. Existing two-column/850px/520px responsive behavior, labelled form, keyboard buttons, visible focus and live status remain in use.
+
+`/?source=observed` explicitly selects **Danh mục đã lưu · KBS · FPT**; plain `/` keeps the ten-equity fixture catalog. Query and selected source survive reload and navigation. The selected FPT result opens the existing observed detail at the explicitly labelled historical sample range (28/09–07/10/2026), without asserting that this range contains candles or is the newest range. `searchSource=observed` tracks search origin separately from the detail `source`; detail source tabs, range forms, sample links and return/header links retain this origin even after a deliberate switch to fixture detail. Direct detail URLs without an origin retain their previous return behavior.
+
+Loading, empty, invalid input/source, error and retry use the existing states. A new request aborts/supersedes the prior request. Disabled observed reads remain an error in this mode; no fixture search occurs as fallback. Search itself shows no prices. The panel distinguishes the stored canonical asset from project-curated company name/aliases/source links, and labels VND, Vietnam timezone, FPT-only scope and unknown source as-of/freshness. There is no asset-specific collection timestamp in the stored contract; `collectedAt` remains null rather than borrowing a candle/delivery timestamp. Catalog presence does not establish candle availability, coverage, collection success or current company registration.
+
+## API and storage boundary
+
+`GET /api/observed/assets/search?q=…` is registered only with the existing `OBSERVED_READS_ENABLED=true` flag (default remains false). It shares observed-read startup/shutdown readiness; Mongo operation errors fail closed. No login/ingestion secret/provider request is needed. Fixture search and history contracts are unchanged.
+
+Exactly one nonblank `q`, at most 100 decoded Unicode codepoints before normalization, is required; duplicate, nested, unknown, blank/combining-only and overlong query parameters return 400 `invalid_query`. The fixture normalization is reused: accent/case/đ folding, whitespace collapse and literal substring matching. This slice does not add fuzzy/recent search or the index VNINDEX to an equity search.
+
+The service performs one `observed_assets.findOne({_id: "VN:HOSE:FPT"})` using the existing `_id` index, explicit public projection and configured `maxTimeMS`. It reads no candles, receipts or provider. Shared schema/canonical-field/digest validation is extracted from the observed history validator and reused. A valid absent or nonmatching asset returns 200 with `data: []`; malformed stored FPT data or unavailable readiness/storage returns sanitized 503 `observed_asset_search_unavailable`, including for a nonmatching query. Disabled route returns 404. Responses from the enabled handler use no-store. No Mongo regex, collection scan, catalog widening, migration, dependency or data write is introduced.
+
+Each result has the validated `asset`, curated `companyName`/`aliases`, and `reference.origin: "curated_reference"` with official URLs/review date. Meta marks `assetOrigin: "stored_observed_asset"`, `availability: "catalog_only"`, coverage `["FPT"]`, provider KBS, the stored dataset when present (null if absent), and null source-as-of/collection time with unknown freshness. Internal delivery IDs, row digests and Mongo IDs never escape. The dataset's historical candle label describes its ingestion family; `catalog_only` explicitly avoids claiming candles were read or exist.
+
+## Proportionate source comparison
+
+The coordinator inspected official MongoDB driver code: installed driver **7.6.0**, [findOne implementation at `0fb2c13`](https://github.com/mongodb/node-mongodb-native/blob/0fb2c13/src/collection.ts#L513-L525), and the [official CRUD integration tests at v6.20.0 / `477140e`](https://github.com/mongodb/node-mongodb-native/blob/477140e/test/integration/crud/find.test.js). The former bounds a find to one document/single batch and closes its cursor; the latter exercises persisted-document CRUD/projections. This fits the existing Node Mongo dependency and FPT identity lookup. Reusing the current driver avoids adding an ODM or broader text-search architecture, extra dependencies and migrations. It is deliberately limited to the existing one-stock approved scope; wider catalogs would need a separate coverage/index design. The official repository is maintained by MongoDB and Apache-2.0 licensed. Only API usage and testing approach were adapted; no upstream code was copied. The worker's independent web fetch of GitHub returned cache misses; source inspection evidence here is the coordinator's, not a claimed worker download.
+
+## Verification and remaining acceptance
+
+Worker checks: lint/typecheck/build passed; 204 unit tests passed; focused actual Mongo/API integration passed 3/3, including server flag absent/false/true without ingestion secret. The new Mongo test proves an asset-only FPT record can match with zero candles; index/nonmatches remain empty; corrupt schema/digest/currency/dataset and storage outage fail closed. Command monitoring verifies exactly one find with identity/projection/limit-one/single-batch/maxTimeMS; explain examines one key/document. The full existing integration suite passed 60/60 (305.333 seconds), including both isolated A4 recovery groups and the shared history/collection-status regressions, with no skipped tests.
+
+Four desktop/320px browser tests passed: existing real fixture search/chart/private-watchlist journeys plus **explicitly stubbed** observed UI loading/late-response, empty, 503/retry, results, reload, keyboard Enter and detail-source/return-origin continuity. Responsive overflow checks passed. Client tests independently reject fixture responses in observed mode and invalid provenance/canonical/curated metadata. The first unit attempt under restricted loopback access failed existing HTTP checks; rerunning with local-network access passed 204/204. No provider was called by the worker. These synthetic/stub checks do not establish real-data product acceptance. Coordinator real-data acceptance is recorded below. Independent review, remote CI and publication are separate; FR-03 remains partial beyond this bounded catalog slice.
+
+## Coordinator real-data acceptance · 04/11/2026
+
+The coordinator confirmed one authorized local provider call per FPT and VNINDEX for trading date **2026-11-02**, during **2026-11-04 13:11:24–13:11:50 UTC** (20:11:24–20:11:50 Vietnam time). Both deliveries persisted and passed exact verification against stored data. This is actual provider evidence supplied by the coordinator; the implementation worker did not call a provider.
+
+In unmocked Chromium at **1440px and 320px**, the coordinator followed observed FPT search → observed detail, manually selected **02/11/2026**, and compared all four displayed OHLC values exactly against the stored API response in memory. Return to search and reload retained the observed source and submitted query. The initial labelled historical sample remains separate from this explicitly chosen acceptance date. VNINDEX's persisted diagnostic does not widen the stock-search catalog beyond FPT.
+
+The coordinator verified removal of the temporary real-data stack and its volumes, including Redis. No raw market payload is tracked. This accepts the bounded stored FPT catalog/search-to-detail continuity against actual data; it does not assert full FR-03, full-core acceptance, current prices, source freshness, candle completeness, calendar/adjustment/volume verification, daily activation or public redisplay rights.
+
+---
+
 # MP-06 — bàn giao trang tra cứu doanh nghiệp
 
 ## Phạm vi và tham chiếu Stitch

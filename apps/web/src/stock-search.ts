@@ -3,25 +3,42 @@ export interface SearchResult {
     assetId: string;
     symbol: string;
     assetType: "equity";
-    exchange: "HOSE" | "HNX" | "UPCOM";
+    exchange?: "HOSE" | "HNX" | "UPCOM";
     currency: "VND";
     unit: "VND";
     timezone: "Asia/Ho_Chi_Minh";
   };
   companyName: string;
   aliases: string[];
-  reference: { officialSources: string[]; reviewedOn: string };
+  reference: { origin?: "curated_reference"; officialSources: string[]; reviewedOn: string };
 }
 
 export interface SearchResponse {
   data: SearchResult[];
-  meta: {
+  meta: FixtureSearchMeta | ObservedSearchMeta;
+}
+
+interface FixtureSearchMeta {
     scope: "fixture equities";
     dataset: "fixture / unknown";
     label: "SYNTHETIC FIXTURE — NOT MARKET DATA";
     provider: "marketpulse-fixture";
     asOf: null;
-  };
+}
+
+export type SearchSource = "fixture" | "observed";
+export interface ObservedSearchMeta {
+  scope: "stored observed equities"; label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT"; provider: "KBS";
+  dataset: { mode: "observed"; label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN"; freshness: "unknown"; sessionCalendar: "unverified" } | null;
+  sourceAsOf: null; collectedAt: null; freshness: "unknown"; coverage: ["FPT"]; availability: "catalog_only"; assetOrigin: "stored_observed_asset";
+}
+export function searchSource(search: string): SearchSource | null {
+  const parameters = new URLSearchParams(search);
+  const sources = parameters.getAll("source");
+  return sources.length === 0 ? "fixture" : sources.length === 1 && (sources[0] === "fixture" || sources[0] === "observed") ? sources[0] : null;
+}
+export function searchHref(query: string, source: SearchSource): string {
+  return `/?${source === "observed" ? "source=observed&" : ""}q=${encodeURIComponent(query)}`;
 }
 
 export function queryError(query: string): string | null {
@@ -80,6 +97,26 @@ export function isSearchResponse(value: unknown): value is SearchResponse {
   });
 }
 
+export function isObservedSearchResponse(value: unknown): value is SearchResponse {
+  if (!record(value) || !record(value.meta) || !Array.isArray(value.data) || value.data.length > 1) return false;
+  const meta = value.meta;
+  if (meta.scope !== "stored observed equities" || meta.label !== "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT"
+    || meta.provider !== "KBS" || meta.sourceAsOf !== null || meta.collectedAt !== null || meta.freshness !== "unknown"
+    || meta.availability !== "catalog_only" || meta.assetOrigin !== "stored_observed_asset"
+    || !Array.isArray(meta.coverage) || meta.coverage.length !== 1 || meta.coverage[0] !== "FPT") return false;
+  const dataset = meta.dataset;
+  if (dataset === null ? value.data.length !== 0 : !record(dataset) || dataset.mode !== "observed"
+    || dataset.label !== "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN" || dataset.freshness !== "unknown" || dataset.sessionCalendar !== "unverified") return false;
+  return value.data.every((item: unknown) => {
+    if (!record(item) || !record(item.asset) || !record(item.reference) || item.reference.origin !== "curated_reference") return false;
+    const asset = item.asset;
+    if (Object.keys(asset).sort().join(",") !== "assetId,assetType,currency,symbol,timezone,unit"
+      || asset.assetId !== "VN:HOSE:FPT" || asset.symbol !== "FPT") return false;
+    return isSearchResponse({ data: [{ ...item, asset: { ...asset, exchange: "HOSE" } }],
+      meta: { scope: "fixture equities", dataset: "fixture / unknown", label: "SYNTHETIC FIXTURE — NOT MARKET DATA", provider: "marketpulse-fixture", asOf: null } });
+  });
+}
+
 export type SearchErrorKind = "invalid" | "unavailable" | "timeout" | "network" | "response";
 
 export class SearchError extends Error {
@@ -93,11 +130,12 @@ export async function fetchSearch(
   signal: AbortSignal,
   request: typeof fetch = fetch,
   timeoutMs = 10_000,
+  source: SearchSource = "fixture",
 ): Promise<SearchResponse> {
   const timeout = new AbortController();
   const timer = setTimeout(() => timeout.abort(), timeoutMs);
   try {
-    const response = await request(`/api/assets/search?q=${encodeURIComponent(query)}`, {
+    const response = await request(`/api/${source === "observed" ? "observed/" : ""}assets/search?q=${encodeURIComponent(query)}`, {
       signal: AbortSignal.any([signal, timeout.signal]),
       cache: "no-store",
       headers: { Accept: "application/json" },
@@ -106,8 +144,8 @@ export async function fetchSearch(
     if (!response.ok) throw new SearchError("unavailable");
     let body: unknown;
     try { body = await response.json(); } catch { throw new SearchError("response"); }
-    if (!isSearchResponse(body)) throw new SearchError("response");
-    return body;
+    if (!(source === "observed" ? isObservedSearchResponse(body) : isSearchResponse(body))) throw new SearchError("response");
+    return body as SearchResponse;
   } catch (error) {
     if (signal.aborted) throw error;
     if (timeout.signal.aborted) throw new SearchError("timeout");

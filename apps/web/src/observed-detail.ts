@@ -1,4 +1,4 @@
-import { queryError } from "./stock-search.js";
+import { queryError, searchHref, type SearchSource } from "./stock-search.js";
 
 export const sampleRange = { from: "2026-09-28", to: "2026-10-07" };
 export interface ObservedRange { from: string; to: string }
@@ -16,22 +16,33 @@ export function validatedSearch(search: string): string | null {
   const value = parameters.get("search");
   return parameters.getAll("search").length === 1 && value && !queryError(value) ? value : null;
 }
+export function validatedSearchSource(search: string): SearchSource {
+  const parameters = new URLSearchParams(search);
+  return parameters.getAll("searchSource").length === 1 && parameters.get("searchSource") === "observed" ? "observed" : "fixture";
+}
+export function searchReturnHref(search: string): string {
+  const query = validatedSearch(search);
+  const source = validatedSearchSource(search);
+  return query ? searchHref(query, source) : source === "observed" ? "/?source=observed" : "/";
+}
 export function detailMode(search: string, symbol: string | null): DetailMode {
   const parameters = new URLSearchParams(search);
   const invalid: DetailMode = { kind: "invalid", message: "Nguồn hoặc khoảng ngày không hợp lệ. Chọn một nguồn và hai ngày hợp lệ, chênh lệch tối đa 31 ngày (32 ngày lịch)." };
+  if (parameters.getAll("searchSource").length > 1 || (parameters.has("searchSource") && !["fixture", "observed"].includes(parameters.get("searchSource")!))) return invalid;
   if (["source", "from", "to"].some(key => parameters.getAll(key).length > 1)) return invalid;
   const source = parameters.get("source");
   if (source === null || source === "fixture") return parameters.has("from") || parameters.has("to") ? invalid : { kind: "fixture" };
   if (source !== "observed") return invalid;
   if (symbol !== "FPT") return { kind: "invalid", message: "Trang dữ liệu đã lưu hiện chỉ hỗ trợ cổ phiếu FPT." };
-  if ([...parameters.keys()].some(key => !["source", "from", "to", "search"].includes(key))) return invalid;
+  if ([...parameters.keys()].some(key => !["source", "from", "to", "search", "searchSource"].includes(key))) return invalid;
   const range = { from: parameters.get("from") ?? "", to: parameters.get("to") ?? "" };
   return validObservedRange(range) ? { kind: "observed", range } : invalid;
 }
-export function detailHref(symbol: string, source: "fixture" | "observed", search: string | null, range = sampleRange): string {
+export function detailHref(symbol: string, source: "fixture" | "observed", search: string | null, range = sampleRange, searchOrigin: SearchSource = "fixture"): string {
   const parameters = new URLSearchParams();
   if (source === "observed") { parameters.set("source", source); parameters.set("from", range.from); parameters.set("to", range.to); }
   if (search) parameters.set("search", search);
+  if (searchOrigin === "observed") parameters.set("searchSource", "observed");
   return `/stocks/${encodeURIComponent(symbol)}${parameters.size ? `?${parameters}` : ""}`;
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Watchlists, { isWatchlistsRoute } from "./Watchlists.js";
-import { errorMessage, fetchSearch, queryError, type SearchResponse, type SearchResult } from "./stock-search.js";
+import { errorMessage, fetchSearch, queryError, searchHref, searchSource, type SearchResponse, type SearchResult } from "./stock-search.js";
+import { detailHref } from "./observed-detail.js";
 import StockDetail from "./StockDetail.js";
 import { stockRoute } from "./stock-detail.js";
 import MarketOverview from "./MarketOverview.js";
@@ -21,16 +22,18 @@ function SearchIcon() {
 }
 
 function CompanyReference({ company, response }: { company: SearchResult; response: SearchResponse }) {
+  const observed = response.meta.scope === "stored observed equities";
+  const query = new URLSearchParams(window.location.search).get("q") ?? company.asset.symbol;
   return <aside className="company-panel" aria-labelledby="company-heading">
     <span className="symbol-tag">{company.asset.symbol}</span>
     <h2 id="company-heading">{company.companyName}</h2>
-    <p className="muted">Cổ phiếu · {company.asset.exchange}</p>
-    <a className="detail-link" href={`/stocks/${encodeURIComponent(company.asset.symbol)}?search=${encodeURIComponent(new URLSearchParams(window.location.search).get("q") ?? company.asset.symbol)}`}>Xem chi tiết & biểu đồ ngày →</a>
+    <p className="muted">Cổ phiếu · {company.asset.exchange ?? "HOSE"}</p>
+    <a className="detail-link" href={observed ? detailHref(company.asset.symbol, "observed", query, undefined, "observed") : `/stocks/${encodeURIComponent(company.asset.symbol)}?search=${encodeURIComponent(query)}`}>Xem chi tiết & biểu đồ ngày →</a>
     <div className="panel-section">
       <h3>Thông tin tham chiếu</h3>
       <dl>
         <div><dt>Mã cổ phiếu</dt><dd>{company.asset.symbol}</dd></div>
-        <div><dt>Sàn</dt><dd>{company.asset.exchange}</dd></div>
+        <div><dt>Sàn</dt><dd>{company.asset.exchange ?? "HOSE"}</dd></div>
         <div><dt>Tiền tệ / đơn vị</dt><dd>{company.asset.currency === company.asset.unit ? company.asset.currency : `${company.asset.currency} / ${company.asset.unit}`}</dd></div>
         <div><dt>Múi giờ</dt><dd>{company.asset.timezone === "Asia/Ho_Chi_Minh" ? "Việt Nam (UTC+7)" : company.asset.timezone}</dd></div>
         <div><dt>Ngày rà soát nguồn</dt><dd>{company.reference.reviewedOn.split("-").reverse().join("/")}</dd></div>
@@ -43,14 +46,17 @@ function CompanyReference({ company, response }: { company: SearchResult; respon
         <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">Nguồn {index + 1} · {new URL(url).hostname}<span aria-hidden="true"> ↗</span><span className="sr-only"> (mở trong tab mới)</span></a></li>)}</ul>
     </div>
     <div className="reference-note">
-      <p>Dữ liệu minh họa — không phải dữ liệu thị trường</p>
-      <p className="small">Nguồn demo: {response.meta.provider === "marketpulse-fixture" ? "MarketPulse VN (dữ liệu minh họa)" : response.meta.provider}. Độ mới chưa xác định; chưa có thời điểm quan sát thị trường.</p>
+      <p>{observed ? "Danh mục tài sản đã lưu · KBS · Chỉ FPT" : "Dữ liệu minh họa — không phải dữ liệu thị trường"}</p>
+      <p className="small">{observed ? "Nguồn danh mục" : "Nguồn demo"}: {response.meta.provider === "marketpulse-fixture" ? "MarketPulse VN (dữ liệu minh họa)" : response.meta.provider}. Độ mới chưa xác định; chưa có thời điểm quan sát thị trường.</p>
+      {observed && <p className="small">Mã và đơn vị đọc từ tài sản đã lưu. Tên doanh nghiệp, bí danh và liên kết là tham chiếu do dự án tuyển chọn, không phải thông tin doanh nghiệp do KBS cung cấp. Chưa có thời điểm thu thập riêng cho tài sản; kết quả không xác nhận có giá hoặc lịch sử trong khoảng ngày nào.</p>}
       <p className="small">Thông tin tham khảo không xác nhận tình trạng đăng ký hiện tại của doanh nghiệp.</p>
     </div>
   </aside>;
 }
 
 function SearchPage() {
+  const source = searchSource(window.location.search);
+  const observed = source === "observed";
   const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [state, setState] = useState<SearchState>({ status: "initial" });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -60,7 +66,8 @@ function SearchPage() {
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("q");
-    if (query && !queryError(query)) void search(query);
+    if (source === null) setState({ status: "error", query: query ?? "", message: "Nguồn tìm kiếm chưa hợp lệ. Chọn một nguồn bên dưới.", retry: false });
+    else if (query !== null) void search(query);
     return () => { requestId.current += 1; controller.current?.abort(); };
   }, []);
 
@@ -68,18 +75,18 @@ function SearchPage() {
     const id = ++requestId.current;
     controller.current?.abort();
     setSelectedId(null);
-    const invalid = queryError(query);
+    const invalid = source === null ? "Nguồn tìm kiếm chưa hợp lệ. Chọn một nguồn bên dưới." : queryError(query);
     if (invalid) {
       setState({ status: "error", query, message: invalid, retry: false });
       input.current?.focus();
       return;
     }
     const next = new AbortController();
-    window.history.replaceState(null, "", `/?q=${encodeURIComponent(query)}`);
+    window.history.replaceState(null, "", searchHref(query, source ?? "fixture"));
     controller.current = next;
     setState({ status: "loading", query });
     try {
-      const response = await fetchSearch(query, next.signal);
+      const response = await fetchSearch(query, next.signal, fetch, 10_000, source ?? "fixture");
       if (id !== requestId.current || next.signal.aborted) return;
       if (response.data.length === 0) setState({ status: "empty", query });
       else {
@@ -111,13 +118,17 @@ function SearchPage() {
       <section className="search-hero" aria-labelledby="page-heading">
         <p className="eyebrow">Tra cứu doanh nghiệp</p>
         <h1 id="page-heading">Tìm doanh nghiệp bạn quan tâm</h1>
-        <p className="intro">Tra cứu mã cổ phiếu hoặc tên công ty trong danh mục 10 mã demo.</p>
+        <p className="intro">{observed ? "Tra cứu tài sản đã lưu từ luồng KBS. Phạm vi hiện tại chỉ FPT; không xác nhận có giá hoặc lịch sử." : "Tra cứu mã cổ phiếu hoặc tên công ty trong danh mục 10 mã demo."}</p>
+        <nav className="observed-source-tabs" aria-label="Nguồn tìm kiếm">
+          <a href={draft ? searchHref(draft, "fixture") : "/"} aria-current={source === "fixture" ? "page" : undefined}>Dữ liệu minh họa</a>
+          <a href={draft ? searchHref(draft, "observed") : "/?source=observed"} aria-current={observed ? "page" : undefined}>Danh mục đã lưu · KBS · FPT</a>
+        </nav>
         <form onSubmit={submit} className="search-form" noValidate>
           <label htmlFor="stock-query">Mã cổ phiếu hoặc tên doanh nghiệp</label>
-          <div className="search-controls"><div className="input-wrap"><SearchIcon /><input ref={input} id="stock-query" name="q" type="search" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ví dụ: FPT, Vietcombank, Hòa Phát" aria-describedby="query-help search-status" aria-invalid={state.status === "error" && !state.retry} autoComplete="off" /></div><button className="primary-button" type="submit"><SearchIcon />Tìm kiếm</button></div>
+          <div className="search-controls"><div className="input-wrap"><SearchIcon /><input ref={input} id="stock-query" name="q" type="search" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={observed ? "Ví dụ: FPT, Công ty Cổ phần FPT" : "Ví dụ: FPT, Vietcombank, Hòa Phát"} aria-describedby="query-help search-status" aria-invalid={state.status === "error" && !state.retry} autoComplete="off" /></div><button className="primary-button" type="submit"><SearchIcon />Tìm kiếm</button></div>
           <p id="query-help" className="small muted">Tìm theo mã hoặc tên, có dấu hoặc không dấu. Tối đa 100 ký tự.</p>
         </form>
-        <div className="examples"><span>Thử tìm</span>{["FPT", "Vietcombank", "Hòa Phát"].map((query) => <button key={query} type="button" onClick={() => { setDraft(query); void search(query); }}>{query}</button>)}</div>
+        <div className="examples"><span>Thử tìm</span>{(observed ? ["FPT", "Công ty Cổ phần FPT"] : ["FPT", "Vietcombank", "Hòa Phát"]).map((query) => <button key={query} type="button" onClick={() => { setDraft(query); void search(query); }}>{query}</button>)}</div>
       </section>
 
       <div className="workspace">
@@ -128,21 +139,21 @@ function SearchPage() {
             <ul className="result-list">{state.response.data.map((company) => {
               const selected = company.asset.assetId === selectedId;
               return <li key={company.asset.assetId}><button className={`result-card${selected ? " selected" : ""}`} type="button" aria-pressed={selected} aria-label={`Xem thông tin ${company.asset.symbol} — ${company.companyName}`} onClick={() => setSelectedId(company.asset.assetId)}>
-                <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{company.asset.exchange} · Cổ phiếu</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
+                <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{company.asset.exchange ?? "HOSE"} · Cổ phiếu</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
               </button></li>;
             })}</ul>
-            <p className="scope-note">Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày.</p>
+            <p className="scope-note">{observed ? "Danh mục đã lưu hiện chỉ FPT. Kết quả chỉ xác nhận tài sản, không xác nhận có giá hoặc lịch sử. Chi tiết mở khoảng mẫu lịch sử, không phải khoảng mới nhất." : "Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày."}</p>
           </> : <div className={`state-panel ${state.status === "error" ? "error-panel" : ""}`}>
             <span className={`state-icon ${state.status === "loading" ? "loading-icon" : ""}`} aria-hidden="true"><SearchIcon /></span>
             <h3>{state.status === "initial" ? "Bắt đầu với một doanh nghiệp" : state.status === "loading" ? "Đang tìm doanh nghiệp…" : state.status === "empty" ? "Chưa tìm thấy kết quả" : "Chưa thể tìm kiếm"}</h3>
             <p>{statusText}</p>
-            {state.status === "empty" && <p className="small muted">Thử mã cổ phiếu hoặc tên khác. Danh mục demo chỉ gồm 10 mã.</p>}
+            {state.status === "empty" && <p className="small muted">{observed ? "Chưa có tài sản đã lưu khớp truy vấn trong phạm vi FPT. Không tìm sang dữ liệu minh họa." : "Thử mã cổ phiếu hoặc tên khác. Danh mục demo chỉ gồm 10 mã."}</p>}
             {state.status === "error" && state.retry && <button type="button" className="secondary-button" onClick={() => void search(state.query)}>Thử lại</button>}
           </div>}
         </section>
         {selected && state.status === "results" ? <CompanyReference company={selected} response={state.response} /> : <aside className="company-panel company-placeholder"><span className="placeholder-symbol" aria-hidden="true">↗</span><h2>Thông tin doanh nghiệp</h2><p className="muted">{state.status === "loading" ? "Thông tin sẽ xuất hiện khi tìm kiếm hoàn tất." : "Tìm và chọn một doanh nghiệp để xem mã, sàn và nguồn tham khảo tại đây."}</p></aside>}
       </div>
-      <div className="demo-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu minh họa — không phải dữ liệu thị trường</strong><p>Thông tin dùng cho bản demo và nghiên cứu. Chưa có giá thị trường trên trang này.</p></div></div>
+      <div className="demo-notice"><span aria-hidden="true">ⓘ</span><div><strong>{observed ? "Danh mục đã lưu · KBS · Độ phủ chỉ FPT" : "Dữ liệu minh họa — không phải dữ liệu thị trường"}</strong><p>{observed ? "VND · Việt Nam (UTC+7). Thời điểm nguồn, thời điểm thu thập riêng của tài sản và độ mới chưa xác định. Tên/bí danh là tham chiếu tuyển chọn. Không có giá trên trang này." : "Thông tin dùng cho bản demo và nghiên cứu. Chưa có giá thị trường trên trang này."}</p></div></div>
     </main>
     <footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ minh họa và nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>
   </>;

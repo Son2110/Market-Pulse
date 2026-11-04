@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { fetchSearch, queryError, type SearchResult } from "./stock-search.js";
+import { fetchSearch, type SearchResult } from "./stock-search.js";
 import { closingChart, closingSummary, DetailError, detailErrorMessage, fetchHistory, type DailyCandle, type HistoryResponse } from "./stock-detail.js";
 import SiteHeader from "./SiteHeader.js";
 import ObservedStockDetail, { DetailSourceLinks } from "./ObservedStockDetail.js";
-import { detailMode, validatedSearch } from "./observed-detail.js";
+import { detailMode, validatedSearch, searchReturnHref } from "./observed-detail.js";
 
 const number = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 const signed = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2, minimumFractionDigits: 2, signDisplay: "exceptZero" });
@@ -90,8 +90,7 @@ function FixtureStockDetail({ symbol }: { symbol: string | null }) {
   const [company, setCompany] = useState<SearchResult | null>(null);
   const [attempt, setAttempt] = useState(0);
   const requestId = useRef(0);
-  const searchQuery = new URLSearchParams(window.location.search).get("search");
-  const backHref = searchQuery && !queryError(searchQuery) ? `/?q=${encodeURIComponent(searchQuery)}` : "/";
+  const backHref = searchReturnHref(window.location.search);
 
   useEffect(() => {
     document.title = symbol ? `${symbol} — Chi tiết cổ phiếu | MarketPulse VN` : "Chi tiết chưa khả dụng | MarketPulse VN";

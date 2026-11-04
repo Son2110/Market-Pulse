@@ -25,6 +25,7 @@ export interface HealthOptions {
   watchlistRouter?: Router;
   ingestionRouter?: Router;
   observedHistoryRouter?: Router;
+  observedSearchRouter?: Router;
   goldReadRouter?: Router;
 }
 
@@ -54,6 +55,7 @@ export function createApp({
   watchlistRouter,
   ingestionRouter,
   observedHistoryRouter,
+  observedSearchRouter,
   goldReadRouter,
 }: HealthOptions): Express {
   const app = express();
@@ -141,6 +143,7 @@ export function createApp({
   }
   if (stockSearchRouter) app.use("/api/assets", stockSearchRouter);
   if (dailyHistoryRouter) app.use("/api/assets", dailyHistoryRouter);
+  if (observedSearchRouter) app.use("/api/observed/assets", observedSearchRouter);
   if (observedHistoryRouter) app.use("/api/observed/assets", observedHistoryRouter);
   app.use("/api/gold/quotes", (_request, response, next) => {
     response.set("Cache-Control", "no-store");

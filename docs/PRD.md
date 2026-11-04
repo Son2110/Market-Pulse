@@ -1,5 +1,8 @@
 # Yêu cầu sản phẩm — scope hiện hành và baseline lịch sử
 
+**FR-03 catalog đã lưu · 04/11/2026:** search root có source observed tường minh chỉ FPT, đọc canonical asset đã lưu và dùng tên/bí danh tham chiếu tuyển chọn có attribution riêng. Query/source giữ qua reload và detail/back; không provider hoặc fixture fallback. Catalog không xác nhận có giá/candle, freshness hoặc lịch sử; chưa hoàn tất FR-03/toàn core. [Handoff hiện hành](FR03_SEARCH_DESIGN.md) phân biệt checks synthetic/stub với nghiệm thu dữ liệu thật và review riêng.
+
+
 ## Phạm vi hiện hành · 26/10/2026 — chiều sâu sản phẩm và dữ liệu thật
 
 Theo yêu cầu chủ dự án, ưu tiên hoàn thiện chiều sâu app trên **dữ liệu thị trường thật**. Loại toàn bộ dự đoán giá bằng AI/ML và nghiên cứu P5 khỏi scope: không xác suất tăng/đi ngang/giảm, training, backtest mô hình dự báo, holdout/calibration, shadow forecast hoặc phục vụ dự báo. Đây là hủy phạm vi, không đổi tên P5 thành một pha nghiên cứu khác. AI phân loại/tóm tắt không dự báo là tùy chọn hoãn; không là điều kiện để hoàn tất core, news hoặc vàng.
