@@ -29,6 +29,102 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 });
 
+test("search source tabs preserve only the committed URL query across drafts and navigation", async ({ page }) => {
+  await page.route("**/api/observed/assets/search?*", route => route.fulfill({ json: {
+    data: [], meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: null,
+      sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
+  } }));
+  await page.route("**/api/assets/search?*", route => route.fulfill({ json: {
+    data: [], meta: { scope: "fixture equities", dataset: "fixture / unknown", label: "SYNTHETIC FIXTURE — NOT MARKET DATA", provider: "marketpulse-fixture", asOf: null },
+  } }));
+  const query = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
+  const tabs = page.getByRole("navigation", { name: "Nguồn tìm kiếm", exact: true });
+  const fixture = tabs.getByRole("link", { name: "Dữ liệu minh họa", exact: true });
+  const observed = tabs.getByRole("link", { name: "Danh mục đã lưu · KBS · FPT", exact: true });
+  await page.goto("/?source=observed&q=FPT");
+  await expect(page.getByRole("heading", { name: "Chưa tìm thấy kết quả", exact: true })).toBeVisible();
+  for (const draft of ["VCB", "", " ", "x".repeat(101)]) {
+    await query.fill(draft);
+    await expect(fixture).toHaveAttribute("href", "/?q=FPT");
+    await expect(observed).toHaveAttribute("href", "/?source=observed&q=FPT");
+  }
+  await query.press("Enter");
+  await expect(page.getByRole("heading", { name: "Chưa thể tìm kiếm", exact: true })).toBeVisible();
+  await expect(fixture).toHaveAttribute("href", "/?q=FPT");
+  await query.fill("Cổ phần FPT"); await query.press("Enter");
+  const encodedQuery = encodeURIComponent("Cổ phần FPT");
+  await expect(fixture).toHaveAttribute("href", `/?q=${encodedQuery}`);
+  await expect(observed).toHaveAttribute("href", `/?source=observed&q=${encodedQuery}`);
+  await query.fill("UNSENT"); await fixture.click();
+  await expect(page).toHaveURL(new RegExp(`/\\?q=${encodedQuery}$`));
+  await expect(query).toHaveValue("Cổ phần FPT");
+  await expect(fixture).toHaveAttribute("aria-current", "page");
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/\\?source=observed&q=${encodedQuery}$`));
+  await expect(observed).toHaveAttribute("aria-current", "page");
+  await expect(fixture).toHaveAttribute("href", `/?q=${encodedQuery}`);
+  for (const url of ["/?source=observed", "/?source=observed&q="]) {
+    await page.goto(url); await query.fill("FPT");
+    await expect(fixture).toHaveAttribute("href", "/");
+    await expect(observed).toHaveAttribute("href", "/?source=observed");
+  }
+  await noOverflow(page);
+});
+
+test("observed catalog UI states and search origin continuity with explicit stub responses", async ({ page }) => {
+  const body = {
+    data: [{ asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"],
+      reference: { origin: "curated_reference", officialSources: ["https://fpt.com/vi/nha-dau-tu/thong-tin-co-phieu"], reviewedOn: "2026-09-29" } }],
+    meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" },
+      sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
+  };
+  let fail = true; let release: (() => void) | undefined; let fixtureRequests = 0;
+  page.on("request", request => { if (new URL(request.url()).pathname === "/api/assets/search") fixtureRequests++; });
+  await page.route("**/api/observed/assets/search?*", async route => {
+    const query = new URL(route.request().url()).searchParams.get("q");
+    if (query === "SLOW") await new Promise<void>(resolve => { release = resolve; });
+    if (query === "ERROR" && fail) { await route.fulfill({ status: 503, json: { error: "observed_asset_search_unavailable" } }); return; }
+    await route.fulfill({ json: { ...body, data: query === "VCB" ? [] : body.data } });
+  });
+  await page.route("**/api/observed/assets/FPT/history?*", async route => {
+    const parameters = new URL(route.request().url()).searchParams;
+    await route.fulfill({ json: { data: { dataset: body.meta.dataset, asset: body.data[0].asset, candles: [] },
+      meta: { status: "no_data", provider: "KBS", interval: "1d", requestedRange: { from: parameters.get("from"), to: parameters.get("to") }, returnedRange: null,
+        sourceAsOf: null, completeness: "unknown", selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" } } });
+  });
+  await page.goto("/?source=observed");
+  await expect(page.getByRole("heading", { name: "Bắt đầu với một doanh nghiệp", exact: true })).toBeVisible();
+  const query = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
+  await query.fill("SLOW"); await query.press("Enter");
+  await expect(page.getByRole("heading", { name: "Đang tìm doanh nghiệp…", exact: true })).toBeVisible();
+  await query.fill("VCB"); await query.press("Enter");
+  await expect(page.getByRole("heading", { name: "Chưa tìm thấy kết quả", exact: true })).toBeVisible();
+  release?.();
+  await query.fill("ERROR"); await query.press("Enter");
+  await expect(page.getByRole("heading", { name: "Chưa thể tìm kiếm", exact: true })).toBeVisible();
+  fail = false; await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Xem thông tin FPT/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("complementary", { name: "Công ty Cổ phần FPT", exact: true })).toContainText("tham chiếu do dự án tuyển chọn");
+  await noOverflow(page); expect(fixtureRequests).toBe(0);
+  await page.reload();
+  const link = page.getByRole("link", { name: "Xem chi tiết & biểu đồ ngày →", exact: true });
+  await expect(link).toHaveAttribute("href", /source=observed.*search=ERROR.*searchSource=observed/);
+  await link.click();
+  await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", "/?source=observed&q=ERROR");
+  await expect(page.getByRole("heading", { name: "Không có quan sát trong khoảng đã chọn", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Khoảng mẫu 28/09–07/10/2026", exact: true })).toHaveAttribute("href", /searchSource=observed/);
+  const emptySample = page.getByRole("link", { name: "Xem khoảng mẫu 28/09–07/10/2026 →", exact: true });
+  await expect(emptySample).toHaveAttribute("href", /searchSource=observed/);
+  await emptySample.click();
+  await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", "/?source=observed&q=ERROR");
+  await page.getByRole("navigation", { name: "Nguồn dữ liệu chi tiết", exact: true }).getByRole("link", { name: "Dữ liệu minh họa", exact: true }).click();
+  await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", "/?source=observed&q=ERROR");
+  await page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true }).click();
+  await expect(page).toHaveURL(/\/\?source=observed&q=ERROR/);
+  await expect(page.getByRole("button", { name: /^Xem thông tin FPT/ })).toBeVisible();
+  await noOverflow(page);
+});
+
 test("real fixture search → chart → private persisted watchlist → logout", async ({ page, browser }, testInfo) => {
   let pageErrors = 0;
   page.on("pageerror", () => { pageErrors += 1; });

@@ -11,6 +11,7 @@ import { createIngestionApi } from "./ingestion-api.js";
 import { createIngestionQueue, DeliveryQueue } from "./ingestion-queue.js";
 import { IngestionStore } from "./ingestion-store.js";
 import { createObservedHistoryRouter, ObservedHistoryService } from "./observed-history.js";
+import { createObservedSearchRouter, ObservedSearchService } from "./observed-search.js";
 import { createStockSearchRouter, StockSearchService } from "./stock-search.js";
 import { connectWithRetry, createStores } from "./stores.js";
 import { createWatchlistApi } from "./watchlists.js";
@@ -104,6 +105,9 @@ const server = createServer(
     authRouter: auth.router,
     stockSearchRouter: createStockSearchRouter(stockSearch),
     dailyHistoryRouter: createDailyHistoryRouter(marketData),
+    observedSearchRouter: config.observedReadsEnabled
+      ? createObservedSearchRouter(new ObservedSearchService(stores.mongo.db(), config.dependencyTimeoutMs), () => connectedBefore && !shuttingDown)
+      : undefined,
     observedHistoryRouter: config.observedReadsEnabled
       ? createObservedHistoryRouter(
         new ObservedHistoryService(stores.mongo.db(), config.dependencyTimeoutMs),

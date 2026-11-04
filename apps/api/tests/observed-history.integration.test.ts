@@ -99,6 +99,9 @@ test("actual API registers observed reads only when enabled and runs with no ing
     const response = await fetch(`${base}/api/observed/assets/fpt/history?from=2026-10-01&to=2026-10-06`);
     assert.equal(response.status, flag === "true" ? 200 : 404);
     if (flag === "true") assert.deepEqual((await response.json()).data.candles, observed().candles);
+    const searchResponse = await fetch(`${base}/api/observed/assets/search?q=FPT`);
+    assert.equal(searchResponse.status, flag === "true" ? 200 : 404);
+    if (flag === "true") assert.deepEqual((await searchResponse.json()).data[0].asset, observed().assets[0]);
     const statusResponse = await fetch(`${base}/api/observed/assets/fpt/collection-status?from=2026-10-01&to=2026-10-06`);
     assert.equal(statusResponse.status, flag === "true" ? 200 : 404);
     if (flag === "true") {

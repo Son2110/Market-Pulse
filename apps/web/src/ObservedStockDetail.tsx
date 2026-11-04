@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import SiteHeader from "./SiteHeader.js";
 import ObservedCollectionStatus from "./ObservedCollectionStatus.js";
 import "./observed-detail.css";
-import { detailHref, fetchObservedHistory, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, type DetailMode, type ObservedCandle, type ObservedHistory } from "./observed-detail.js";
+import { detailHref as buildDetailHref, searchReturnHref, validatedSearchSource, fetchObservedHistory, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, type DetailMode, type ObservedCandle, type ObservedHistory } from "./observed-detail.js";
 
+const detailHref = (symbol: string, source: "fixture" | "observed", search: string | null) =>
+  buildDetailHref(symbol, source, search, undefined, validatedSearchSource(window.location.search));
 const date = (value: string) => value.split("-").reverse().join("/");
 export function DetailSourceLinks({ symbol, selected, search }: { symbol: string; selected: "fixture" | "observed"; search: string | null }) {
   return <nav className="observed-source-tabs" aria-label="Nguồn dữ liệu chi tiết">
@@ -75,7 +77,7 @@ type State = { status: "loading" } | { status: "loaded"; response: ObservedHisto
 export default function ObservedStockDetail({ symbol, mode }: { symbol: string | null; mode: Exclude<DetailMode, { kind: "fixture" }> }) {
   const [state, setState] = useState<State>({ status: "loading" }); const [attempt, setAttempt] = useState(0); const requestId = useRef(0);
   const parameters = new URLSearchParams(window.location.search); const search = validatedSearch(window.location.search);
-  const backHref = search ? `/?q=${encodeURIComponent(search)}` : "/";
+  const backHref = searchReturnHref(window.location.search);
   const from = mode.kind === "observed" ? mode.range.from : parameters.get("from") ?? sampleRange.from;
   const to = mode.kind === "observed" ? mode.range.to : parameters.get("to") ?? sampleRange.to;
   const valid = mode.kind === "observed";
@@ -99,7 +101,7 @@ export default function ObservedStockDetail({ symbol, mode }: { symbol: string |
       <div className="demo-notice detail-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu đã lưu · KBS · Không phải giá hiện tại</strong><p>Độ mới, thời điểm quan sát từ nguồn, lịch phiên và cơ sở điều chỉnh chưa xác minh. Thông tin phục vụ nghiên cứu.</p></div></div>
       <section className="detail-card observed-heading" aria-labelledby="observed-heading"><p className="asset-line"><span className="symbol-tag">{symbol ?? "—"}</span><span className="small muted">{symbol === "FPT" ? "HOSE · Cổ phiếu · VND" : "Mã ngoài phạm vi dữ liệu đã lưu"}</span></p><h1 id="observed-heading">{symbol === "FPT" ? "Cổ phiếu FPT" : "Chi tiết dữ liệu đã lưu"}</h1><DetailSourceLinks symbol={symbol ?? "FPT"} selected="observed" search={search} /></section>
       {symbol === "FPT" && <section className="detail-card observed-range-card" aria-labelledby="observed-range-heading"><h2 id="observed-range-heading">Khoảng ngày đã chọn</h2>
-        <form method="get" action="/stocks/FPT" className="observed-range-form"><input type="hidden" name="source" value="observed" />{search && <input type="hidden" name="search" value={search} />}
+        <form method="get" action="/stocks/FPT" className="observed-range-form"><input type="hidden" name="source" value="observed" />{validatedSearchSource(window.location.search) === "observed" && <input type="hidden" name="searchSource" value="observed" />}{search && <input type="hidden" name="search" value={search} />}
           <label htmlFor="observed-from">Từ ngày<input id="observed-from" type="date" name="from" required defaultValue={from} aria-describedby="observed-range-help" /></label>
           <label htmlFor="observed-to">Đến ngày<input id="observed-to" type="date" name="to" required defaultValue={to} aria-describedby="observed-range-help" /></label><button className="primary-button" type="submit">Xem dữ liệu</button>
         </form><p id="observed-range-help" className="small muted">Bao gồm hai ngày đầu/cuối; chênh lệch tối đa 31 ngày (32 ngày lịch). <a href={detailHref("FPT", "observed", search)}>Khoảng mẫu 28/09–07/10/2026</a> · Không phải khoảng mới nhất.</p>

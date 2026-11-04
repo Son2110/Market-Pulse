@@ -21,7 +21,7 @@ interface IndexedStock extends StockSearchResult {
   normalizedTerms: string[];
 }
 
-function normalizeSearchText(value: string): string {
+export function normalizeSearchText(value: string): string {
   return value.normalize("NFD")
     .toLocaleLowerCase("vi-VN")
     .replace(/\p{M}/gu, "")
@@ -146,7 +146,7 @@ interface ParsedSearchQuery {
   query: string;
 }
 
-function parseSearchQuery(originalUrl: string): ParsedSearchQuery | null {
+export function parseSearchQuery(originalUrl: string): ParsedSearchQuery | null {
   const parameters = new URL(originalUrl, "http://localhost").searchParams;
   const keys = [...parameters.keys()];
   if (keys.length !== 1 || keys[0] !== "q") return null;
