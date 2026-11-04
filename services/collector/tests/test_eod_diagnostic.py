@@ -1,10 +1,12 @@
 """Offline diagnostic checks; real provider acceptance is a separate manual run."""
 
+import contextlib
 import copy
 import json
 import os
 import sys
 import threading
+import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -13,6 +15,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[3]
 sys.path[:0] = [str(ROOT), str(ROOT / "services/collector")]
 from collector import eod_diagnostic as diagnostic
+from collector import eod_runner as runner
 from collector.eod_runner import EodError
 from collector.transport import delivery_envelope, submit
 from collector.vnstock_adapter import normalize_rows
@@ -37,6 +40,19 @@ def sample():
                            "accepted": 0, "queued": 0, "running": 0, "success": 1, "failure": 0, "unknown": 0}}}
     delivery = {"counts": {"assets": 1, "observations": 1}}
     return document, history, status, delivery
+
+
+@contextlib.contextmanager
+def local_server(handler):
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 class DiagnosticTests(unittest.TestCase):
@@ -106,9 +122,116 @@ class DiagnosticTests(unittest.TestCase):
     def test_api_port_must_belong_to_selected_project(self):
         response = type("Response", (), {"stdout": json.dumps({"3001/tcp": [{"HostIp": "127.0.0.1", "HostPort": "3999"}]})})()
         with patch.object(diagnostic, "container_id", side_effect=["a" * 12, "b" * 12]), \
-                patch.object(diagnostic.subprocess, "run", return_value=response) as run, self.assertRaises(EodError):
+                patch.object(diagnostic.subprocess, "run", return_value=response) as run, self.assertRaises(EodError) as caught:
             diagnostic.stack_ready("mp-eod-diagnostic-test", ORIGIN)
+        self.assertEqual(caught.exception.code, "diagnostic_api_mismatch")
         self.assertEqual(run.call_count, 1)
+
+    def test_read_deadline_covers_dripping_headers_and_bodies(self):
+        for phase in ("headers", "body", "missing_body"):
+            requested = threading.Event()
+            class Handler(BaseHTTPRequestHandler):
+                def log_message(self, *_args):
+                    pass
+
+                def do_GET(self):
+                    requested.set()
+                    body = b'{"error":"asset_not_found"}' if phase == "missing_body" else b'{"data":"' + b'x' * 32 + b'"}'
+                    try:
+                        self.send_response(404 if phase == "missing_body" else 200)
+                        self.send_header("Content-Length", str(len(body)))
+                        self.flush_headers()
+                        if phase == "headers":
+                            for byte in b"X-Slow: " + b"x" * 32 + b"\r\n\r\n":
+                                self.wfile.write(bytes([byte]))
+                                self.wfile.flush()
+                                time.sleep(0.025)
+                            self.wfile.write(body)
+                        else:
+                            self.end_headers()
+                            for byte in body:
+                                self.wfile.write(bytes([byte]))
+                                self.wfile.flush()
+                                time.sleep(0.025)
+                    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                        pass
+
+            with self.subTest(phase=phase), local_server(Handler) as origin:
+                started = time.monotonic()
+                with self.assertRaises(EodError) as caught:
+                    diagnostic.read_json(origin, allow_missing=True, deadline=started + 0.2)
+                elapsed = time.monotonic() - started
+                self.assertTrue(requested.is_set())
+                self.assertEqual(caught.exception.code, "local_read_failed")
+                self.assertGreaterEqual(elapsed, 0.18)
+                self.assertLess(elapsed, 0.5)
+
+    def test_verification_reads_share_deadline_and_keep_overlap_lease(self):
+        document, history, status, delivery = sample()
+        calls = []
+        lease_held = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                pass
+
+            def do_GET(self):
+                calls.append(self.path)
+                try:
+                    with runner.LocalRunLock():
+                        lease_held.append(False)
+                except EodError as error:
+                    lease_held.append(error.code == "overlap_lock_unavailable")
+                body = json.dumps(history if "/history?" in self.path else status).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                time.sleep(0.15)
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                    pass
+
+        with local_server(Handler) as origin, patch.object(diagnostic, "VERIFY_TIMEOUT_SECONDS", 0.25), \
+                patch.dict(os.environ, {"INGESTION_ENDPOINT": ORIGIN + "/internal/ingestion/deliveries", "INGESTION_SECRET": "a" * 64}), \
+                patch.object(runner, "collect", return_value=(document, {})), \
+                patch.object(runner, "_deliver", return_value={"state": "persisted", **delivery}), \
+                patch.object(runner, "SYMBOLS", ("FPT",)):
+            started = time.monotonic()
+            result = runner.run(enable_eod=True, target_date=TARGET, submit_enabled=True,
+                                verify_persisted=lambda doc, receipt: diagnostic.verify_document(origin, doc, receipt))
+            elapsed = time.monotonic() - started
+        self.assertEqual(result["symbols"][0]["verification"], {"state": "failed", "errorCode": "local_read_failed"})
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(lease_held, [True, True])
+        self.assertLess(elapsed, 0.5)
+        with runner.LocalRunLock():
+            pass
+
+    def test_read_security_and_response_bound_survive_deadline(self):
+        calls = []
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                pass
+
+            def do_GET(self):
+                calls.append((self.path, self.headers.get("Authorization")))
+                body = b'{"ok":true}' if self.path == "/ok" else b"" if self.path == "/redirect" else b"x" * 65537
+                self.send_response(302 if self.path == "/redirect" else 200)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Location", "/ok")
+                self.end_headers()
+                self.wfile.write(body)
+
+        environment = {"HTTP_PROXY": "http://127.0.0.1:1", "http_proxy": "http://127.0.0.1:1", "NO_PROXY": "", "no_proxy": ""}
+        with local_server(Handler) as origin, patch.dict(os.environ, environment), \
+                patch("urllib.request.proxy_bypass", return_value=False):
+            self.assertEqual(diagnostic.read_json(origin + "/ok"), (200, {"ok": True}))
+            self.assertEqual(diagnostic.read_json(origin + "/ok", auth_secret="a" * 64)[0], 200)
+            for path in ("/redirect", "/large"):
+                with self.assertRaises(EodError):
+                    diagnostic.read_json(origin + path)
+        self.assertEqual(calls, [("/ok", None), ("/ok", "Bearer " + "a" * 64), ("/redirect", None), ("/large", None)])
 
     def test_wrong_ingestion_secret_fails_before_imports_or_provider(self):
         from io import BytesIO

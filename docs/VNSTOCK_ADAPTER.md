@@ -6,7 +6,7 @@ The owner authorized one bounded real-data diagnostic, separate from daily activ
 
 Preflight finds exactly one API/worker under the selected project/service labels, binds the endpoint to that API's published `3001/tcp` loopback port, checks actual worker health via fixed Docker exec arguments, and authenticates with a random nonexistent receipt ID (only exact `404 {error:not_found}` passes). It checks pinned provider imports/versions, observed/ingestion/queue readiness, and both target histories are empty or return exact observed `asset_not_found`. Wrong secret, missing dependency, disabled flag, wrong stack or nonempty target fails before collection. Auth/read probes disable redirects/proxies; only the ingestion auth probe receives a bearer. Shared POST/poll explicitly disables ambient proxies on loopback, preserving external HTTPS behavior.
 
-After terminal success, the helper compares actual UI-facing `/api/observed/assets/:symbol/history` against the retained full candle list (exact OHLC strings, dates, bar IDs/digests, timestamps, units/source/nulls), asset/dataset and receipt counts. It checks history provider/interval/requested range/null source-as-of/unknown completeness, and collection-status selected/success counts, unknown freshness, unverified calendar and null source-as-of. Both symbols must pass for `diagnosticVerified=true`/exit 0; persisted mismatches become `verification_failed`. Partial/no-data/pending/error stay failures. Receipt success does not verify market freshness/finality/rights.
+After terminal success, the helper compares actual UI-facing `/api/observed/assets/:symbol/history` against the retained full candle list (exact OHLC strings, dates, bar IDs/digests, timestamps, units/source/nulls), asset/dataset and receipt counts. It checks history provider/interval/requested range/null source-as-of/unknown completeness, and collection-status selected/success counts, unknown freshness, unverified calendar and null source-as-of. Each symbol's two verification reads share a ten-second wall-clock deadline, including connection, slow headers and body, while the overlap lease stays held. Other diagnostic reads have a five-second wall-clock deadline; socket inactivity also remains bounded to five seconds. Timeout returns safe `local_read_failed` verification metadata. Both symbols must pass for `diagnosticVerified=true`/exit 0; persisted mismatches become `verification_failed`. Partial/no-data/pending/error stay failures. Receipt success does not verify market freshness/finality/rights.
 
 ### Manual runbook
 
@@ -15,15 +15,26 @@ Use only for a separately authorized date/scope, with a fresh isolated local pro
 With a Python environment where those imports succeed, prepare the existing four-service Compose stack in PowerShell (choose unused ports and a fresh suffix):
 
 ```powershell
+$ErrorActionPreference = 'Stop'
 $diagnosticProject = 'mp-eod-diagnostic-your-unique-suffix'
 $env:API_PORT = '3029'
 $env:MONGODB_PORT = '27229'
 $env:REDIS_PORT = '6399'
 $env:OBSERVED_READS_ENABLED = 'true'
 $env:GOLD_READS_ENABLED = 'false'
+$env:INGESTION_SECRET = $null
 $diagnosticBytes = New-Object byte[] 32
-[Security.Cryptography.RandomNumberGenerator]::Fill($diagnosticBytes)
-$env:INGESTION_SECRET = ([BitConverter]::ToString($diagnosticBytes)).Replace('-', '').ToLowerInvariant()
+$diagnosticRng = [Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $diagnosticRng.GetBytes($diagnosticBytes)
+    $diagnosticSecret = ([BitConverter]::ToString($diagnosticBytes)).Replace('-', '').ToLowerInvariant()
+    if ($diagnosticSecret -notmatch '^[a-f0-9]{64}$' -or $diagnosticSecret -eq ('0' * 64)) {
+        throw 'Diagnostic secret generation failed'
+    }
+    $env:INGESTION_SECRET = $diagnosticSecret
+} finally {
+    $diagnosticRng.Dispose()
+}
 $env:INGESTION_ENDPOINT = 'http://127.0.0.1:3029/internal/ingestion/deliveries'
 $env:PYTHONPATH = "$PWD;$PWD/services/collector"
 $env:VNSTOCK_DISABLE_AGENT_SETUP = '1'

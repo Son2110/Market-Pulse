@@ -9,15 +9,67 @@ import io
 import json
 import os
 import re
+import socket
 import subprocess
+import time
 import uuid
+from http.client import HTTPConnection
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import ProxyHandler, Request, build_opener
+from urllib.request import HTTPHandler, ProxyHandler, Request, build_opener
 
 from collector.eod_runner import EodError, run
 from collector.transport import NoRedirect, validate_submission_options
 from collector.vnstock_adapter import VERSIONS, validate_request
+
+
+READ_TIMEOUT_SECONDS = 5
+VERIFY_TIMEOUT_SECONDS = 10
+
+
+def _remaining(deadline: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError
+    return min(READ_TIMEOUT_SECONDS, remaining)
+
+
+class _DeadlineSocket(socket.socket):
+    def __init__(self, *args, deadline: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._deadline = deadline
+
+    def recv_into(self, *args, **kwargs):
+        # HTTP headers and buffered bodies may each perform many socket reads.
+        self.settimeout(_remaining(self._deadline))
+        return super().recv_into(*args, **kwargs)
+
+    def sendall(self, *args, **kwargs):
+        self.settimeout(_remaining(self._deadline))
+        return super().sendall(*args, **kwargs)
+
+
+class _DeadlineHTTPConnection(HTTPConnection):
+    def __init__(self, *args, deadline: float, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._deadline = deadline
+
+    def connect(self):
+        self.timeout = _remaining(self._deadline)
+        super().connect()
+        original = self.sock
+        self.sock = _DeadlineSocket(original.family, original.type, original.proto,
+                                    fileno=original.detach(), deadline=self._deadline)
+
+
+class _DeadlineHTTPHandler(HTTPHandler):
+    def __init__(self, deadline: float):
+        super().__init__()
+        self._deadline = deadline
+
+    def http_open(self, request):
+        return self.do_open(lambda *args, **kwargs: _DeadlineHTTPConnection(
+            *args, deadline=self._deadline, **kwargs), request)
 
 
 def local_origin(endpoint: str) -> str:
@@ -34,26 +86,33 @@ def local_origin(endpoint: str) -> str:
 
 
 def read_json(url: str, *, allow_missing: bool = False, missing_error: str = "asset_not_found",
-              auth_secret: str | None = None) -> tuple[int, dict]:
+              auth_secret: str | None = None, deadline: float | None = None) -> tuple[int, dict]:
     # Only the explicit ingestion auth probe receives a bearer; proxies are disabled.
     headers = {"Authorization": f"Bearer {auth_secret}"} if auth_secret is not None else {}
+    deadline = deadline if deadline is not None else time.monotonic() + READ_TIMEOUT_SECONDS
     try:
-        with build_opener(ProxyHandler({}), NoRedirect()).open(Request(url, headers=headers), timeout=5) as response:
+        opener = build_opener(ProxyHandler({}), NoRedirect(), _DeadlineHTTPHandler(deadline))
+        with opener.open(Request(url, headers=headers), timeout=_remaining(deadline)) as response:
             raw = response.read(65537)
+            _remaining(deadline)
             if response.status != 200 or len(raw) > 65536:
                 raise EodError("invalid_local_response")
             result = json.loads(raw)
             if not isinstance(result, dict):
                 raise EodError("invalid_local_response")
+            _remaining(deadline)
             return response.status, result
     except HTTPError as error:
-        if allow_missing and error.code == 404:
-            try:
-                raw = error.read(65537)
-                if len(raw) <= 65536 and json.loads(raw) == {"error": missing_error}:
-                    return 404, {"error": missing_error}
-            except (ValueError, UnicodeError, OSError):
-                pass
+        with error:
+            if allow_missing and error.code == 404:
+                try:
+                    raw = error.read(65537)
+                    _remaining(deadline)
+                    if len(raw) <= 65536 and json.loads(raw) == {"error": missing_error}:
+                        _remaining(deadline)
+                        return 404, {"error": missing_error}
+                except (ValueError, UnicodeError, OSError):
+                    pass
         raise EodError("local_read_failed") from None
     except (URLError, OSError, ValueError, UnicodeError):
         raise EodError("local_read_failed") from None
@@ -88,6 +147,8 @@ def stack_ready(project: str, origin: str) -> None:
         subprocess.run(["docker", "exec", worker, "node", "-e",
                         "fetch('http://127.0.0.1:3002/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"],
                        capture_output=True, timeout=10, check=True)
+    except EodError:
+        raise
     except (OSError, ValueError, subprocess.SubprocessError):
         raise EodError("worker_not_ready") from None
 
@@ -134,12 +195,13 @@ def preflight(*, enabled: bool, target_date: str, project: str) -> str:
 
 
 def verify_document(origin: str, document: dict, delivery: dict) -> dict:
+    deadline = time.monotonic() + VERIFY_TIMEOUT_SECONDS
     request = document["request"]
     path = f"{origin}/api/observed/assets/{request['symbol']}"
     query = f"?from={request['start']}&to={request['end']}"
     try:
-        history = read_json(path + "/history" + query)[1]
-        status = read_json(path + "/collection-status" + query)[1]
+        history = read_json(path + "/history" + query, deadline=deadline)[1]
+        status = read_json(path + "/collection-status" + query, deadline=deadline)[1]
         data, meta, collection = history.get("data", {}), history.get("meta", {}), status.get("meta", {})
         if any(not isinstance(value, dict) for value in (data, meta, collection)):
             raise EodError("invalid_local_response")
