@@ -56,6 +56,7 @@ function CompanyReference({ company, response }: { company: SearchResult; respon
 
 function SearchPage() {
   const source = searchSource(window.location.search);
+  const committedQuery = new URLSearchParams(window.location.search).get("q") ?? "";
   const observed = source === "observed";
   const [draft, setDraft] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [state, setState] = useState<SearchState>({ status: "initial" });
@@ -120,8 +121,8 @@ function SearchPage() {
         <h1 id="page-heading">Tìm doanh nghiệp bạn quan tâm</h1>
         <p className="intro">{observed ? "Tra cứu tài sản đã lưu từ luồng KBS. Phạm vi hiện tại chỉ FPT; không xác nhận có giá hoặc lịch sử." : "Tra cứu mã cổ phiếu hoặc tên công ty trong danh mục 10 mã demo."}</p>
         <nav className="observed-source-tabs" aria-label="Nguồn tìm kiếm">
-          <a href={draft ? searchHref(draft, "fixture") : "/"} aria-current={source === "fixture" ? "page" : undefined}>Dữ liệu minh họa</a>
-          <a href={draft ? searchHref(draft, "observed") : "/?source=observed"} aria-current={observed ? "page" : undefined}>Danh mục đã lưu · KBS · FPT</a>
+          <a href={committedQuery ? searchHref(committedQuery, "fixture") : "/"} aria-current={source === "fixture" ? "page" : undefined}>Dữ liệu minh họa</a>
+          <a href={committedQuery ? searchHref(committedQuery, "observed") : "/?source=observed"} aria-current={observed ? "page" : undefined}>Danh mục đã lưu · KBS · FPT</a>
         </nav>
         <form onSubmit={submit} className="search-form" noValidate>
           <label htmlFor="stock-query">Mã cổ phiếu hoặc tên doanh nghiệp</label>

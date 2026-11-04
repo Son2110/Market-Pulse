@@ -29,6 +29,48 @@ test.afterEach(async ({ page }, testInfo) => {
   }
 });
 
+test("search source tabs preserve only the committed URL query across drafts and navigation", async ({ page }) => {
+  await page.route("**/api/observed/assets/search?*", route => route.fulfill({ json: {
+    data: [], meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: null,
+      sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
+  } }));
+  await page.route("**/api/assets/search?*", route => route.fulfill({ json: {
+    data: [], meta: { scope: "fixture equities", dataset: "fixture / unknown", label: "SYNTHETIC FIXTURE — NOT MARKET DATA", provider: "marketpulse-fixture", asOf: null },
+  } }));
+  const query = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
+  const tabs = page.getByRole("navigation", { name: "Nguồn tìm kiếm", exact: true });
+  const fixture = tabs.getByRole("link", { name: "Dữ liệu minh họa", exact: true });
+  const observed = tabs.getByRole("link", { name: "Danh mục đã lưu · KBS · FPT", exact: true });
+  await page.goto("/?source=observed&q=FPT");
+  await expect(page.getByRole("heading", { name: "Chưa tìm thấy kết quả", exact: true })).toBeVisible();
+  for (const draft of ["VCB", "", " ", "x".repeat(101)]) {
+    await query.fill(draft);
+    await expect(fixture).toHaveAttribute("href", "/?q=FPT");
+    await expect(observed).toHaveAttribute("href", "/?source=observed&q=FPT");
+  }
+  await query.press("Enter");
+  await expect(page.getByRole("heading", { name: "Chưa thể tìm kiếm", exact: true })).toBeVisible();
+  await expect(fixture).toHaveAttribute("href", "/?q=FPT");
+  await query.fill("Cổ phần FPT"); await query.press("Enter");
+  const encodedQuery = encodeURIComponent("Cổ phần FPT");
+  await expect(fixture).toHaveAttribute("href", `/?q=${encodedQuery}`);
+  await expect(observed).toHaveAttribute("href", `/?source=observed&q=${encodedQuery}`);
+  await query.fill("UNSENT"); await fixture.click();
+  await expect(page).toHaveURL(new RegExp(`/\\?q=${encodedQuery}$`));
+  await expect(query).toHaveValue("Cổ phần FPT");
+  await expect(fixture).toHaveAttribute("aria-current", "page");
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`/\\?source=observed&q=${encodedQuery}$`));
+  await expect(observed).toHaveAttribute("aria-current", "page");
+  await expect(fixture).toHaveAttribute("href", `/?q=${encodedQuery}`);
+  for (const url of ["/?source=observed", "/?source=observed&q="]) {
+    await page.goto(url); await query.fill("FPT");
+    await expect(fixture).toHaveAttribute("href", "/");
+    await expect(observed).toHaveAttribute("href", "/?source=observed");
+  }
+  await noOverflow(page);
+});
+
 test("observed catalog UI states and search origin continuity with explicit stub responses", async ({ page }) => {
   const body = {
     data: [{ asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"],

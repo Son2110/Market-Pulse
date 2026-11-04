@@ -4,6 +4,7 @@ import { observedAssetProjection, validatedObservedAsset } from "./observed-hist
 import type { Dataset, ObservedAsset } from "./ingestion-contract.js";
 import { STOCK_REFERENCE_CATALOG } from "./stock-reference-catalog.js";
 import { normalizeSearchText, parseSearchQuery } from "./stock-search.js";
+import { withinTimeout } from "./platform/health/dependency-probes.js";
 
 export interface ObservedSearchResponse {
   data: Array<{ asset: ObservedAsset; companyName: string; aliases: string[]; reference: { origin: "curated_reference"; officialSources: string[]; reviewedOn: string } }>;
@@ -15,8 +16,8 @@ export interface ObservedSearchReader { search(query: string): Promise<ObservedS
 export class ObservedSearchService implements ObservedSearchReader {
   constructor(private readonly db: Db, private readonly timeoutMs = 1000) {}
   async search(query: string): Promise<ObservedSearchResponse> {
-    const document = await this.db.collection<Document & { _id: string }>("observed_assets")
-      .findOne({ _id: "VN:HOSE:FPT" }, { projection: observedAssetProjection, maxTimeMS: this.timeoutMs });
+    const document = await withinTimeout(() => this.db.collection<Document & { _id: string }>("observed_assets")
+      .findOne({ _id: "VN:HOSE:FPT" }, { projection: observedAssetProjection, maxTimeMS: this.timeoutMs }), this.timeoutMs);
     const stored = document ? validatedObservedAsset("FPT", document) : null;
     const entry = STOCK_REFERENCE_CATALOG.find(item => item.symbol === "FPT");
     if (!entry) throw new Error("missing_reference");

@@ -6,6 +6,7 @@ import { createApp } from "../src/health.js";
 import { digest } from "../src/ingestion-contract.js";
 import { observedAssetProjection } from "../src/observed-history-contract.js";
 import { createObservedSearchRouter, ObservedSearchService } from "../src/observed-search.js";
+import { DependencyTimeoutError } from "../src/platform/health/dependency-probes.js";
 import { observed } from "./observed-test-data.js";
 
 function stored() {
@@ -49,6 +50,26 @@ test("observed catalog distinguishes absent assets from corrupt stored contracts
     const row = stored(); mutate(row); document = row;
     await assert.rejects(service.search("FPT")); await assert.rejects(service.search("no match"));
   }
+});
+
+test("observed catalog bounds a Mongo operation that never settles", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const service = new ObservedSearchService({ collection: () => ({ findOne: () => new Promise(() => undefined) }) } as unknown as Db, 25);
+  const rejection = assert.rejects(service.search("FPT"), DependencyTimeoutError);
+  t.mock.timers.tick(25);
+  await rejection;
+});
+
+test("observed catalog returns sanitized 503 when Mongo remains pending", async t => {
+  const service = new ObservedSearchService({ collection: () => ({ findOne: () => new Promise(() => undefined) }) } as unknown as Db, 25);
+  const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, observedSearchRouter: createObservedSearchRouter(service) }));
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert(address && typeof address === "object");
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/observed/assets/search?q=FPT`, { signal: AbortSignal.timeout(1000) });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "observed_asset_search_unavailable" });
+  assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
 test("observed search validates query before readiness/read, sanitizes errors and is absent when disabled", async t => {
