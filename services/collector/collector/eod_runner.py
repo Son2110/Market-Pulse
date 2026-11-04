@@ -124,7 +124,8 @@ def _status(results: list[dict], submit_enabled: bool) -> str:
 
 
 def run(*, enable_eod: bool = False, target_date: str, submit_enabled: bool = False,
-        poll_seconds: int | None = None, delivery_retries: int | None = None) -> dict:
+        poll_seconds: int | None = None, delivery_retries: int | None = None,
+        verify_persisted=None) -> dict:
     """Collect each symbol once; optional delivery recovery never recollects it."""
     poll, retries = _validate(enable_eod, target_date, submit_enabled, poll_seconds, delivery_retries)
     results = []
@@ -155,6 +156,8 @@ def run(*, enable_eod: bool = False, target_date: str, submit_enabled: bool = Fa
                                     "counts": {"assets": len(retained["assets"]), "candles": count}}
             if submit_enabled and count:
                 result["delivery"] = _deliver(retained, poll, retries)
+                if verify_persisted is not None and result["delivery"]["state"] == "persisted":
+                    result["verification"] = verify_persisted(retained, result["delivery"])
     return {"status": _status(results, submit_enabled), "provider": "KBS", "targetDate": target_date,
             "timezone": "Asia/Ho_Chi_Minh", "sourceAsOf": None, "freshness": "unknown",
             "sessionCalendar": "unverified", "startedAt": started, "finishedAt": _now(), "symbols": results}

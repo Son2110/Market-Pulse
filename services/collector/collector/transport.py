@@ -7,7 +7,7 @@ import re
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 import rfc8785
 
@@ -52,7 +52,8 @@ def submit(document: dict, delivery_id: str | None = None, poll_seconds: int = 0
     body = json.dumps(envelope, ensure_ascii=False, allow_nan=False).encode("utf-8")
     if len(body) > 1024 * 1024:
         raise ValueError("Submission exceeds 1 MiB")
-    opener = build_opener(NoRedirect())
+    local = urlsplit(endpoint).hostname in {"127.0.0.1", "localhost", "::1"}
+    opener = build_opener(ProxyHandler({}), NoRedirect()) if local else build_opener(NoRedirect())
 
     def request(url: str, data: bytes | None = None) -> dict:
         req = Request(url, data=data, headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"})

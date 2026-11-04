@@ -1,5 +1,52 @@
 # Optional Vnstock/KBS adapter — FR-18
 
+## One-time local EOD diagnostic · 03/11/2026
+
+The owner authorized one bounded real-data diagnostic, separate from daily activation/public display/retention. The [diagnostic command](../services/collector/collector/eod_diagnostic.py) reuses the existing runner/transport, retains each document only in RAM through comparison and prints metadata/counts/booleans only. It requires explicit opt-in, one explicit date, a numeric loopback HTTP ingestion endpoint, empty target histories and a uniquely named Compose project. Repeating the command consumes new provider calls; there is no automatic refetch, saved payload, fixture fallback, scheduler or durable resume.
+
+Preflight finds exactly one API/worker under the selected project/service labels, binds the endpoint to that API's published `3001/tcp` loopback port, checks actual worker health via fixed Docker exec arguments, and authenticates with a random nonexistent receipt ID (only exact `404 {error:not_found}` passes). It checks pinned provider imports/versions, observed/ingestion/queue readiness, and both target histories are empty or return exact observed `asset_not_found`. Wrong secret, missing dependency, disabled flag, wrong stack or nonempty target fails before collection. Auth/read probes disable redirects/proxies; only the ingestion auth probe receives a bearer. Shared POST/poll explicitly disables ambient proxies on loopback, preserving external HTTPS behavior.
+
+After terminal success, the helper compares actual UI-facing `/api/observed/assets/:symbol/history` against the retained full candle list (exact OHLC strings, dates, bar IDs/digests, timestamps, units/source/nulls), asset/dataset and receipt counts. It checks history provider/interval/requested range/null source-as-of/unknown completeness, and collection-status selected/success counts, unknown freshness, unverified calendar and null source-as-of. Each symbol's two verification reads share a ten-second wall-clock deadline, including connection, slow headers and body, while the overlap lease stays held. Other diagnostic reads have a five-second wall-clock deadline; socket inactivity also remains bounded to five seconds. Timeout returns safe `local_read_failed` verification metadata. Both symbols must pass for `diagnosticVerified=true`/exit 0; persisted mismatches become `verification_failed`. Partial/no-data/pending/error stay failures. Receipt success does not verify market freshness/finality/rights.
+
+### Manual runbook
+
+Use only for a separately authorized date/scope, with a fresh isolated local project/database and random source-specific ingestion secret. Docker Desktop must run. Use the existing pinned optional provider plus contract dependencies; never install/upgrade automatically. On this workstation, `.venv/vnstock-probe` lacked jsonschema/rfc8785: a temporary **file-backed** launcher appended the existing Python 3.10 user-site (jsonschema) and base `Lib/site-packages` (rfc8785) **after** venv paths, preserving provider dependency precedence. No environment/dependency was modified. Check actual imports, not only `find_spec`; the earlier import failure happened before any provider request.
+
+With a Python environment where those imports succeed, prepare the existing four-service Compose stack in PowerShell (choose unused ports and a fresh suffix):
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$diagnosticProject = 'mp-eod-diagnostic-your-unique-suffix'
+$env:API_PORT = '3029'
+$env:MONGODB_PORT = '27229'
+$env:REDIS_PORT = '6399'
+$env:OBSERVED_READS_ENABLED = 'true'
+$env:GOLD_READS_ENABLED = 'false'
+$env:INGESTION_SECRET = $null
+$diagnosticBytes = New-Object byte[] 32
+$diagnosticRng = [Security.Cryptography.RandomNumberGenerator]::Create()
+try {
+    $diagnosticRng.GetBytes($diagnosticBytes)
+    $diagnosticSecret = ([BitConverter]::ToString($diagnosticBytes)).Replace('-', '').ToLowerInvariant()
+    if ($diagnosticSecret -notmatch '^[a-f0-9]{64}$' -or $diagnosticSecret -eq ('0' * 64)) {
+        throw 'Diagnostic secret generation failed'
+    }
+    $env:INGESTION_SECRET = $diagnosticSecret
+} finally {
+    $diagnosticRng.Dispose()
+}
+$env:INGESTION_ENDPOINT = 'http://127.0.0.1:3029/internal/ingestion/deliveries'
+$env:PYTHONPATH = "$PWD;$PWD/services/collector"
+$env:VNSTOCK_DISABLE_AGENT_SETUP = '1'
+$env:VNSTOCK_TELEMETRY = 'off'
+docker compose -p $diagnosticProject up -d --build --wait mongodb redis api worker
+python -m collector.eod_diagnostic --enable-local-diagnostic --target-date YYYY-MM-DD --compose-project $diagnosticProject
+```
+
+Replace the date placeholder with the specifically authorized canonical date. Bounds are fixed: FPT → VNINDEX serial, 45 seconds/provider, polling 60 seconds, delivery retries zero. Any provider error stops subsequent collection, including denial/challenge/rate limiting. Empty FPT may continue to VNINDEX without becoming success. This runbook does not authorize an automatic second run. The helper does not provision/delete infrastructure: verify project/service/config-path labels, mounts, volume labels/references before `docker compose -p $diagnosticProject down --volumes`; confirm its containers/network/volumes and directly traced anonymous volumes are gone. Remove temporary environment/secret values and close the session. Do not print full Docker inspect/environment/provider responses or prices.
+
+**Observed result:** the single authorized real run for `2026-11-02` collected/persisted one candle per symbol; both exact history comparisons passed, then owned resources were deleted. Later auth/project/proxy guards were tested offline without repeating provider calls. See [evidence and limits](REAL_DATA_CORE_AUDIT.md#real-eod-persisted-history-diagnostic--03112026). This completes the bounded diagnostic feature/sample, not daily activation, all FR-18, the complete product journey or public display.
+
 ## Local EOD foundation · 03/11/2026
 
 The new [EOD command](../services/collector/collector/eod_cli.py) and [runner](../services/collector/collector/eod_runner.py) implement the authorized offline foundation on baseline `090b5b6` after PR #44 merged. **Live activation remains pending.** This slice made no provider call or real-data submission, added no dependencies, scheduler, CI job or application flag, and preserves the existing fixture and manual probe commands. It does not complete FR-18 or accept real-data product coverage.
