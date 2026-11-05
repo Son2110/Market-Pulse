@@ -1,14 +1,26 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
+import type { Db } from "mongodb";
 import { readConfig } from "../src/config.js";
 import { createApp } from "../src/health.js";
 import { collectedOrder, digest, type ObservedPayload } from "../src/ingestion-contract.js";
-import { observedHistoryResponse, parseObservedHistoryQuery } from "../src/observed-history-contract.js";
-import { createObservedHistoryRouter, type ObservedHistoryReader } from "../src/observed-history.js";
+import { latestObservedRange, observedHistoryResponse, parseObservedHistoryQuery } from "../src/observed-history-contract.js";
+import { createObservedHistoryRouter, ObservedHistoryService, type ObservedHistoryReader } from "../src/observed-history.js";
 import { observed, rehash } from "./observed-test-data.js";
 
 const range = { from: "2026-10-01", to: "2026-10-06" };
+test("latest stored window uses 30 inclusive UTC calendar dates and clamps at year one", () => {
+  assert.deepEqual(latestObservedRange("2024-03-01"), { from: "2024-02-01", to: "2024-03-01" });
+  assert.deepEqual(latestObservedRange("2026-01-15"), { from: "2025-12-17", to: "2026-01-15" });
+  assert.deepEqual(latestObservedRange("0001-01-01"), { from: "0001-01-01", to: "0001-01-01" });
+  assert.deepEqual(latestObservedRange("0001-01-20"), { from: "0001-01-01", to: "0001-01-20" });
+  for (const date of ["0000-01-01", "2026-02-29", "", "2026-11-04T00:00:00Z"]) assert.throws(() => latestObservedRange(date));
+});
+test("latest lookup has a whole-operation deadline even when a Mongo read never settles", async () => {
+  const db = { collection: () => ({ findOne: () => new Promise(() => undefined) }) } as unknown as Db;
+  await assert.rejects(new ObservedHistoryService(db, 10).latestWindow(), /dependency_timeout/);
+});
 function stored(payload = observed()) {
   return {
     asset: { record: payload.assets[0], dataset: payload.dataset, schemaVersion: payload.schemaVersion, rowDigest: digest(payload.assets[0]!), _id: "private", firstDeliveryId: "private" },
@@ -87,4 +99,16 @@ test("observed HTTP validates inputs before reads and sanitizes failures with no
     assert.deepEqual(await response.json(), { error }); assert.equal(response.headers.get("cache-control"), "no-store");
   }
   assert.equal(called, 1);
+});
+
+test("latest window HTTP rejects arbitrary ranges/parameters and non-FPT before lookup", async t => {
+  let calls = 0;
+  const reader: ObservedHistoryReader = { read: async () => null, latestWindow: async () => { calls++; throw new Error("private mongo hostname"); } };
+  const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, observedHistoryRouter: createObservedHistoryRouter(reader) }));
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert(address && typeof address === "object"); const base = `http://127.0.0.1:${address.port}/api/observed/assets/`;
+  for (const [path, status, error] of [["FPT/latest-window?from=2026-10-01", 400, "invalid_query"], ["FPT/latest-window?interval=1d&interval=1d", 400, "invalid_query"], ["%24FPT/latest-window", 400, "invalid_symbol"], ["%ZZ/latest-window", 400, "invalid_symbol"], ["VNINDEX/latest-window", 404, "asset_not_found"], ["VCB/latest-window", 404, "asset_not_found"], ["fpt/latest-window", 503, "observed_latest_window_unavailable"]] as const) {
+    const response = await fetch(`${base}${path}`); assert.equal(response.status, status); assert.deepEqual(await response.json(), { error }); assert.equal(response.headers.get("cache-control"), "no-store");
+  }
+  assert.equal(calls, 1);
 });

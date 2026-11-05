@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compareDecimal, detailHref, detailMode, fetchObservedHistory, isObservedHistory, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, validObservedRange, type ObservedCandle, type ObservedHistory } from "../src/observed-detail.js";
+import { compareDecimal, detailHref, detailMode, fetchObservedHistory, fetchObservedLatestWindow, isObservedHistory, isObservedLatestWindow, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, validObservedRange, type ObservedCandle, type ObservedHistory, type ObservedLatestWindow } from "../src/observed-detail.js";
 
 function response(): ObservedHistory {
   const candle: ObservedCandle = {
@@ -36,7 +36,50 @@ test("links preserve validated search and label the fixed sample range through U
   assert.equal(validatedSearch("?search=H%C3%B2a+Ph%C3%A1t"), "Hòa Phát");
   for (const query of ["?search=", "?search=%20", "?search=a&search=b", "?search=" + "a".repeat(101)]) assert.equal(validatedSearch(query), null);
   assert.equal(detailHref("FPT", "fixture", "Hòa Phát"), "/stocks/FPT?search=H%C3%B2a+Ph%C3%A1t");
-  assert.equal(detailHref("FPT", "observed", null), "/stocks/FPT?source=observed&from=2026-09-28&to=2026-10-07");
+  assert.equal(detailHref("FPT", "observed", null, sampleRange), "/stocks/FPT?source=observed&from=2026-09-28&to=2026-10-07");
+  assert.equal(detailHref("FPT", "observed", null), "/stocks/FPT?source=observed&window=latest");
+});
+
+function latestWindow(): ObservedLatestWindow {
+  const { asset, dataset } = response().data;
+  return { data: { asset, dataset }, meta: { status: "available", provider: "KBS", interval: "1d", latestTradingDate: "2024-03-01", range: { from: "2024-02-01", to: "2024-03-01" },
+    calendarDays: 30, sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" } };
+}
+test("latest mode is explicit, FPT-only and incompatible with manual ranges", () => {
+  assert.deepEqual(detailMode("?source=observed&window=latest&search=FPT&searchSource=observed", "FPT"), { kind: "latest" });
+  for (const query of ["?window=latest", "?source=fixture&window=latest", "?source=observed&window=", "?source=observed&window=latest&window=latest", "?source=observed&window=latest&from=2026-10-01", "?source=observed&window=latest&to=2026-10-01", "?source=observed&window=latest&cursor=x"])
+    assert.equal(detailMode(query, "FPT").kind, "invalid", query);
+  for (const symbol of [null, "VCB", "VNINDEX"]) assert.equal(detailMode("?source=observed&window=latest", symbol).kind, "invalid");
+});
+test("latest window guard enforces exact public identity and 30 inclusive calendar dates including leap and minimum year", () => {
+  assert(isObservedLatestWindow(latestWindow()));
+  const minimum = latestWindow(); minimum.meta.latestTradingDate = "0001-01-02"; minimum.meta.range = { from: "0001-01-01", to: "0001-01-02" }; assert(isObservedLatestWindow(minimum));
+  const empty = latestWindow(); empty.meta.status = "no_data"; empty.meta.range = null; empty.meta.latestTradingDate = null; assert(isObservedLatestWindow(empty));
+  for (const mutate of [
+    (b: ObservedLatestWindow) => { b.meta.range!.from = "2024-02-02"; },
+    (b: ObservedLatestWindow) => { b.meta.latestTradingDate = "2024-02-30"; },
+    (b: ObservedLatestWindow) => { b.meta.status = "no_data"; },
+    (b: ObservedLatestWindow) => { b.meta.range = null; },
+    (b: ObservedLatestWindow) => { Object.assign(b.meta, { extra: 1 }); },
+    (b: ObservedLatestWindow) => { Object.assign(b.meta, { calendarDays: 31 }); },
+    (b: ObservedLatestWindow) => { Object.assign(b.data.asset, { symbol: "VCB" }); },
+    (b: ObservedLatestWindow) => { Object.assign(b.data.dataset, { freshness: "fresh" }); },
+    (b: ObservedLatestWindow) => { Object.assign(b.meta, { sourceAsOf: "2026-11-04" }); },
+  ]) { const b = latestWindow(); mutate(b); assert(!isObservedLatestWindow(b)); }
+});
+test("latest window fetch is no-store, guarded, abortable and maps bounded failures", async () => {
+  const signal = new AbortController().signal;
+  assert.deepEqual(await fetchObservedLatestWindow(signal, async (url, options) => {
+    assert.equal(url, "/api/observed/assets/FPT/latest-window"); assert.equal(options?.cache, "no-store"); assert.equal((options?.headers as Record<string, string>).Accept, "application/json"); return Response.json(latestWindow());
+  }), latestWindow());
+  for (const [status, kind] of [[400, "invalid"], [404, "missing"], [503, "unavailable"]] as const)
+    await assert.rejects(fetchObservedLatestWindow(signal, async () => new Response("", { status })), error => error instanceof ObservedError && error.kind === kind);
+  for (const request of [async () => Response.json({}), async () => new Response("bad json")])
+    await assert.rejects(fetchObservedLatestWindow(signal, request), error => error instanceof ObservedError && error.kind === "response");
+  await assert.rejects(fetchObservedLatestWindow(signal, async () => { throw new Error("offline"); }), error => error instanceof ObservedError && error.kind === "network");
+  const waiting: typeof fetch = async (_url, options) => new Promise((_resolve, reject) => { options?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true }); });
+  await assert.rejects(fetchObservedLatestWindow(signal, waiting, 5), error => error instanceof ObservedError && error.kind === "timeout");
+  const controller = new AbortController(); const pending = fetchObservedLatestWindow(controller.signal, waiting); controller.abort(); await assert.rejects(pending, error => error instanceof DOMException && error.name === "AbortError");
 });
 test("decimal comparison preserves precision beyond floating point without altering prices", () => {
   assert.equal(compareDecimal("100000.00000000000000001", "100000"), 1);

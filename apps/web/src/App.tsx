@@ -143,7 +143,7 @@ function SearchPage() {
                 <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{company.asset.exchange ?? "HOSE"} · Cổ phiếu</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
               </button></li>;
             })}</ul>
-            <p className="scope-note">{observed ? "Danh mục đã lưu hiện chỉ FPT. Kết quả chỉ xác nhận tài sản, không xác nhận có giá hoặc lịch sử. Chi tiết mở khoảng mẫu lịch sử, không phải khoảng mới nhất." : "Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày."}</p>
+            <p className="scope-note">{observed ? "Danh mục đã lưu hiện chỉ FPT. Kết quả chỉ xác nhận tài sản, không xác nhận có giá hoặc lịch sử. Chi tiết tìm khoảng 30 ngày lịch kết thúc ở ngày có quan sát đã lưu lớn nhất; không xác nhận giá hiện tại hoặc độ mới." : "Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày."}</p>
           </> : <div className={`state-panel ${state.status === "error" ? "error-panel" : ""}`}>
             <span className={`state-icon ${state.status === "loading" ? "loading-icon" : ""}`} aria-hidden="true"><SearchIcon /></span>
             <h3>{state.status === "initial" ? "Bắt đầu với một doanh nghiệp" : state.status === "loading" ? "Đang tìm doanh nghiệp…" : state.status === "empty" ? "Chưa tìm thấy kết quả" : "Chưa thể tìm kiếm"}</h3>

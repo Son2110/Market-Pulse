@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import SiteHeader from "./SiteHeader.js";
 import ObservedCollectionStatus from "./ObservedCollectionStatus.js";
 import "./observed-detail.css";
-import { detailHref as buildDetailHref, searchReturnHref, validatedSearchSource, fetchObservedHistory, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, type DetailMode, type ObservedCandle, type ObservedHistory } from "./observed-detail.js";
+import { detailHref as buildDetailHref, searchReturnHref, validatedSearchSource, fetchObservedHistory, fetchObservedLatestWindow, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, type DetailMode, type ObservedCandle, type ObservedHistory, type ObservedLatestWindow } from "./observed-detail.js";
 
 const detailHref = (symbol: string, source: "fixture" | "observed", search: string | null) =>
   buildDetailHref(symbol, source, search, undefined, validatedSearchSource(window.location.search));
+const sampleHref = (search: string | null) => buildDetailHref("FPT", "observed", search, sampleRange, validatedSearchSource(window.location.search));
 const date = (value: string) => value.split("-").reverse().join("/");
 export function DetailSourceLinks({ symbol, selected, search }: { symbol: string; selected: "fixture" | "observed"; search: string | null }) {
   return <nav className="observed-source-tabs" aria-label="Nguồn dữ liệu chi tiết">
@@ -74,13 +75,28 @@ function ObservedSource({ response }: { response: ObservedHistory }) {
 }
 
 type State = { status: "loading" } | { status: "loaded"; response: ObservedHistory } | { status: "error"; message: string; retry: boolean };
+type WindowState = { status: "loading" } | { status: "loaded"; response: ObservedLatestWindow } | { status: "error"; message: string };
 export default function ObservedStockDetail({ symbol, mode }: { symbol: string | null; mode: Exclude<DetailMode, { kind: "fixture" }> }) {
   const [state, setState] = useState<State>({ status: "loading" }); const [attempt, setAttempt] = useState(0); const requestId = useRef(0);
+  const [windowState, setWindowState] = useState<WindowState>({ status: "loading" }); const [windowAttempt, setWindowAttempt] = useState(0);
   const parameters = new URLSearchParams(window.location.search); const search = validatedSearch(window.location.search);
   const backHref = searchReturnHref(window.location.search);
-  const from = mode.kind === "observed" ? mode.range.from : parameters.get("from") ?? sampleRange.from;
-  const to = mode.kind === "observed" ? mode.range.to : parameters.get("to") ?? sampleRange.to;
-  const valid = mode.kind === "observed";
+  const latestMode = mode.kind === "latest";
+  const windowLoading = latestMode && windowState.status === "loading";
+  const resolvedRange = latestMode && windowState.status === "loaded" ? windowState.response.meta.range : null;
+  const from = mode.kind === "observed" ? mode.range.from : latestMode ? resolvedRange?.from ?? "" : parameters.get("from") ?? sampleRange.from;
+  const to = mode.kind === "observed" ? mode.range.to : latestMode ? resolvedRange?.to ?? "" : parameters.get("to") ?? sampleRange.to;
+  const valid = mode.kind === "observed" || (latestMode && resolvedRange !== null);
+  useEffect(() => {
+    if (!latestMode || symbol !== "FPT") return;
+    const controller = new AbortController(); setWindowState({ status: "loading" });
+    void fetchObservedLatestWindow(controller.signal).then(response => {
+      if (!controller.signal.aborted) setWindowState({ status: "loaded", response });
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) setWindowState({ status: "error", message: observedErrorMessage(error) });
+    });
+    return () => controller.abort();
+  }, [latestMode, symbol, windowAttempt]);
   useEffect(() => {
     document.title = `${symbol ?? "Mã chưa hợp lệ"} — Dữ liệu đã lưu | MarketPulse VN`;
     if (!valid || !symbol) return;
@@ -102,17 +118,21 @@ export default function ObservedStockDetail({ symbol, mode }: { symbol: string |
       <section className="detail-card observed-heading" aria-labelledby="observed-heading"><p className="asset-line"><span className="symbol-tag">{symbol ?? "—"}</span><span className="small muted">{symbol === "FPT" ? "HOSE · Cổ phiếu · VND" : "Mã ngoài phạm vi dữ liệu đã lưu"}</span></p><h1 id="observed-heading">{symbol === "FPT" ? "Cổ phiếu FPT" : "Chi tiết dữ liệu đã lưu"}</h1><DetailSourceLinks symbol={symbol ?? "FPT"} selected="observed" search={search} /></section>
       {symbol === "FPT" && <section className="detail-card observed-range-card" aria-labelledby="observed-range-heading"><h2 id="observed-range-heading">Khoảng ngày đã chọn</h2>
         <form method="get" action="/stocks/FPT" className="observed-range-form"><input type="hidden" name="source" value="observed" />{validatedSearchSource(window.location.search) === "observed" && <input type="hidden" name="searchSource" value="observed" />}{search && <input type="hidden" name="search" value={search} />}
-          <label htmlFor="observed-from">Từ ngày<input id="observed-from" type="date" name="from" required defaultValue={from} aria-describedby="observed-range-help" /></label>
-          <label htmlFor="observed-to">Đến ngày<input id="observed-to" type="date" name="to" required defaultValue={to} aria-describedby="observed-range-help" /></label><button className="primary-button" type="submit">Xem dữ liệu</button>
-        </form><p id="observed-range-help" className="small muted">Bao gồm hai ngày đầu/cuối; chênh lệch tối đa 31 ngày (32 ngày lịch). <a href={detailHref("FPT", "observed", search)}>Khoảng mẫu 28/09–07/10/2026</a> · Không phải khoảng mới nhất.</p>
+          <label htmlFor="observed-from">Từ ngày<input key={`from:${from}`} id="observed-from" type="date" name="from" required defaultValue={from} disabled={windowLoading} aria-describedby="observed-range-help" /></label>
+          <label htmlFor="observed-to">Đến ngày<input key={`to:${to}`} id="observed-to" type="date" name="to" required defaultValue={to} disabled={windowLoading} aria-describedby="observed-range-help" /></label><button className="primary-button" type="submit" disabled={windowLoading}>Xem dữ liệu</button>
+        </form><p id="observed-range-help" className="small muted">Bao gồm hai ngày đầu/cuối; chênh lệch tối đa 31 ngày (32 ngày lịch). <a href={sampleHref(search)}>Khoảng mẫu 28/09–07/10/2026</a> · Không phải khoảng mới nhất. <a href={detailHref("FPT", "observed", search)}>Xem khoảng đã lưu mới nhất</a></p>
+        {latestMode && <p className="small muted">Chế độ khoảng đã lưu mới nhất: tối đa 30 ngày lịch, kết thúc ở ngày có quan sát đã lưu lớn nhất. Không phải 30 phiên; không xác nhận giá hiện tại, độ mới hoặc độ đầy đủ.{resolvedRange && ` Khoảng yêu cầu: ${date(resolvedRange.from)} – ${date(resolvedRange.to)}.`}</p>}
       </section>}
       {valid && symbol === "FPT" && <ObservedCollectionStatus key={`FPT:${from}:${to}`} range={{ from, to }} />}
-      <div aria-busy={valid && state.status === "loading"}>
-        {mode.kind === "invalid" || state.status === "error" ? <section className="state-panel error-panel detail-state" role="alert"><h2>Chưa thể đọc dữ liệu đã lưu</h2><p>{mode.kind === "invalid" ? mode.message : state.status === "error" ? state.message : ""}</p>{mode.kind !== "invalid" && state.status === "error" && state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Thử lại</button>}</section>
+      <div aria-busy={(latestMode && windowState.status === "loading") || (valid && state.status === "loading")}>
+        {latestMode && windowState.status === "error" ? <section className="state-panel error-panel detail-state" role="alert"><h2>Chưa thể xác định khoảng đã lưu mới nhất</h2><p>{windowState.message}</p><button className="secondary-button" type="button" onClick={() => setWindowAttempt(value => value + 1)}>Thử lại khoảng mới nhất</button></section>
+          : latestMode && windowState.status === "loading" ? <section className="state-panel detail-state" role="status"><h2>Đang tìm khoảng đã lưu mới nhất…</h2><p>Đang đọc ngày có quan sát đã lưu lớn nhất.</p></section>
+            : latestMode && windowState.status === "loaded" && !resolvedRange ? <section className="state-panel detail-state" role="status"><h2>Chưa có quan sát FPT đã lưu</h2><p>Chưa thể xác định khoảng ngày. Không có giá hoặc biểu đồ để hiển thị; độ đầy đủ chưa xác minh.</p><button className="secondary-button" type="button" onClick={() => setWindowAttempt(value => value + 1)}>Thử lại khoảng mới nhất</button></section>
+          : mode.kind === "invalid" || state.status === "error" ? <section className="state-panel error-panel detail-state" role="alert"><h2>Chưa thể đọc dữ liệu đã lưu</h2><p>{mode.kind === "invalid" ? mode.message : state.status === "error" ? state.message : ""}</p>{mode.kind !== "invalid" && state.status === "error" && state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Thử lại</button>}</section>
           : state.status === "loading" ? <section className="state-panel detail-state" role="status"><span className="state-icon loading-icon" aria-hidden="true">↗</span><h2>Đang tải dữ liệu đã lưu…</h2><p>Đang đọc các quan sát trong khoảng ngày đã chọn.</p></section>
             : response && <>
               {latest && <section className="detail-card observed-price" aria-labelledby="observed-price-heading"><div className="price-hero-top"><div><h2 id="observed-price-heading">Giá đóng cửa cuối khoảng có dữ liệu</h2><p className="small muted">{date(latest.tradingDate)} · Không phải giá hiện tại</p><p className="price-value observed-exact-price">{latest.close}<span> VND</span></p></div><p className="small muted">Không tính thay đổi / lợi nhuận:<br />cơ sở điều chỉnh chưa xác định.</p></div><dl className="ohlcv-grid">{[["Mở cửa", latest.open], ["Cao nhất", latest.high], ["Thấp nhất", latest.low], ["Khối lượng", "Không có dữ liệu"]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="observed-exact-price">{value}{label !== "Khối lượng" && <span> VND</span>}</dd></div>)}</dl></section>}
-              <div className="detail-workspace"><div className="detail-main-column">{latest ? <><ObservedChart candles={response.data.candles} /><ObservedTable candles={response.data.candles} /></> : <section className="detail-card state-panel" role="status"><h2>Không có quan sát trong khoảng đã chọn</h2><p>Không có giá hoặc biểu đồ để hiển thị. Độ đầy đủ và lịch phiên chưa xác minh.</p><a className="detail-link" href={detailHref("FPT", "observed", search)}>Xem khoảng mẫu 28/09–07/10/2026 →</a></section>}</div><ObservedSource response={response} /></div>
+              <div className="detail-workspace"><div className="detail-main-column">{latest ? <><ObservedChart candles={response.data.candles} /><ObservedTable candles={response.data.candles} /></> : <section className="detail-card state-panel" role="status"><h2>Không có quan sát trong khoảng đã chọn</h2><p>Không có giá hoặc biểu đồ để hiển thị. Độ đầy đủ và lịch phiên chưa xác minh.</p><a className="detail-link" href={sampleHref(search)}>Xem khoảng mẫu 28/09–07/10/2026 →</a></section>}</div><ObservedSource response={response} /></div>
             </>}
       </div>
     </main><footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>

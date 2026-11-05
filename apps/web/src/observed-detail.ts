@@ -2,7 +2,7 @@ import { queryError, searchHref, type SearchSource } from "./stock-search.js";
 
 export const sampleRange = { from: "2026-09-28", to: "2026-10-07" };
 export interface ObservedRange { from: string; to: string }
-export type DetailMode = { kind: "fixture" } | { kind: "observed"; range: ObservedRange } | { kind: "invalid"; message: string };
+export type DetailMode = { kind: "fixture" } | { kind: "observed"; range: ObservedRange } | { kind: "latest" } | { kind: "invalid"; message: string };
 export function validObservedDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$(?![\s\S])/.test(value) && !value.startsWith("0000-")
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
@@ -29,18 +29,19 @@ export function detailMode(search: string, symbol: string | null): DetailMode {
   const parameters = new URLSearchParams(search);
   const invalid: DetailMode = { kind: "invalid", message: "Nguồn hoặc khoảng ngày không hợp lệ. Chọn một nguồn và hai ngày hợp lệ, chênh lệch tối đa 31 ngày (32 ngày lịch)." };
   if (parameters.getAll("searchSource").length > 1 || (parameters.has("searchSource") && !["fixture", "observed"].includes(parameters.get("searchSource")!))) return invalid;
-  if (["source", "from", "to"].some(key => parameters.getAll(key).length > 1)) return invalid;
+  if (["source", "from", "to", "window"].some(key => parameters.getAll(key).length > 1)) return invalid;
   const source = parameters.get("source");
-  if (source === null || source === "fixture") return parameters.has("from") || parameters.has("to") ? invalid : { kind: "fixture" };
+  if (source === null || source === "fixture") return parameters.has("from") || parameters.has("to") || parameters.has("window") ? invalid : { kind: "fixture" };
   if (source !== "observed") return invalid;
   if (symbol !== "FPT") return { kind: "invalid", message: "Trang dữ liệu đã lưu hiện chỉ hỗ trợ cổ phiếu FPT." };
-  if ([...parameters.keys()].some(key => !["source", "from", "to", "search", "searchSource"].includes(key))) return invalid;
+  if ([...parameters.keys()].some(key => !["source", "from", "to", "window", "search", "searchSource"].includes(key))) return invalid;
+  if (parameters.has("window")) return parameters.get("window") === "latest" && !parameters.has("from") && !parameters.has("to") ? { kind: "latest" } : invalid;
   const range = { from: parameters.get("from") ?? "", to: parameters.get("to") ?? "" };
   return validObservedRange(range) ? { kind: "observed", range } : invalid;
 }
-export function detailHref(symbol: string, source: "fixture" | "observed", search: string | null, range = sampleRange, searchOrigin: SearchSource = "fixture"): string {
+export function detailHref(symbol: string, source: "fixture" | "observed", search: string | null, range?: ObservedRange, searchOrigin: SearchSource = "fixture"): string {
   const parameters = new URLSearchParams();
-  if (source === "observed") { parameters.set("source", source); parameters.set("from", range.from); parameters.set("to", range.to); }
+  if (source === "observed") { parameters.set("source", source); if (range) { parameters.set("from", range.from); parameters.set("to", range.to); } else parameters.set("window", "latest"); }
   if (search) parameters.set("search", search);
   if (searchOrigin === "observed") parameters.set("searchSource", "observed");
   return `/stocks/${encodeURIComponent(symbol)}${parameters.size ? `?${parameters}` : ""}`;
@@ -92,6 +93,40 @@ const asset = { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", curr
 const dataset = { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" };
 const source = { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" };
 const candleKeys = ["assetId", "tradingDate", "interval", "currency", "unit", "timezone", "adjustmentBasis", "open", "high", "low", "close", "volume", "volumeUnit", "providerTimeLabel", "timeProvenance", "sourceAsOf", "collectedAt", "source", "barId", "contentDigest"];
+export interface ObservedLatestWindow {
+  data: Pick<ObservedHistory["data"], "dataset" | "asset">;
+  meta: { status: "available" | "no_data"; provider: "KBS"; interval: "1d"; latestTradingDate: string | null; range: ObservedRange | null;
+    calendarDays: 30; sourceAsOf: null; freshness: "unknown"; completeness: "unknown"; selectionSemantics: "max_stored_trading_date" };
+}
+export function isObservedLatestWindow(value: unknown): value is ObservedLatestWindow {
+  if (!keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset"]) || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset)
+    || !keys(value.meta, ["status", "provider", "interval", "latestTradingDate", "range", "calendarDays", "sourceAsOf", "freshness", "completeness", "selectionSemantics"])) return false;
+  const meta = value.meta;
+  if (meta.provider !== "KBS" || meta.interval !== "1d" || meta.calendarDays !== 30 || meta.sourceAsOf !== null || meta.freshness !== "unknown"
+    || meta.completeness !== "unknown" || meta.selectionSemantics !== "max_stored_trading_date") return false;
+  if (meta.status === "no_data") return meta.range === null && meta.latestTradingDate === null;
+  if (meta.status !== "available" || !validObservedDate(meta.latestTradingDate)) return false;
+  const from = new Date(Math.max(Date.parse("0001-01-01"), Date.parse(meta.latestTradingDate) - 29 * 86400_000)).toISOString().slice(0, 10);
+  return exact(meta.range, { from, to: meta.latestTradingDate });
+}
+
+export async function fetchObservedLatestWindow(signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000): Promise<ObservedLatestWindow> {
+  const timeout = new AbortController(); const timer = setTimeout(() => timeout.abort(), timeoutMs);
+  try {
+    const response = await request("/api/observed/assets/FPT/latest-window", { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
+    if (response.status === 400) throw new ObservedError("invalid");
+    if (response.status === 404) throw new ObservedError("missing");
+    if (!response.ok) throw new ObservedError("unavailable");
+    let body: unknown; try { body = await response.json(); } catch { throw new ObservedError("response"); }
+    if (!isObservedLatestWindow(body)) throw new ObservedError("response");
+    return body;
+  } catch (error) {
+    if (signal.aborted) throw error;
+    if (timeout.signal.aborted) throw new ObservedError("timeout");
+    if (error instanceof ObservedError) throw error;
+    throw new ObservedError("network");
+  } finally { clearTimeout(timer); }
+}
 export function isObservedHistory(value: unknown, range: ObservedRange): value is ObservedHistory {
   if (!validObservedRange(range) || !keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset", "candles"]) || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset)
     || !Array.isArray(value.data.candles) || value.data.candles.length > 32 || !keys(value.meta, ["status", "provider", "interval", "requestedRange", "returnedRange", "sourceAsOf", "completeness", "selectionSemantics"])) return false;

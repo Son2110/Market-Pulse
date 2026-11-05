@@ -99,6 +99,9 @@ test("actual API registers observed reads only when enabled and runs with no ing
     const response = await fetch(`${base}/api/observed/assets/fpt/history?from=2026-10-01&to=2026-10-06`);
     assert.equal(response.status, flag === "true" ? 200 : 404);
     if (flag === "true") assert.deepEqual((await response.json()).data.candles, observed().candles);
+    const latestResponse = await fetch(`${base}/api/observed/assets/fpt/latest-window`);
+    assert.equal(latestResponse.status, flag === "true" ? 200 : 404);
+    if (flag === "true") assert.deepEqual((await latestResponse.json()).meta.range, { from: "2026-09-03", to: "2026-10-02" });
     const searchResponse = await fetch(`${base}/api/observed/assets/search?q=FPT`);
     assert.equal(searchResponse.status, flag === "true" ? 200 : 404);
     if (flag === "true") assert.deepEqual((await searchResponse.json()).data[0].asset, observed().assets[0]);
@@ -116,4 +119,42 @@ test("actual API registers observed reads only when enabled and runs with no ing
     assert.equal(await c.store.observed.revisions.countDocuments(), 1);
     child.kill("SIGKILL"); await exited;
   }
+});
+
+test("real Mongo latest window selects max trading date over collection time and fails closed on stored corruption", async t => {
+  const c = await setup(); t.after(c.close);
+  const reader = new ObservedHistoryService(c.db);
+  const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, observedHistoryRouter: createObservedHistoryRouter(reader) }));
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert(address && typeof address === "object");
+  const get = () => fetch(`http://127.0.0.1:${address.port}/api/observed/assets/FPT/latest-window`);
+  assert.equal(await reader.latestWindow(), null);
+  assert.equal((await get()).status, 404);
+  const empty = observed(); empty.candles = []; await c.persist("empty", empty);
+  const knownEmpty = await reader.latestWindow(); assert(knownEmpty);
+  assert.equal(knownEmpty.meta.status, "no_data"); assert.equal(knownEmpty.meta.latestTradingDate, null); assert.equal(knownEmpty.meta.range, null);
+  const emptyResponse = await get(); assert.equal(emptyResponse.status, 200); assert.equal(emptyResponse.headers.get("cache-control"), "no-store"); assert.deepEqual(await emptyResponse.json(), knownEmpty);
+  await c.persist("baseline");
+  const dates = addDate(addDate(observed(), "2026-09-02"), "2026-09-03");
+  dates.request.start = "2026-09-02"; dates.request.end = "2026-10-02"; dates.candles.sort((a, b) => a.tradingDate.localeCompare(b.tradingDate));
+  for (const row of dates.candles) row.collectedAt = "2026-12-01T00:00:00Z";
+  await c.persist("old-day-refetch", rehash(dates));
+  const latest = addDate(observed(), "2026-10-03"); await c.persist("new-day", latest);
+  await c.persist("index", observed(true));
+  const result = await reader.latestWindow(); assert(result);
+  assert.equal(result.meta.latestTradingDate, "2026-10-03"); assert.deepEqual(result.meta.range, { from: "2026-09-04", to: "2026-10-03" });
+  assert.equal(result.meta.freshness, "unknown"); assert.equal(result.meta.sourceAsOf, null);
+  assert(!/(deliveryId|collectedOrder|firstDeliveryId|rowDigest|_id)/.test(JSON.stringify(result)));
+  const history = await reader.read("FPT", result.meta.range!); assert(history); assert.deepEqual(history.data.candles.map(row => row.tradingDate), ["2026-10-02", "2026-10-03"]);
+  const query = c.db.collection("observed_candles_latest").find({ "record.assetId": "VN:HOSE:FPT", "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": "unknown" }, { hint: "asset_daily_history" }).sort({ "record.tradingDate": -1 }).limit(1);
+  const plan = JSON.stringify(await query.explain("executionStats")); assert(plan.includes('"indexName":"asset_daily_history"')); assert(plan.includes('"direction":"backward"')); assert(!plan.includes('"stage":"SORT"'));
+  const row = await c.store.observed.latest.findOne({ "record.tradingDate": "2026-10-03", "record.assetId": "VN:HOSE:FPT" }); assert(row);
+  await c.store.observed.latest.updateOne({ _id: row._id }, { $set: { "record.close": "9999" } }, { bypassDocumentValidation: true });
+  await assert.rejects(reader.latestWindow(), /observed_history_invalid_storage/);
+  const invalidResponse = await get(); assert.equal(invalidResponse.status, 503); assert.deepEqual(await invalidResponse.json(), { error: "observed_latest_window_unavailable" });
+  await c.store.observed.latest.replaceOne({ _id: row._id }, row);
+  const asset = await c.db.collection("observed_assets").findOne({ _id: "VN:HOSE:FPT" } as never); assert(asset);
+  await c.db.collection("observed_assets").updateOne({ _id: asset._id }, { $set: { rowDigest: "bad" } }, { bypassDocumentValidation: true }); await assert.rejects(reader.latestWindow(), /observed_history_invalid_storage/);
+  await c.db.collection("observed_assets").replaceOne({ _id: asset._id }, asset);
+  await c.client.close(); await assert.rejects(reader.latestWindow()); assert.equal((await get()).status, 503); await c.client.connect();
 });

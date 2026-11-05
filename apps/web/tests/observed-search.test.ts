@@ -34,7 +34,7 @@ test("source and query survive reload URLs and independent detail source toggles
   const href = searchHref("Cổ phần FPT", "observed"); assert.equal(new URL(href, "http://localhost").searchParams.get("q"), "Cổ phần FPT");
   const detail = detailHref("FPT", "observed", "Cổ phần FPT", undefined, "observed");
   const parameters = new URL(detail, "http://localhost").search;
-  assert.equal(detailMode(parameters, "FPT").kind, "observed"); assert.equal(searchReturnHref(parameters), href);
+  assert.equal(detailMode(parameters, "FPT").kind, "latest"); assert.equal(searchReturnHref(parameters), href);
   const fixtureDetail = detailHref("FPT", "fixture", "Cổ phần FPT", undefined, "observed");
   assert.equal(detailMode(new URL(fixtureDetail, "http://localhost").search, "FPT").kind, "fixture");
   assert.equal(searchReturnHref(new URL(fixtureDetail, "http://localhost").search), href);

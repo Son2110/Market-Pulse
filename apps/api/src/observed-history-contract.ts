@@ -5,6 +5,18 @@ import { collectedOrder, observedContent, type Dataset, type ObservedAsset, type
 import { canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 
 export interface ObservedHistoryRange { from: string; to: string }
+export interface ObservedLatestWindowResponse {
+  data: Pick<ObservedHistoryResponse["data"], "dataset" | "asset">;
+  meta: { status: "available" | "no_data"; provider: "KBS"; interval: "1d";
+    latestTradingDate: string | null; range: ObservedHistoryRange | null; calendarDays: 30;
+    sourceAsOf: null; freshness: "unknown"; completeness: "unknown"; selectionSemantics: "max_stored_trading_date" };
+}
+
+export function latestObservedRange(to: string): ObservedHistoryRange {
+  if (!validObservedDate(to)) throw new Error("observed_history_invalid_storage");
+  const start = Math.max(Date.parse("0001-01-01"), Date.parse(to) - 29 * 86400_000);
+  return { from: new Date(start).toISOString().slice(0, 10), to };
+}
 export interface ObservedHistoryResponse {
   data: { dataset: Dataset; asset: ObservedAsset; candles: ObservedCandle[] };
   meta: {
