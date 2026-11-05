@@ -92,6 +92,9 @@ test("observed catalog UI states and search origin continuity with explicit stub
       meta: { status: "no_data", provider: "KBS", interval: "1d", requestedRange: { from: parameters.get("from"), to: parameters.get("to") }, returnedRange: null,
         sourceAsOf: null, completeness: "unknown", selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" } } });
   });
+  await page.route("**/api/observed/assets/FPT/latest-window", route => route.fulfill({ json: { data: { dataset: body.meta.dataset, asset: body.data[0].asset },
+    meta: { status: "available", provider: "KBS", interval: "1d", latestTradingDate: "2026-10-07", range: { from: "2026-09-08", to: "2026-10-07" }, calendarDays: 30,
+      sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" } } }));
   await page.goto("/?source=observed");
   await expect(page.getByRole("heading", { name: "Bắt đầu với một doanh nghiệp", exact: true })).toBeVisible();
   const query = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
@@ -122,6 +125,79 @@ test("observed catalog UI states and search origin continuity with explicit stub
   await page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true }).click();
   await expect(page).toHaveURL(/\/\?source=observed&q=ERROR/);
   await expect(page.getByRole("button", { name: /^Xem thông tin FPT/ })).toBeVisible();
+  await noOverflow(page);
+});
+
+test("latest stored FPT window handles discovery, retries, independent history/status and manual navigation with explicit stubs", async ({ page }) => {
+  const data = { asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" },
+    dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" } };
+  const range = { from: "2026-10-04", to: "2026-11-02" };
+  const meta = { status: "available", provider: "KBS", interval: "1d", latestTradingDate: range.to, range, calendarDays: 30,
+    sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" };
+  const candle = { assetId: "VN:HOSE:FPT", tradingDate: range.to, interval: "1d", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh", adjustmentBasis: "unknown",
+    open: "100000.123456789123456789", high: "110000", low: "90000", close: "101000.123456789123456789", volume: null, volumeUnit: "not_available",
+    providerTimeLabel: "2026-11-02 00:00:00", timeProvenance: "provider_naive_calendar_label", sourceAsOf: null, collectedAt: "2026-11-03T07:00:00.123456+07:00",
+    source: { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" }, barId: "a".repeat(64), contentDigest: "b".repeat(64) };
+  let discovery: "slow" | "error" | "loaded" | "empty" | "malformed" = "slow"; let release: (() => void) | undefined;
+  let windowCalls = 0; let historyCalls = 0; let statusCalls = 0; let fixtureCalls = 0; let historyFails = false; let statusFails = true;
+  page.on("request", request => { if (/^\/api\/assets\//.test(new URL(request.url()).pathname)) fixtureCalls++; });
+  await page.route("**/api/observed/assets/FPT/latest-window", async route => {
+    windowCalls++; if (discovery === "slow") await new Promise<void>(resolve => { release = resolve; });
+    if (discovery === "error") { await route.fulfill({ status: 503, json: { error: "observed_latest_window_unavailable" } }); return; }
+    await route.fulfill({ json: { data, meta: discovery === "empty" ? { ...meta, status: "no_data", latestTradingDate: null, range: null } : discovery === "malformed" ? { ...meta, range: { ...range, from: "2026-10-05" } } : meta } });
+  });
+  await page.route("**/api/observed/assets/FPT/history?*", async route => {
+    historyCalls++; const params = new URL(route.request().url()).searchParams; const requestedRange = { from: params.get("from"), to: params.get("to") };
+    if (historyFails) { await route.fulfill({ status: 503, json: { error: "observed_history_unavailable" } }); return; }
+    const candles = requestedRange.to === range.to ? [candle] : [];
+    await route.fulfill({ json: { data: { ...data, candles }, meta: { status: candles.length ? "available" : "no_data", provider: "KBS", interval: "1d", requestedRange,
+      returnedRange: candles.length ? { from: range.to, to: range.to } : null, sourceAsOf: null, completeness: "unknown", selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" } } });
+  });
+  await page.route("**/api/observed/assets/FPT/collection-status?*", async route => {
+    statusCalls++; if (statusFails) { await route.fulfill({ status: 503, json: { error: "observed_collection_status_unavailable" } }); return; }
+    const params = new URL(route.request().url()).searchParams;
+    await route.fulfill({ json: { data, meta: { status: "no_stored_bars", provider: "KBS", interval: "1d", requestedRange: { from: params.get("from"), to: params.get("to") }, returnedRange: null,
+      sourceAsOf: null, completeness: "unknown", selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest", freshness: "unknown", sessionCalendar: "unverified",
+      selectedCandleCount: 0, collectedAtRange: null, candleCountsByDeliveryStatus: { accepted: 0, queued: 0, running: 0, success: 0, failure: 0, unknown: 0 }, statusSemantics: "referenced_delivery_status_at_read_time", consistency: "non_atomic_read" } } });
+  });
+  const latestUrl = "/stocks/FPT?source=observed&window=latest&search=FPT&searchSource=observed";
+  await page.goto(latestUrl);
+  await expect(page.getByRole("heading", { name: "Đang tìm khoảng đã lưu mới nhất…", exact: true })).toBeVisible();
+  const fromInput = page.getByLabel("Từ ngày", { exact: true }); const toInput = page.getByLabel("Đến ngày", { exact: true });
+  const rangeSubmit = page.getByRole("button", { name: "Xem dữ liệu", exact: true });
+  await expect(fromInput).toBeDisabled(); await expect(toInput).toBeDisabled(); await expect(rangeSubmit).toBeDisabled();
+  expect(historyCalls).toBe(0); expect(statusCalls).toBe(0); await noOverflow(page);
+  discovery = "error"; release?.();
+  await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng đã lưu mới nhất", exact: true })).toBeVisible();
+  await expect(fromInput).toBeEnabled(); await expect(toInput).toBeEnabled(); await expect(rangeSubmit).toBeEnabled();
+  await fromInput.fill("2026-01-01"); await toInput.fill("2026-01-02");
+  discovery = "slow"; const previousRelease = release; const retry = page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }); await retry.focus(); await expect(retry).toBeFocused(); await retry.press("Enter");
+  await expect(page.getByRole("heading", { name: "Đang tìm khoảng đã lưu mới nhất…", exact: true })).toBeVisible();
+  await expect(fromInput).toBeDisabled(); await expect(toInput).toBeDisabled(); await expect(rangeSubmit).toBeDisabled();
+  await expect.poll(() => release !== previousRelease).toBe(true); discovery = "loaded"; release?.();
+  await expect(page.getByRole("heading", { name: "Giá đóng cửa cuối khoảng có dữ liệu", exact: true })).toBeVisible();
+  await expect(fromInput).toBeEnabled(); await expect(toInput).toBeEnabled(); await expect(rangeSubmit).toBeEnabled();
+  await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(range.from); await expect(page.getByLabel("Đến ngày", { exact: true })).toHaveValue(range.to);
+  await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(1); await expect(page.getByRole("table")).toContainText(candle.close);
+  const statusRetry = page.getByRole("button", { name: "Thử lại trạng thái thu thập", exact: true }); await expect(statusRetry).toBeVisible();
+  const beforeStatusRetry = { historyCalls, windowCalls }; statusFails = false; await statusRetry.click();
+  await expect(page.getByText("Không có quan sát đã lưu được chọn trong khoảng này.", { exact: false })).toBeVisible();
+  expect(historyCalls).toBe(beforeStatusRetry.historyCalls); expect(windowCalls).toBe(beforeStatusRetry.windowCalls);
+  await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(1); await noOverflow(page);
+  historyFails = true; await page.reload();
+  await expect(page.getByRole("heading", { name: "Chưa thể đọc dữ liệu đã lưu", exact: true })).toBeVisible();
+  await expect(page.getByText("Không có quan sát đã lưu được chọn trong khoảng này.", { exact: false })).toBeVisible();
+  const beforeHistoryRetry = { windowCalls, statusCalls }; historyFails = false; await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+  await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(1); expect(windowCalls).toBe(beforeHistoryRetry.windowCalls); expect(statusCalls).toBe(beforeHistoryRetry.statusCalls);
+  await page.getByLabel("Từ ngày", { exact: true }).fill("2026-01-01"); await page.getByLabel("Đến ngày", { exact: true }).fill("2026-01-02");
+  await page.getByRole("button", { name: "Xem dữ liệu", exact: true }).click(); await expect(page).toHaveURL(/source=observed&searchSource=observed&search=FPT&from=2026-01-01&to=2026-01-02/);
+  await expect(page.getByRole("heading", { name: "Không có quan sát trong khoảng đã chọn", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", "/?source=observed&q=FPT");
+  const beforeEmpty = { historyCalls, statusCalls }; discovery = "empty"; await page.goto(latestUrl);
+  await expect(page.getByRole("heading", { name: "Chưa có quan sát FPT đã lưu", exact: true })).toBeVisible(); expect(historyCalls).toBe(beforeEmpty.historyCalls); expect(statusCalls).toBe(beforeEmpty.statusCalls);
+  await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(""); await expect(page.getByRole("table")).toHaveCount(0);
+  discovery = "malformed"; await page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng đã lưu mới nhất", exact: true })).toBeVisible(); expect(historyCalls).toBe(beforeEmpty.historyCalls); expect(fixtureCalls).toBe(0);
   await noOverflow(page);
 });
 
