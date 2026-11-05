@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
@@ -157,4 +158,34 @@ test("real Mongo latest window selects max trading date over collection time and
   await c.db.collection("observed_assets").updateOne({ _id: asset._id }, { $set: { rowDigest: "bad" } }, { bypassDocumentValidation: true }); await assert.rejects(reader.latestWindow(), /observed_history_invalid_storage/);
   await c.db.collection("observed_assets").replaceOne({ _id: asset._id }, asset);
   await c.client.close(); await assert.rejects(reader.latestWindow()); assert.equal((await get()).status, 503); await c.client.connect();
+});
+
+test("latest-window CSOT expires an exhausted pool checkout without running queued reads later", { timeout: 15000 }, async t => {
+  const c = await setup(); t.after(c.close); await c.persist("pool-test");
+  const capped = await c.db.createCollection("pool_blocker", { capped: true, size: 4096 });
+  await capped.insertOne({ value: 1 });
+  const client = new MongoClient(mongoUrl, { maxPoolSize: 1, waitQueueTimeoutMS: 0, serverSelectionTimeoutMS: 1000, monitorCommands: true });
+  await client.connect(); t.after(() => client.close());
+  const db = client.db(c.db.databaseName);
+  const blocker = db.collection("pool_blocker").find({}, { tailable: true, awaitData: true, maxAwaitTimeMS: 5000, batchSize: 1 });
+  t.after(() => blocker.close());
+  assert.equal((await blocker.next())?.value, 1);
+  const getMoreStarted = new Promise<void>(resolve => {
+    client.on("commandStarted", event => { if (event.commandName === "getMore") resolve(); });
+  });
+  const blockedRead = blocker.next();
+  await getMoreStarted;
+  const commands: string[] = [];
+  client.on("commandStarted", event => { if (event.commandName === "find") commands.push(String(event.command.find)); });
+  const checkoutFailed = once(client, "connectionCheckOutFailed", { signal: AbortSignal.timeout(2000) });
+  await assert.rejects(new ObservedHistoryService(db, 100).latestWindow(), /dependency_timeout|Timed out/);
+  const [failure] = await checkoutFailed;
+  assert.equal(failure.reason, "timeout");
+  assert.deepEqual(commands, []);
+  await capped.insertOne({ value: 2 });
+  assert.equal((await blockedRead)?.value, 2);
+  await pause(100);
+  assert.deepEqual(commands, []);
+  assert.equal((await new ObservedHistoryService(db).latestWindow())?.meta.latestTradingDate, "2026-10-02");
+  assert.deepEqual(commands, ["observed_assets", "observed_candles_latest"]);
 });

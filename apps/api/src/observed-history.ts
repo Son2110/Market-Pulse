@@ -2,7 +2,7 @@ import { Router, type ErrorRequestHandler } from "express";
 import type { Db, Document } from "mongodb";
 import { latestObservedRange, observedAssetProjection, observedCandleProjection, observedHistoryResponse, parseObservedHistoryQuery, validatedObservedAsset, type ObservedHistoryRange, type ObservedHistoryResponse, type ObservedLatestWindowResponse } from "./observed-history-contract.js";
 import { observedCollectionStatusResponse, observedDeliveryStatusProjection, selectedDeliveryId, type ObservedCollectionStatusResponse } from "./observed-collection-status-contract.js";
-import { withinTimeout } from "./platform/health/dependency-probes.js";
+import { DependencyTimeoutError, withinTimeout } from "./platform/health/dependency-probes.js";
 
 export interface ObservedHistoryReader {
   read(symbol: string, range: ObservedHistoryRange): Promise<ObservedHistoryResponse | null>;
@@ -13,15 +13,29 @@ export interface ObservedHistoryReader {
 export class ObservedHistoryService implements ObservedHistoryReader {
   constructor(private readonly db: Db, private readonly timeoutMs = 1000) {}
   async latestWindow(): Promise<ObservedLatestWindowResponse | null> {
+    const deadline = performance.now() + Math.max(1, Math.trunc(this.timeoutMs));
+    const remainingMs = () => {
+      const remaining = Math.floor(deadline - performance.now());
+      if (remaining <= 0) throw new DependencyTimeoutError();
+      return remaining;
+    };
     return withinTimeout(async () => {
+      // CSOT also bounds selection and pool checkout; both reads share one deadline.
+      const assetTimeout = remainingMs();
       const asset = await this.db.collection<Document & { _id: string }>("observed_assets")
-        .findOne({ _id: "VN:HOSE:FPT" }, { projection: observedAssetProjection, maxTimeMS: this.timeoutMs });
+        .findOne({ _id: "VN:HOSE:FPT" }, { projection: observedAssetProjection, maxTimeMS: assetTimeout, timeoutMS: assetTimeout });
+      remainingMs();
       if (!asset) return null;
       const data = validatedObservedAsset("FPT", asset);
-      const rows = await this.db.collection("observed_candles_latest").find({
+      const candleTimeout = remainingMs();
+      const cursor = this.db.collection("observed_candles_latest").find({
         "record.assetId": "VN:HOSE:FPT", "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": "unknown",
-      }, { projection: observedCandleProjection, maxTimeMS: this.timeoutMs, hint: "asset_daily_history" })
-        .sort({ "record.tradingDate": -1 }).limit(1).toArray();
+      }, { projection: observedCandleProjection, maxTimeMS: candleTimeout, timeoutMS: candleTimeout, timeoutMode: "cursorLifetime", hint: "asset_daily_history" })
+        .sort({ "record.tradingDate": -1 }).limit(1);
+      let rows: Document[];
+      try { rows = await cursor.toArray(); }
+      finally { await cursor.close({ timeoutMS: Math.max(1, Math.floor(deadline - performance.now())) }); }
+      remainingMs();
       const date: unknown = rows[0]?.record?.tradingDate;
       const range = rows.length ? latestObservedRange(typeof date === "string" ? date : "") : null;
       if (range) observedHistoryResponse("FPT", range, asset, rows);

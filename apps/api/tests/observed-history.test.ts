@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
-import type { Db } from "mongodb";
+import type { Db, FindOptions } from "mongodb";
 import { readConfig } from "../src/config.js";
 import { createApp } from "../src/health.js";
 import { collectedOrder, digest, type ObservedPayload } from "../src/ingestion-contract.js";
-import { latestObservedRange, observedHistoryResponse, parseObservedHistoryQuery } from "../src/observed-history-contract.js";
+import { latestObservedRange, observedAssetProjection, observedCandleProjection, observedHistoryResponse, parseObservedHistoryQuery } from "../src/observed-history-contract.js";
 import { createObservedHistoryRouter, ObservedHistoryService, type ObservedHistoryReader } from "../src/observed-history.js";
 import { observed, rehash } from "./observed-test-data.js";
 
@@ -20,6 +20,57 @@ test("latest stored window uses 30 inclusive UTC calendar dates and clamps at ye
 test("latest lookup has a whole-operation deadline even when a Mongo read never settles", async () => {
   const db = { collection: () => ({ findOne: () => new Promise(() => undefined) }) } as unknown as Db;
   await assert.rejects(new ObservedHistoryService(db, 10).latestWindow(), /dependency_timeout/);
+});
+test("late asset completion after the deadline cannot enqueue a candle query", async () => {
+  let resolveAsset!: (value: unknown) => void;
+  const pendingAsset = new Promise(resolve => { resolveAsset = resolve; });
+  let candleQueries = 0;
+  const db = { collection: (name: string) => name === "observed_assets" ? { findOne: () => pendingAsset } : {
+    find: () => { candleQueries++; throw new Error("late candle query"); },
+  } } as unknown as Db;
+  await assert.rejects(new ObservedHistoryService(db, 10).latestWindow(), /dependency_timeout/);
+  resolveAsset(stored().asset);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(candleQueries, 0);
+});
+
+test("latest reads share the remaining CSOT budget and always close the candle cursor", async () => {
+  for (const fail of [false, true]) {
+    const data = stored();
+    let assetTimeout = 0;
+    let candleTimeout = 0;
+    let closed = 0;
+    const cursor = {
+      sort: (sort: unknown) => { assert.deepEqual(sort, { "record.tradingDate": -1 }); return cursor; },
+      limit: (limit: number) => { assert.equal(limit, 1); return cursor; },
+      toArray: async () => { if (fail) throw new Error("candle read failed"); return data.rows; },
+      close: async (options: { timeoutMS: number }) => { closed++; assert(options.timeoutMS > 0 && options.timeoutMS <= candleTimeout); },
+    };
+    const db = { collection: (name: string) => name === "observed_assets" ? {
+      findOne: async (filter: unknown, options: FindOptions) => {
+        assert.deepEqual(filter, { _id: "VN:HOSE:FPT" });
+        assert.deepEqual(options.projection, observedAssetProjection);
+        assetTimeout = options.timeoutMS!;
+        assert(assetTimeout > 0 && assetTimeout <= 1000);
+        assert.equal(options.maxTimeMS, assetTimeout);
+        await new Promise(resolve => setTimeout(resolve, 20));
+        return data.asset;
+      },
+    } : {
+      find: (filter: unknown, options: FindOptions) => {
+        assert.equal(name, "observed_candles_latest");
+        assert.deepEqual(filter, { "record.assetId": "VN:HOSE:FPT", "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": "unknown" });
+        candleTimeout = options.timeoutMS!;
+        assert(candleTimeout > 0 && candleTimeout < assetTimeout);
+        assert.deepEqual(options, { projection: observedCandleProjection, maxTimeMS: candleTimeout, timeoutMS: candleTimeout, timeoutMode: "cursorLifetime", hint: "asset_daily_history" });
+        return cursor;
+      },
+    } } as unknown as Db;
+    const lookup = new ObservedHistoryService(db, 1000).latestWindow();
+    if (fail) await assert.rejects(lookup, /candle read failed/);
+    else assert.equal((await lookup)?.meta.latestTradingDate, "2026-10-02");
+    assert.equal(closed, 1);
+  }
 });
 function stored(payload = observed()) {
   return {
