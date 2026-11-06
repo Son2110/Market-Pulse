@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compareDecimal, sampleRange, validObservedRange, detailMode, isObservedHistory } from "../src/observed-detail.js";
-import { fetchObservedIndexHistory, isObservedIndexHistory, overviewHref, overviewMode, ObservedIndexError, observedIndexErrorMessage, type ObservedIndexCandle, type ObservedIndexHistory } from "../src/observed-market-overview.js";
+import { compareDecimal, sampleRange, validObservedRange, detailMode, isObservedHistory, isObservedLatestWindow } from "../src/observed-detail.js";
+import { fetchObservedIndexHistory, fetchObservedIndexLatestWindow, isObservedIndexHistory, isObservedIndexLatestWindow, overviewHref, overviewMode, ObservedIndexError, observedIndexErrorMessage, type ObservedIndexCandle, type ObservedIndexHistory, type ObservedIndexLatestWindow } from "../src/observed-market-overview.js";
 
 function response(): ObservedIndexHistory {
   const candle: ObservedIndexCandle = {
@@ -18,14 +18,54 @@ function series(prices: string[], dates = ["2026-09-28", "2026-09-29", "2026-10-
   return prices.map((close, index) => ({ ...response().data.candles[0], open: close, high: close, low: close, close, tradingDate: dates[index] }));
 }
 
-test("overview defaults to fixture and observed requires one source, explicit valid range and known parameters", () => {
+test("overview defaults to fixture and observed requires one source, explicit valid range or latest window, and known parameters", () => {
   assert.deepEqual(overviewMode(""), { kind: "fixture" });
   assert.deepEqual(overviewMode("?source=fixture"), { kind: "fixture" });
+  assert.deepEqual(overviewMode("?source=observed&window=latest"), { kind: "latest" });
   assert.deepEqual(overviewMode("?source=observed&from=2026-09-28&to=2026-10-07"), { kind: "observed", range: sampleRange });
-  for (const query of ["?source=", "?source=unknown", "?from=2026-09-28", "?source=fixture&to=2026-10-07", "?source=observed", "?source=observed&from=2026-10-07&to=2026-09-28", "?source=observed&from=2026-01-01&to=2026-02-02", "?source=observed&from=2026-02-30&to=2026-03-01", "?source=observed&source=fixture&from=2026-09-28&to=2026-10-07", "?source=observed&from=2026-09-28&from=2026-09-28&to=2026-10-07", "?source=observed&from=2026-09-28&to=2026-10-07&to=2026-10-07", "?source=observed&from=2026-09-28&to=2026-10-07&interval=5d", "?source=fixture&unknown=value", "?unknown=value"])
+  for (const query of ["?source=", "?source=unknown", "?from=2026-09-28", "?window=latest", "?source=fixture&window=latest", "?source=fixture&to=2026-10-07", "?source=observed", "?source=observed&window=", "?source=observed&window=latest&window=latest", "?source=observed&window=latest&from=2026-10-01", "?source=observed&window=latest&to=2026-10-01", "?source=observed&window=latest&cursor=x", "?source=observed&from=2026-10-07&to=2026-09-28", "?source=observed&from=2026-01-01&to=2026-02-02", "?source=observed&from=2026-02-30&to=2026-03-01", "?source=observed&source=fixture&from=2026-09-28&to=2026-10-07", "?source=observed&from=2026-09-28&from=2026-09-28&to=2026-10-07", "?source=observed&from=2026-09-28&to=2026-10-07&to=2026-10-07", "?source=observed&from=2026-09-28&to=2026-10-07&interval=5d", "?source=fixture&unknown=value", "?unknown=value"])
     assert.equal(overviewMode(query).kind, "invalid", query);
   assert.equal(overviewHref("fixture"), "/market");
-  assert.equal(overviewHref("observed"), "/market?source=observed&from=2026-09-28&to=2026-10-07");
+  assert.equal(overviewHref("observed"), "/market?source=observed&window=latest");
+  assert.equal(overviewHref("observed", sampleRange), "/market?source=observed&from=2026-09-28&to=2026-10-07");
+});
+
+function latestWindow(): ObservedIndexLatestWindow {
+  const { asset, dataset } = response().data;
+  return { data: { asset, dataset }, meta: { status: "available", provider: "KBS", interval: "1d", latestTradingDate: "2024-03-01", range: { from: "2024-02-01", to: "2024-03-01" },
+    calendarDays: 30, sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" } };
+}
+test("index latest window guard enforces exact VNINDEX identity and 30 inclusive calendar dates while staying isolated from FPT", () => {
+  assert(isObservedIndexLatestWindow(latestWindow()));
+  assert(!isObservedLatestWindow(latestWindow()));
+  const minimum = latestWindow(); minimum.meta.latestTradingDate = "0001-01-02"; minimum.meta.range = { from: "0001-01-01", to: "0001-01-02" }; assert(isObservedIndexLatestWindow(minimum));
+  const empty = latestWindow(); empty.meta.status = "no_data"; empty.meta.range = null; empty.meta.latestTradingDate = null; assert(isObservedIndexLatestWindow(empty));
+  for (const mutate of [
+    (b: ObservedIndexLatestWindow) => { b.meta.range!.from = "2024-02-02"; },
+    (b: ObservedIndexLatestWindow) => { b.meta.latestTradingDate = "2024-02-30"; },
+    (b: ObservedIndexLatestWindow) => { b.meta.status = "no_data"; },
+    (b: ObservedIndexLatestWindow) => { b.meta.range = null; },
+    (b: ObservedIndexLatestWindow) => { Object.assign(b.meta, { extra: 1 }); },
+    (b: ObservedIndexLatestWindow) => { Object.assign(b.meta, { calendarDays: 31 }); },
+    (b: ObservedIndexLatestWindow) => { Object.assign(b.data.asset, { symbol: "FPT" }); },
+    (b: ObservedIndexLatestWindow) => { Object.assign(b.data.asset, { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND" }); },
+    (b: ObservedIndexLatestWindow) => { Object.assign(b.data.dataset, { freshness: "fresh" }); },
+    (b: ObservedIndexLatestWindow) => { Object.assign(b.meta, { sourceAsOf: "2026-11-04" }); },
+  ]) { const b = latestWindow(); mutate(b); assert(!isObservedIndexLatestWindow(b)); }
+});
+test("index latest window fetch is no-store, guarded, abortable and maps bounded failures", async () => {
+  const signal = new AbortController().signal;
+  assert.deepEqual(await fetchObservedIndexLatestWindow(signal, async (url, options) => {
+    assert.equal(url, "/api/observed/assets/VNINDEX/latest-window"); assert.equal(options?.cache, "no-store"); assert.equal((options?.headers as Record<string, string>).Accept, "application/json"); return Response.json(latestWindow());
+  }), latestWindow());
+  for (const [status, kind] of [[400, "invalid"], [404, "missing"], [503, "unavailable"]] as const)
+    await assert.rejects(fetchObservedIndexLatestWindow(signal, async () => new Response("", { status })), error => error instanceof ObservedIndexError && error.kind === kind);
+  for (const request of [async () => Response.json({}), async () => new Response("bad json")])
+    await assert.rejects(fetchObservedIndexLatestWindow(signal, request), error => error instanceof ObservedIndexError && error.kind === "response");
+  await assert.rejects(fetchObservedIndexLatestWindow(signal, async () => { throw new Error("offline"); }), error => error instanceof ObservedIndexError && error.kind === "network");
+  const waiting: typeof fetch = async (_url, options) => new Promise((_resolve, reject) => { options?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true }); });
+  await assert.rejects(fetchObservedIndexLatestWindow(signal, waiting, 5), error => error instanceof ObservedIndexError && error.kind === "timeout");
+  const controller = new AbortController(); const pending = fetchObservedIndexLatestWindow(controller.signal, waiting); controller.abort(); await assert.rejects(pending, error => error instanceof DOMException && error.name === "AbortError");
 });
 
 test("inclusive range accepts 31 day difference and leap dates, rejects 32 and rollover", () => {

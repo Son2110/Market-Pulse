@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import SiteHeader from "./SiteHeader.js";
 import { sampleRange } from "./observed-detail.js";
-import { fetchObservedIndexHistory, ObservedIndexError, observedIndexErrorMessage, overviewHref, type ObservedIndexHistory, type OverviewMode } from "./observed-market-overview.js";
+import { fetchObservedIndexHistory, fetchObservedIndexLatestWindow, ObservedIndexError, observedIndexErrorMessage, overviewHref, type ObservedIndexHistory, type ObservedIndexLatestWindow, type OverviewMode } from "./observed-market-overview.js";
 import "./observed-market-overview.css";
 
 const date = (value: string) => value.split("-").reverse().join("/");
+const sampleHref = overviewHref("observed", sampleRange);
+const latestHref = overviewHref("observed");
 export function OverviewSourceLinks({ selected }: { selected: "fixture" | "observed" }) {
   return <nav className="overview-source-links" aria-label="Nguồn dữ liệu tổng quan">
     <a href={overviewHref("fixture")} aria-current={selected === "fixture" ? "page" : undefined}>Dữ liệu minh họa</a>
-    <a href={overviewHref("observed")} aria-current={selected === "observed" ? "page" : undefined}>Dữ liệu đã lưu · KBS</a>
+    <a href={latestHref} aria-current={selected === "observed" ? "page" : undefined}>Dữ liệu đã lưu · KBS</a>
   </nav>;
 }
 
@@ -20,7 +22,7 @@ function IndexSource({ response }: { response: ObservedIndexHistory }) {
       ["Nguồn dữ liệu", "KBS qua Vnstock 4.0.8 / vnai 2.6.2"],
       ["Đơn vị", "Điểm chỉ số"], ["Tiền tệ", "Không áp dụng"], ["Cơ sở điều chỉnh", "Không áp dụng"], ["Khối lượng", "Không có dữ liệu"],
       ["Múi giờ tài sản", "Asia/Ho_Chi_Minh (UTC+7)"], ["Thời điểm quan sát từ nguồn", "Chưa xác định"], ["Độ mới", "Chưa xác định"],
-      ["Độ đầy đủ", "Chưa xác định"], ["Lịch phiên", "Chưa xác minh"], ["Phạm vi trả về", range ? `${date(range.from)} – ${date(range.to)}` : "Không có quan sát"],
+      ["Độ đầy đủ", "Chưa xác định"], ["Lịch phiên", "Chưa xác minh"], ["Khoảng yêu cầu", `${date(response.meta.requestedRange.from)} – ${date(response.meta.requestedRange.to)}`], ["Phạm vi trả về", range ? `${date(range.from)} – ${date(range.to)}` : "Không có quan sát"],
     ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <div className="reference-note"><p>Dữ liệu đã lưu · Không phải mức chỉ số hiện tại</p><p className="small">Nhãn ngày/giờ từ nguồn không có múi giờ. Thời điểm thu thập trong bảng giữ múi giờ gốc, không phải thời điểm quan sát từ nguồn.</p><p className="small">Mỗi quan sát được chọn theo thời điểm thu thập rồi dấu vân tay nội dung. Các dòng có thể đến từ nhiều lần thu thập hoặc đợt ghi dữ liệu chưa hoàn tất/thất bại; chưa xác nhận tập dữ liệu đầy đủ hay đồng nhất.</p></div>
   </aside>;
@@ -50,12 +52,27 @@ function IndexTable({ response }: { response: ObservedIndexHistory }) {
 }
 
 type State = { status: "loading" } | { status: "loaded"; response: ObservedIndexHistory } | { status: "error"; message: string; retry: boolean };
+type WindowState = { status: "loading" } | { status: "loaded"; response: ObservedIndexLatestWindow } | { status: "error"; message: string };
 export default function ObservedMarketOverview({ mode }: { mode: Exclude<OverviewMode, { kind: "fixture" }> }) {
   const [state, setState] = useState<State>({ status: "loading" }); const [attempt, setAttempt] = useState(0); const requestId = useRef(0);
+  const [windowState, setWindowState] = useState<WindowState>({ status: "loading" }); const [windowAttempt, setWindowAttempt] = useState(0);
   const parameters = new URLSearchParams(window.location.search);
-  const from = mode.kind === "observed" ? mode.range.from : parameters.get("from") ?? sampleRange.from;
-  const to = mode.kind === "observed" ? mode.range.to : parameters.get("to") ?? sampleRange.to;
-  const valid = mode.kind === "observed";
+  const latestMode = mode.kind === "latest";
+  const windowLoading = latestMode && windowState.status === "loading";
+  const resolvedRange = latestMode && windowState.status === "loaded" ? windowState.response.meta.range : null;
+  const from = mode.kind === "observed" ? mode.range.from : latestMode ? resolvedRange?.from ?? "" : parameters.get("from") ?? sampleRange.from;
+  const to = mode.kind === "observed" ? mode.range.to : latestMode ? resolvedRange?.to ?? "" : parameters.get("to") ?? sampleRange.to;
+  const valid = mode.kind === "observed" || (latestMode && resolvedRange !== null);
+  useEffect(() => {
+    if (!latestMode) return;
+    const controller = new AbortController(); setWindowState({ status: "loading" });
+    void fetchObservedIndexLatestWindow(controller.signal).then(response => {
+      if (!controller.signal.aborted) setWindowState({ status: "loaded", response });
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) setWindowState({ status: "error", message: observedIndexErrorMessage(error) });
+    });
+    return () => controller.abort();
+  }, [latestMode, windowAttempt]);
   useEffect(() => {
     document.title = "Tổng quan VN-Index — Dữ liệu đã lưu | MarketPulse VN";
     if (!valid) return;
@@ -69,25 +86,32 @@ export default function ObservedMarketOverview({ mode }: { mode: Exclude<Overvie
     return () => { requestId.current += 1; controller.abort(); };
   }, [valid, from, to, attempt]);
   const response = valid && state.status === "loaded" ? state.response : null;
-  const statusText = mode.kind === "invalid" ? mode.message : state.status === "loading" ? "Đang tải các quan sát VN-Index đã lưu…" : state.status === "error" ? state.message : response?.data.candles.length ? `Đã tải ${response.data.candles.length} quan sát VN-Index.` : "Không có quan sát trong khoảng đã chọn.";
+  const statusText = latestMode && windowState.status === "loading" ? "Đang tìm khoảng VN-Index đã lưu mới nhất…"
+    : latestMode && windowState.status === "error" ? windowState.message
+      : latestMode && windowState.status === "loaded" && !resolvedRange ? "Chưa có quan sát VN-Index đã lưu."
+        : mode.kind === "invalid" ? mode.message : state.status === "loading" ? "Đang tải các quan sát VN-Index đã lưu…" : state.status === "error" ? state.message : response?.data.candles.length ? `Đã tải ${response.data.candles.length} quan sát VN-Index.` : "Không có quan sát trong khoảng đã chọn.";
   return <>
-    <a className="skip-link" href="#main">Đến nội dung tổng quan</a><SiteHeader active="market" />
+    <a className="skip-link" href="#main">Đến nội dung tổng quan</a><SiteHeader active="market" searchHref="/?source=observed" />
     <main id="main" className="page overview-page observed-index">
       <div className="demo-notice overview-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu đã lưu · KBS · Không phải mức chỉ số hiện tại</strong><p>Thời điểm quan sát từ nguồn, độ mới và độ đầy đủ chưa xác định; lịch phiên chưa xác minh. Thông tin phục vụ nghiên cứu, không phải lời khuyên đầu tư.</p></div></div>
       <div className="overview-heading"><div><h1>Tổng quan thị trường (VN-Index)</h1><p className="intro">Các quan sát ngày đã lưu trong khoảng bạn chọn</p></div><OverviewSourceLinks selected="observed" /></div>
       <section className="detail-card observed-index-range" aria-labelledby="observed-index-range-heading"><h2 id="observed-index-range-heading">Khoảng ngày đã chọn</h2>
         <form method="get" action="/market" className="observed-index-range-form"><input type="hidden" name="source" value="observed" />
-          <label htmlFor="observed-index-from">Từ ngày<input id="observed-index-from" type="date" name="from" required defaultValue={from} aria-describedby="observed-index-range-help" /></label>
-          <label htmlFor="observed-index-to">Đến ngày<input id="observed-index-to" type="date" name="to" required defaultValue={to} aria-describedby="observed-index-range-help" /></label><button className="primary-button" type="submit">Xem dữ liệu</button>
-        </form><p id="observed-index-range-help" className="small muted">Bao gồm hai ngày đầu/cuối; chênh lệch tối đa 31 ngày (32 ngày lịch). <a href={overviewHref("observed")}>Khoảng mẫu cố định 28/09–07/10/2026</a> · Không phải khoảng mới nhất.</p>
+          <label htmlFor="observed-index-from">Từ ngày<input key={`from:${from}`} id="observed-index-from" type="date" name="from" required defaultValue={from} disabled={windowLoading} aria-describedby="observed-index-range-help" /></label>
+          <label htmlFor="observed-index-to">Đến ngày<input key={`to:${to}`} id="observed-index-to" type="date" name="to" required defaultValue={to} disabled={windowLoading} aria-describedby="observed-index-range-help" /></label><button className="primary-button" type="submit" disabled={windowLoading}>Xem dữ liệu</button>
+        </form><p id="observed-index-range-help" className="small muted">Bao gồm hai ngày đầu/cuối; chênh lệch tối đa 31 ngày (32 ngày lịch). <a href={sampleHref}>Khoảng mẫu cố định 28/09–07/10/2026</a> · Không phải khoảng mới nhất. <a href={latestHref}>Xem khoảng đã lưu mới nhất</a></p>
+        {latestMode && <p className="small muted">Chế độ khoảng đã lưu mới nhất: tối đa 30 ngày lịch, kết thúc ở ngày có quan sát đã lưu lớn nhất. Không phải 30 phiên; không xác nhận mức chỉ số hiện tại, độ mới hoặc độ đầy đủ.{resolvedRange && ` Khoảng yêu cầu: ${date(resolvedRange.from)} – ${date(resolvedRange.to)}.`}</p>}
       </section>
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{statusText}</p>
-      <div aria-busy={valid && state.status === "loading"}>
-        {mode.kind === "invalid" || state.status === "error" ? <section className="state-panel error-panel overview-state" role="alert"><h2>Chưa thể đọc dữ liệu VN-Index đã lưu</h2><p>{mode.kind === "invalid" ? mode.message : state.status === "error" ? state.message : ""}</p>{mode.kind !== "invalid" && state.status === "error" && state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Thử lại</button>}</section>
+      <div aria-busy={(latestMode && windowState.status === "loading") || (valid && state.status === "loading")}>
+        {latestMode && windowState.status === "error" ? <section className="state-panel error-panel overview-state" role="alert"><h2>Chưa thể xác định khoảng VN-Index đã lưu mới nhất</h2><p>{windowState.message}</p><button className="secondary-button" type="button" onClick={() => setWindowAttempt(value => value + 1)}>Thử lại khoảng mới nhất</button></section>
+          : latestMode && windowState.status === "loading" ? <section className="state-panel overview-state" role="status"><h2>Đang tìm khoảng đã lưu mới nhất…</h2><p>Đang đọc ngày có quan sát VN-Index đã lưu lớn nhất.</p></section>
+            : latestMode && windowState.status === "loaded" && !resolvedRange ? <section className="state-panel overview-state" role="status"><h2>Chưa có quan sát VN-Index đã lưu</h2><p>Chưa thể xác định khoảng ngày. Không có mức đóng cửa để hiển thị; độ đầy đủ và lịch phiên chưa xác minh.</p><button className="secondary-button" type="button" onClick={() => setWindowAttempt(value => value + 1)}>Thử lại khoảng mới nhất</button></section>
+          : mode.kind === "invalid" || state.status === "error" ? <section className="state-panel error-panel overview-state" role="alert"><h2>Chưa thể đọc dữ liệu VN-Index đã lưu</h2><p>{mode.kind === "invalid" ? mode.message : state.status === "error" ? state.message : ""}</p>{mode.kind !== "invalid" && state.status === "error" && state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Thử lại</button>}</section>
           : state.status === "loading" ? <section className="state-panel overview-state"><h2>Đang tải VN-Index đã lưu…</h2><p>Đang đọc các quan sát trong khoảng ngày đã chọn.</p></section>
-            : response && <><IndexSummary response={response} /><div className="overview-workspace"><div className="overview-main-column">{response.data.candles.length ? <IndexTable response={response} /> : <section className="detail-card state-panel overview-state"><h2>Không có quan sát trong khoảng đã chọn</h2><p>Chưa có mức đóng cửa để hiển thị. Độ đầy đủ chưa xác định và lịch phiên chưa xác minh.</p><a className="detail-link" href={overviewHref("observed")}>Xem khoảng mẫu cố định 28/09–07/10/2026 →</a><button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Tải lại</button></section>}</div><IndexSource response={response} /></div></>}
+            : response && <><IndexSummary response={response} /><div className="overview-workspace"><div className="overview-main-column">{response.data.candles.length ? <IndexTable response={response} /> : <section className="detail-card state-panel overview-state"><h2>Không có quan sát trong khoảng đã chọn</h2><p>Chưa có mức đóng cửa để hiển thị. Độ đầy đủ chưa xác định và lịch phiên chưa xác minh.</p><a className="detail-link" href={sampleHref}>Xem khoảng mẫu cố định 28/09–07/10/2026 →</a><button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Tải lại</button></section>}</div><IndexSource response={response} /></div></>}
       </div>
-      <section className="detail-card overview-search-card" aria-labelledby="observed-index-search-heading"><div><p className="eyebrow">Điều hướng tra cứu</p><h2 id="observed-index-search-heading">Tra cứu cổ phiếu</h2><p className="small muted">Tìm kiếm và mở chi tiết từng doanh nghiệp trong danh mục 10 mã demo.</p></div><a className="detail-link" href="/">Mở trang tra cứu <span aria-hidden="true">→</span></a></section>
+      <section className="detail-card overview-search-card" aria-labelledby="observed-index-search-heading"><div><p className="eyebrow">Điều hướng tra cứu</p><h2 id="observed-index-search-heading">Tra cứu cổ phiếu</h2><p className="small muted">Tìm kiếm trong danh mục tài sản đã lưu (FPT) và mở chi tiết dữ liệu đã lưu.</p></div><a className="detail-link" href="/?source=observed">Mở trang tra cứu <span aria-hidden="true">→</span></a></section>
     </main><footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>
   </>;
 }

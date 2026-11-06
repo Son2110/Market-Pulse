@@ -34,42 +34,50 @@ test("late asset completion after the deadline cannot enqueue a candle query", a
   assert.equal(candleQueries, 0);
 });
 
-test("latest reads share the remaining CSOT budget and always close the candle cursor", async () => {
-  for (const fail of [false, true]) {
-    const data = stored();
-    let assetTimeout = 0;
-    let candleTimeout = 0;
-    let closed = 0;
-    const cursor = {
-      sort: (sort: unknown) => { assert.deepEqual(sort, { "record.tradingDate": -1 }); return cursor; },
-      limit: (limit: number) => { assert.equal(limit, 1); return cursor; },
-      toArray: async () => { if (fail) throw new Error("candle read failed"); return data.rows; },
-      close: async (options: { timeoutMS: number }) => { closed++; assert(options.timeoutMS > 0 && options.timeoutMS <= candleTimeout); },
-    };
-    const db = { collection: (name: string) => name === "observed_assets" ? {
-      findOne: async (filter: unknown, options: FindOptions) => {
-        assert.deepEqual(filter, { _id: "VN:HOSE:FPT" });
-        assert.deepEqual(options.projection, observedAssetProjection);
-        assetTimeout = options.timeoutMS!;
-        assert(assetTimeout > 0 && assetTimeout <= 1000);
-        assert.equal(options.maxTimeMS, assetTimeout);
-        await new Promise(resolve => setTimeout(resolve, 20));
-        return data.asset;
-      },
-    } : {
-      find: (filter: unknown, options: FindOptions) => {
-        assert.equal(name, "observed_candles_latest");
-        assert.deepEqual(filter, { "record.assetId": "VN:HOSE:FPT", "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": "unknown" });
-        candleTimeout = options.timeoutMS!;
-        assert(candleTimeout > 0 && candleTimeout < assetTimeout);
-        assert.deepEqual(options, { projection: observedCandleProjection, maxTimeMS: candleTimeout, timeoutMS: candleTimeout, timeoutMode: "cursorLifetime", hint: "asset_daily_history" });
-        return cursor;
-      },
-    } } as unknown as Db;
-    const lookup = new ObservedHistoryService(db, 1000).latestWindow();
-    if (fail) await assert.rejects(lookup, /candle read failed/);
-    else assert.equal((await lookup)?.meta.latestTradingDate, "2026-10-02");
-    assert.equal(closed, 1);
+test("latest reads share the remaining CSOT budget and always close the candle cursor for FPT and VNINDEX", async () => {
+  for (const [symbol, index] of [["FPT", false], ["VNINDEX", true]] as const) {
+    for (const fail of [false, true]) {
+      const data = stored(observed(index));
+      const assetId = index ? "VN:INDEX:VNINDEX" : "VN:HOSE:FPT";
+      const adjustmentBasis = index ? "not_applicable" : "unknown";
+      let assetTimeout = 0;
+      let candleTimeout = 0;
+      let closed = 0;
+      const cursor = {
+        sort: (sort: unknown) => { assert.deepEqual(sort, { "record.tradingDate": -1 }); return cursor; },
+        limit: (limit: number) => { assert.equal(limit, 1); return cursor; },
+        toArray: async () => { if (fail) throw new Error("candle read failed"); return data.rows; },
+        close: async (options: { timeoutMS: number }) => { closed++; assert(options.timeoutMS > 0 && options.timeoutMS <= candleTimeout); },
+      };
+      const db = { collection: (name: string) => name === "observed_assets" ? {
+        findOne: async (filter: unknown, options: FindOptions) => {
+          assert.deepEqual(filter, { _id: assetId });
+          assert.deepEqual(options.projection, observedAssetProjection);
+          assetTimeout = options.timeoutMS!;
+          assert(assetTimeout > 0 && assetTimeout <= 1000);
+          assert.equal(options.maxTimeMS, assetTimeout);
+          await new Promise(resolve => setTimeout(resolve, 20));
+          return data.asset;
+        },
+      } : {
+        find: (filter: unknown, options: FindOptions) => {
+          assert.equal(name, "observed_candles_latest");
+          assert.deepEqual(filter, { "record.assetId": assetId, "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": adjustmentBasis });
+          candleTimeout = options.timeoutMS!;
+          assert(candleTimeout > 0 && candleTimeout < assetTimeout);
+          assert.deepEqual(options, { projection: observedCandleProjection, maxTimeMS: candleTimeout, timeoutMS: candleTimeout, timeoutMode: "cursorLifetime", hint: "asset_daily_history" });
+          return cursor;
+        },
+      } } as unknown as Db;
+      const lookup = new ObservedHistoryService(db, 1000).latestWindow(symbol);
+      if (fail) await assert.rejects(lookup, /candle read failed/);
+      else {
+        const result = await lookup;
+        assert.equal(result?.meta.latestTradingDate, "2026-10-02");
+        assert.equal(result?.data.asset.symbol, symbol);
+      }
+      assert.equal(closed, 1);
+    }
   }
 });
 function stored(payload = observed()) {
@@ -152,14 +160,14 @@ test("observed HTTP validates inputs before reads and sanitizes failures with no
   assert.equal(called, 1);
 });
 
-test("latest window HTTP rejects arbitrary ranges/parameters and non-FPT before lookup", async t => {
-  let calls = 0;
-  const reader: ObservedHistoryReader = { read: async () => null, latestWindow: async () => { calls++; throw new Error("private mongo hostname"); } };
+test("latest window HTTP rejects arbitrary ranges/parameters and unsupported symbols before lookup", async t => {
+  const called: string[] = [];
+  const reader: ObservedHistoryReader = { read: async () => null, latestWindow: async (symbol) => { called.push(symbol ?? ""); throw new Error("private mongo hostname"); } };
   const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, observedHistoryRouter: createObservedHistoryRouter(reader) }));
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === "object"); const base = `http://127.0.0.1:${address.port}/api/observed/assets/`;
-  for (const [path, status, error] of [["FPT/latest-window?from=2026-10-01", 400, "invalid_query"], ["FPT/latest-window?interval=1d&interval=1d", 400, "invalid_query"], ["%24FPT/latest-window", 400, "invalid_symbol"], ["%ZZ/latest-window", 400, "invalid_symbol"], ["VNINDEX/latest-window", 404, "asset_not_found"], ["VCB/latest-window", 404, "asset_not_found"], ["fpt/latest-window", 503, "observed_latest_window_unavailable"]] as const) {
+  for (const [path, status, error] of [["FPT/latest-window?from=2026-10-01", 400, "invalid_query"], ["VNINDEX/latest-window?window=latest", 400, "invalid_query"], ["FPT/latest-window?interval=1d&interval=1d", 400, "invalid_query"], ["%24FPT/latest-window", 400, "invalid_symbol"], ["%ZZ/latest-window", 400, "invalid_symbol"], ["VCB/latest-window", 404, "asset_not_found"], ["fpt/latest-window", 503, "observed_latest_window_unavailable"], ["vnindex/latest-window", 503, "observed_latest_window_unavailable"]] as const) {
     const response = await fetch(`${base}${path}`); assert.equal(response.status, status); assert.deepEqual(await response.json(), { error }); assert.equal(response.headers.get("cache-control"), "no-store");
   }
-  assert.equal(calls, 1);
+  assert.deepEqual(called, ["FPT", "VNINDEX"]);
 });

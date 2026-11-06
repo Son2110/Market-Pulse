@@ -1,18 +1,20 @@
 import { compareDecimal, sampleRange, validObservedDate, validObservedRange, type ObservedRange } from "./observed-detail.js";
 
-export type OverviewMode = { kind: "fixture" } | { kind: "observed"; range: ObservedRange } | { kind: "invalid"; message: string };
+export type OverviewMode = { kind: "fixture" } | { kind: "observed"; range: ObservedRange } | { kind: "latest" } | { kind: "invalid"; message: string };
 export function overviewMode(search: string): OverviewMode {
   const parameters = new URLSearchParams(search);
   const invalid: OverviewMode = { kind: "invalid", message: "Nguồn hoặc khoảng ngày không hợp lệ. Chọn một nguồn và hai ngày hợp lệ, chênh lệch tối đa 31 ngày (32 ngày lịch)." };
-  if ([...parameters.keys()].some(key => !["source", "from", "to"].includes(key) || parameters.getAll(key).length !== 1)) return invalid;
+  if ([...parameters.keys()].some(key => !["source", "from", "to", "window"].includes(key) || parameters.getAll(key).length !== 1)) return invalid;
   const source = parameters.get("source");
-  if (source === null || source === "fixture") return parameters.has("from") || parameters.has("to") ? invalid : { kind: "fixture" };
+  if (source === null || source === "fixture") return parameters.has("from") || parameters.has("to") || parameters.has("window") ? invalid : { kind: "fixture" };
   if (source !== "observed") return invalid;
+  if (parameters.has("window")) return parameters.get("window") === "latest" && !parameters.has("from") && !parameters.has("to") ? { kind: "latest" } : invalid;
   const range = { from: parameters.get("from") ?? "", to: parameters.get("to") ?? "" };
   return validObservedRange(range) ? { kind: "observed", range } : invalid;
 }
-export function overviewHref(source: "fixture" | "observed", range = sampleRange): string {
-  return source === "fixture" ? "/market" : `/market?${new URLSearchParams({ source, ...range })}`;
+export function overviewHref(source: "fixture" | "observed", range?: ObservedRange): string {
+  if (source === "fixture") return "/market";
+  return `/market?${new URLSearchParams(range ? { source, ...range } : { source, window: "latest" })}`;
 }
 
 export interface ObservedIndexCandle {
@@ -27,6 +29,11 @@ export interface ObservedIndexHistory {
     asset: { assetId: "VN:INDEX:VNINDEX"; symbol: "VNINDEX"; assetType: "index"; currency: null; unit: "index_point"; timezone: "Asia/Ho_Chi_Minh" }; candles: ObservedIndexCandle[] };
   meta: { status: "available" | "no_data"; provider: "KBS"; interval: "1d"; requestedRange: ObservedRange; returnedRange: ObservedRange | null;
     sourceAsOf: null; completeness: "unknown"; selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" };
+}
+export interface ObservedIndexLatestWindow {
+  data: Pick<ObservedIndexHistory["data"], "dataset" | "asset">;
+  meta: { status: "available" | "no_data"; provider: "KBS"; interval: "1d"; latestTradingDate: string | null; range: ObservedRange | null;
+    calendarDays: 30; sourceAsOf: null; freshness: "unknown"; completeness: "unknown"; selectionSemantics: "max_stored_trading_date" };
 }
 function object(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 function keys(value: unknown, expected: string[]): value is Record<string, unknown> {
@@ -54,6 +61,36 @@ const asset = { assetId: "VN:INDEX:VNINDEX", symbol: "VNINDEX", assetType: "inde
 const dataset = { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" };
 const source = { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" };
 const candleKeys = ["assetId", "tradingDate", "interval", "currency", "unit", "timezone", "adjustmentBasis", "open", "high", "low", "close", "volume", "volumeUnit", "providerTimeLabel", "timeProvenance", "sourceAsOf", "collectedAt", "source", "barId", "contentDigest"];
+export function isObservedIndexLatestWindow(value: unknown): value is ObservedIndexLatestWindow {
+  if (!keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset"]) || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset)
+    || !keys(value.meta, ["status", "provider", "interval", "latestTradingDate", "range", "calendarDays", "sourceAsOf", "freshness", "completeness", "selectionSemantics"])) return false;
+  const meta = value.meta;
+  if (meta.provider !== "KBS" || meta.interval !== "1d" || meta.calendarDays !== 30 || meta.sourceAsOf !== null || meta.freshness !== "unknown"
+    || meta.completeness !== "unknown" || meta.selectionSemantics !== "max_stored_trading_date") return false;
+  if (meta.status === "no_data") return meta.range === null && meta.latestTradingDate === null;
+  if (meta.status !== "available" || !validObservedDate(meta.latestTradingDate)) return false;
+  const from = new Date(Math.max(Date.parse("0001-01-01"), Date.parse(meta.latestTradingDate) - 29 * 86400_000)).toISOString().slice(0, 10);
+  return exact(meta.range, { from, to: meta.latestTradingDate });
+}
+export async function fetchObservedIndexLatestWindow(signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000): Promise<ObservedIndexLatestWindow> {
+  signal.throwIfAborted();
+  const timeout = new AbortController(); const timer = setTimeout(() => timeout.abort(), timeoutMs);
+  try {
+    const response = await request("/api/observed/assets/VNINDEX/latest-window", { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
+    if (response.status === 400) throw new ObservedIndexError("invalid");
+    if (response.status === 404) throw new ObservedIndexError("missing");
+    if (!response.ok) throw new ObservedIndexError("unavailable");
+    let body: unknown; try { body = await response.json(); } catch { throw new ObservedIndexError("response"); }
+    signal.throwIfAborted(); timeout.signal.throwIfAborted();
+    if (!isObservedIndexLatestWindow(body)) throw new ObservedIndexError("response");
+    return body;
+  } catch (error) {
+    if (signal.aborted) throw error;
+    if (timeout.signal.aborted) throw new ObservedIndexError("timeout");
+    if (error instanceof ObservedIndexError) throw error;
+    throw new ObservedIndexError("network");
+  } finally { clearTimeout(timer); }
+}
 export function isObservedIndexHistory(value: unknown, range: ObservedRange): value is ObservedIndexHistory {
   if (!validObservedRange(range) || !keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset", "candles"]) || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset)
     || !Array.isArray(value.data.candles) || value.data.candles.length > 32 || !keys(value.meta, ["status", "provider", "interval", "requestedRange", "returnedRange", "sourceAsOf", "completeness", "selectionSemantics"])) return false;
@@ -105,3 +142,4 @@ export function observedIndexErrorMessage(error: unknown): string {
     default: return "Không thể kết nối để tải dữ liệu đã lưu. Kiểm tra kết nối và thử lại.";
   }
 }
+export { sampleRange };
