@@ -278,7 +278,13 @@ Observed OHLC/close text keeps exact decimal strings; the approximate chart is h
 
 ### Optional stored observed VN-Index overview
 
-With the optional stored-read API enabled locally as described above, open `/market?source=observed&from=2026-09-28&to=2026-10-07` (or `/market/` with the same query). The source link selects this fixed, labelled sample window; it does not claim to be latest. The GET date form requires both inclusive dates, with at most 31 days difference (32 calendar dates). Duplicate/unknown query parameters, invalid source/date/range are rejected without fetching. `/market` and `/market/` keep the existing fixture summary/calculations by default; the fixture source link clears the observed range.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d923aa98ecfb20994b63c477c91c48e470715afb87ed89982b8ac1f1abbf7937 -->
+
+With the optional stored-read API enabled locally as described above, the observed source link opens the latest stored VN-Index window at `/market?source=observed&window=latest` (or `/market/` with the same query). The fixed, labelled 28/09–07/10/2026 sample remains available at `/market?source=observed&from=2026-09-28&to=2026-10-07` (or `/market/` with the same query). The GET date form requires both inclusive dates, with at most 31 days difference (32 calendar dates). Duplicate/unknown query parameters, invalid source/date/range are rejected without fetching. `/market` and `/market/` keep the existing fixture summary/calculations by default; the fixture source link clears the observed range.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Only this valid mode calls the existing `/api/observed/assets/VNINDEX/history`, with no-store and a 10-second timeout. It neither enables the server flag nor calls a provider/collector or falls back to fixture. Missing/disabled reads, unavailable/network/timeout/malformed responses have observed errors and retry where applicable. Empty results retain source metadata and show no price. Retry/unmount cancels requests and discards late results.
 
