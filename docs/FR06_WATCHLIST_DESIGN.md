@@ -1,5 +1,15 @@
 # FR-06 — bàn giao trang danh sách theo dõi
 
+## FR-06 — danh sách theo dõi với dữ liệu đã lưu · 07/11/2026
+
+Trang `/watchlists` và `/watchlists/` giữ design system hiện có (`Watchlists.tsx`, `watchlist-session.ts`, `styles.css`, `SiteHeader.tsx`), không tạo thiết kế Stitch hoặc cài dependency mới. Bổ sung thanh chuyển nguồn **Dữ liệu minh họa** (`/watchlists`) và **Dữ liệu đã lưu · KBS · FPT** (`/watchlists?source=observed`). `watchlistMode` kiểm tra chặt query string, chỉ chấp nhận `source=fixture` hoặc `source=observed` (mặc định `fixture` khi không có query) và từ chối mọi tham số lạ/trùng trước khi gọi API tài khoản hay danh sách.
+
+Trong chế độ `source=observed`, trang giữ nguyên toàn bộ cơ chế xác minh `/api/auth/me`, cô lập quyền sở hữu theo bearer token, khóa single-flight mutation, reconciliation khi write mơ hồ và hủy/clear state khi logout/expiry/pagehide/delete-recreate. Tìm kiếm mã để thêm gọi `GET /api/observed/assets/search?q=…` (catalog tài sản đã lưu hiện chỉ `FPT`), không quét sang 10 mã fixture. Với các mã trong danh sách:
+- Dòng `FPT` liên kết tới `/stocks/FPT?source=observed&window=latest&searchSource=observed` và tải quan sát đã lưu mới nhất qua `GET /api/observed/assets/FPT/latest-window` rồi `GET /api/observed/assets/FPT/history?from=…&to=…`. Giá đóng cửa giữ nguyên chuỗi thập phân (`${latest.close} VND`, không làm tròn qua `Number`/`Intl`), không tính thay đổi giá hoặc lợi nhuận vì `adjustmentBasis: "unknown"` và lịch phiên chưa xác minh, hiển thị rõ `tradingDate`, `providerTimeLabel` (không có múi giờ) và `collectedAt` (múi giờ gốc, không phải market as-of). Khi `latest-window` hoặc `history` trả `no_data`, dòng hiện trạng thái chưa có quan sát; khi lỗi có nút **Tải lại giá FPT** độc lập.
+- Các mã ngoài `FPT` đã lưu trong danh sách từ trước được đánh dấu `unsupported` (*Mã ngoài phạm vi dữ liệu đã lưu (hiện chỉ hỗ trợ FPT). Không chuyển sang dữ liệu minh họa.*), không gọi fixture history hay endpoint observed không hỗ trợ, và vẫn cho phép bỏ mã.
+
+Kiểm tra local đạt: `npm run lint`, `npm run typecheck`, `npm run test:unit` (219 tests, gồm 28 watchlist unit tests), `npm run build`, `npm run test:e2e` (12/12 Playwright journeys ở 1440px và 320px), Python contract/collector tests và docs checks.
+
 ## Phạm vi và thiết kế
 
 Trang `/watchlists` và `/watchlists/` là lát cắt frontend serial của MP-09: một danh sách theo user demo cục bộ, tạo/đổi tên/xóa, tìm và thêm/bỏ đúng mười equity canonical của fixture, cùng giá đóng cửa/thay đổi mới nhất từ API history hiện có. Không thay backend, schema, dependency, fixture hoặc provider. FR-06 gốc vẫn **một phần**, GATE-3 còn chờ; nguồn live **NOT VERIFIED**. Xem [PRD](PRD.md), [roadmap](ROADMAP.md) và [hướng dẫn local](LOCAL_DEVELOPMENT.md).
