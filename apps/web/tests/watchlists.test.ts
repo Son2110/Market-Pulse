@@ -267,12 +267,18 @@ test("observed FPT row handles latest-window error, retry, no_data window, empty
     assert.match(env.manager.state.rows.FPT.message, /Chưa có quan sát FPT đã lưu/u);
   } finally { env.stop(); }
   const slowWindow = deferred<ObservedLatestWindow>();
-  const envLate = setup({ observedLatestWindow: async () => slowWindow.promise, write: async () => ({ ...list, symbols: [] }) }, () => now, "observed");
+  let lateHistoryCalls = 0;
+  const envLate = setup({
+    observedLatestWindow: async () => slowWindow.promise,
+    observedHistory: async () => { lateHistoryCalls++; return observedHistoryResponse(); },
+    write: async () => ({ ...list, symbols: [] }),
+  }, () => now, "observed");
   try {
     await settle();
     await envLate.manager.mutate({ kind: "remove", id: list.id, symbol: "FPT" });
     slowWindow.resolve(observedWindow());
     await settle();
+    assert.equal(lateHistoryCalls, 0);
     assert.deepEqual(envLate.manager.state.rows, {});
   } finally { envLate.stop(); }
 });
