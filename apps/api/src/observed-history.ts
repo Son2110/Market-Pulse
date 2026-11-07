@@ -7,12 +7,15 @@ import { DependencyTimeoutError, withinTimeout } from "./platform/health/depende
 export interface ObservedHistoryReader {
   read(symbol: string, range: ObservedHistoryRange): Promise<ObservedHistoryResponse | null>;
   collectionStatus?(symbol: string, range: ObservedHistoryRange): Promise<ObservedCollectionStatusResponse | null>;
-  latestWindow?(): Promise<ObservedLatestWindowResponse | null>;
+  latestWindow?(symbol?: string): Promise<ObservedLatestWindowResponse | null>;
 }
 
 export class ObservedHistoryService implements ObservedHistoryReader {
   constructor(private readonly db: Db, private readonly timeoutMs = 1000) {}
-  async latestWindow(): Promise<ObservedLatestWindowResponse | null> {
+  async latestWindow(symbol = "FPT"): Promise<ObservedLatestWindowResponse | null> {
+    const normalized = symbol.toUpperCase();
+    const assetId = `VN:${normalized === "FPT" ? "HOSE" : "INDEX"}:${normalized}`;
+    const adjustmentBasis = normalized === "FPT" ? "unknown" : "not_applicable";
     const deadline = performance.now() + Math.max(1, Math.trunc(this.timeoutMs));
     const remainingMs = () => {
       const remaining = Math.floor(deadline - performance.now());
@@ -23,13 +26,13 @@ export class ObservedHistoryService implements ObservedHistoryReader {
       // CSOT also bounds selection and pool checkout; both reads share one deadline.
       const assetTimeout = remainingMs();
       const asset = await this.db.collection<Document & { _id: string }>("observed_assets")
-        .findOne({ _id: "VN:HOSE:FPT" }, { projection: observedAssetProjection, maxTimeMS: assetTimeout, timeoutMS: assetTimeout });
+        .findOne({ _id: assetId }, { projection: observedAssetProjection, maxTimeMS: assetTimeout, timeoutMS: assetTimeout });
       remainingMs();
       if (!asset) return null;
-      const data = validatedObservedAsset("FPT", asset);
+      const data = validatedObservedAsset(normalized, asset);
       const candleTimeout = remainingMs();
       const cursor = this.db.collection("observed_candles_latest").find({
-        "record.assetId": "VN:HOSE:FPT", "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": "unknown",
+        "record.assetId": assetId, "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": adjustmentBasis,
       }, { projection: observedCandleProjection, maxTimeMS: candleTimeout, timeoutMS: candleTimeout, timeoutMode: "cursorLifetime", hint: "asset_daily_history" })
         .sort({ "record.tradingDate": -1 }).limit(1);
       let rows: Document[];
@@ -38,7 +41,7 @@ export class ObservedHistoryService implements ObservedHistoryReader {
       remainingMs();
       const date: unknown = rows[0]?.record?.tradingDate;
       const range = rows.length ? latestObservedRange(typeof date === "string" ? date : "") : null;
-      if (range) observedHistoryResponse("FPT", range, asset, rows);
+      if (range) observedHistoryResponse(normalized, range, asset, rows);
       return { data, meta: { status: range ? "available" : "no_data", provider: "KBS", interval: "1d", latestTradingDate: range?.to ?? null,
         range, calendarDays: 30, sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" } };
     }, this.timeoutMs);
@@ -73,10 +76,11 @@ export function createObservedHistoryRouter(reader: ObservedHistoryReader, isRea
     response.set("Cache-Control", "no-store");
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/.test(request.params.symbol)) { response.status(400).json({ error: "invalid_symbol" }); return; }
     if (new URL(request.originalUrl, "http://localhost").searchParams.size) { response.status(400).json({ error: "invalid_query" }); return; }
-    if (request.params.symbol.toUpperCase() !== "FPT") { response.status(404).json({ error: "asset_not_found" }); return; }
+    const normalized = request.params.symbol.toUpperCase();
+    if (!["FPT", "VNINDEX"].includes(normalized)) { response.status(404).json({ error: "asset_not_found" }); return; }
     try {
       if (!isReady()) throw new Error("not_ready");
-      const result = await reader.latestWindow?.();
+      const result = await reader.latestWindow?.(normalized);
       if (!result) { response.status(404).json({ error: "asset_not_found" }); return; }
       response.status(200).json(result);
     } catch { response.status(503).json({ error: "observed_latest_window_unavailable" }); }

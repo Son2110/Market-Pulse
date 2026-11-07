@@ -201,6 +201,75 @@ test("latest stored FPT window handles discovery, retries, independent history/s
   await noOverflow(page);
 });
 
+test("latest stored VN-Index window handles discovery, retries, manual range navigation and observed search continuity with explicit stubs", async ({ page }) => {
+  const data = { asset: { assetId: "VN:INDEX:VNINDEX", symbol: "VNINDEX", assetType: "index", currency: null, unit: "index_point", timezone: "Asia/Ho_Chi_Minh" },
+    dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" } };
+  const range = { from: "2026-10-04", to: "2026-11-02" };
+  const meta = { status: "available", provider: "KBS", interval: "1d", latestTradingDate: range.to, range, calendarDays: 30,
+    sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" };
+  const candle = { assetId: "VN:INDEX:VNINDEX", tradingDate: range.to, interval: "1d", currency: null, unit: "index_point", timezone: "Asia/Ho_Chi_Minh", adjustmentBasis: "not_applicable",
+    open: "1250.123456789123456789", high: "1260", low: "1240", close: "1255.987654321987654321", volume: null, volumeUnit: "not_available",
+    providerTimeLabel: "2026-11-02 00:00:00", timeProvenance: "provider_naive_calendar_label", sourceAsOf: null, collectedAt: "2026-11-03T07:00:00.123456+07:00",
+    source: { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" }, barId: "c".repeat(64), contentDigest: "d".repeat(64) };
+  let discovery: "slow" | "error" | "loaded" | "empty" | "malformed" = "slow"; let release: (() => void) | undefined;
+  let windowCalls = 0; let historyCalls = 0; let fixtureCalls = 0; let historyFails = false;
+  page.on("request", request => { if (/^\/api\/assets\//.test(new URL(request.url()).pathname)) fixtureCalls++; });
+  await page.route("**/api/observed/assets/VNINDEX/latest-window", async route => {
+    windowCalls++; if (discovery === "slow") await new Promise<void>(resolve => { release = resolve; });
+    if (discovery === "error") { await route.fulfill({ status: 503, json: { error: "observed_latest_window_unavailable" } }); return; }
+    await route.fulfill({ json: { data, meta: discovery === "empty" ? { ...meta, status: "no_data", latestTradingDate: null, range: null } : discovery === "malformed" ? { ...meta, range: { ...range, from: "2026-10-05" } } : meta } });
+  });
+  await page.route("**/api/observed/assets/VNINDEX/history?*", async route => {
+    historyCalls++; const params = new URL(route.request().url()).searchParams; const requestedRange = { from: params.get("from"), to: params.get("to") };
+    if (historyFails) { await route.fulfill({ status: 503, json: { error: "observed_history_unavailable" } }); return; }
+    const candles = requestedRange.to === range.to ? [candle] : [];
+    await route.fulfill({ json: { data: { ...data, candles }, meta: { status: candles.length ? "available" : "no_data", provider: "KBS", interval: "1d", requestedRange,
+      returnedRange: candles.length ? { from: range.to, to: range.to } : null, sourceAsOf: null, completeness: "unknown", selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" } } });
+  });
+  await page.goto("/market");
+  const observedTab = page.getByRole("navigation", { name: "Nguồn dữ liệu tổng quan", exact: true }).getByRole("link", { name: "Dữ liệu đã lưu · KBS", exact: true });
+  await expect(observedTab).toHaveAttribute("href", "/market?source=observed&window=latest");
+  fixtureCalls = 0;
+  await observedTab.click();
+  await expect(page).toHaveURL(/\/market\?source=observed&window=latest$/);
+  await expect(page.getByRole("heading", { name: "Đang tìm khoảng đã lưu mới nhất…", exact: true })).toBeVisible();
+  const fromInput = page.getByLabel("Từ ngày", { exact: true }); const toInput = page.getByLabel("Đến ngày", { exact: true });
+  const rangeSubmit = page.getByRole("button", { name: "Xem dữ liệu", exact: true });
+  await expect(fromInput).toBeDisabled(); await expect(toInput).toBeDisabled(); await expect(rangeSubmit).toBeDisabled();
+  expect(historyCalls).toBe(0); await noOverflow(page);
+  discovery = "error"; release?.();
+  await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng VN-Index đã lưu mới nhất", exact: true })).toBeVisible();
+  await expect(fromInput).toBeEnabled(); await expect(toInput).toBeEnabled(); await expect(rangeSubmit).toBeEnabled();
+  await fromInput.fill("2026-01-01"); await toInput.fill("2026-01-02");
+  discovery = "slow"; const previousRelease = release; const retry = page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }); await retry.focus(); await expect(retry).toBeFocused(); await retry.press("Enter");
+  await expect(page.getByRole("heading", { name: "Đang tìm khoảng đã lưu mới nhất…", exact: true })).toBeVisible();
+  await expect(fromInput).toBeDisabled(); await expect(toInput).toBeDisabled(); await expect(rangeSubmit).toBeDisabled();
+  await expect.poll(() => release !== previousRelease).toBe(true); discovery = "loaded"; release?.();
+  await expect(page.getByRole("heading", { name: "Mức đóng cửa cuối khoảng có dữ liệu", exact: true })).toBeVisible();
+  await expect(fromInput).toBeEnabled(); await expect(toInput).toBeEnabled(); await expect(rangeSubmit).toBeEnabled();
+  await expect(fromInput).toHaveValue(range.from); await expect(toInput).toHaveValue(range.to);
+  await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(1); await expect(page.getByRole("table")).toContainText(candle.close);
+  await expect(page.getByRole("complementary", { name: "Nguồn & phạm vi", exact: true })).toContainText("04/10/2026 – 02/11/2026");
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tra cứu cổ phiếu", exact: true })).toHaveAttribute("href", "/?source=observed");
+  await expect(page.getByRole("link", { name: /Mở trang tra cứu/ })).toHaveAttribute("href", "/?source=observed");
+  await noOverflow(page);
+  historyFails = true; await page.reload();
+  await expect(page.getByRole("heading", { name: "Chưa thể đọc dữ liệu VN-Index đã lưu", exact: true })).toBeVisible();
+  const beforeHistoryRetry = windowCalls; historyFails = false; await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+  await expect(page.getByRole("table").locator("tbody tr")).toHaveCount(1); expect(windowCalls).toBe(beforeHistoryRetry);
+  await page.getByLabel("Từ ngày", { exact: true }).fill("2026-01-01"); await page.getByLabel("Đến ngày", { exact: true }).fill("2026-01-02");
+  await page.getByRole("button", { name: "Xem dữ liệu", exact: true }).click(); await expect(page).toHaveURL(/\/market\?source=observed&from=2026-01-01&to=2026-01-02$/);
+  await expect(page.getByRole("heading", { name: "Không có quan sát trong khoảng đã chọn", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Xem khoảng mẫu cố định 28/09–07/10/2026 →", exact: true })).toHaveAttribute("href", "/market?source=observed&from=2026-09-28&to=2026-10-07");
+  const beforeEmpty = historyCalls; discovery = "empty"; await page.getByRole("link", { name: "Xem khoảng đã lưu mới nhất", exact: true }).click();
+  await expect(page).toHaveURL(/\/market\?source=observed&window=latest$/);
+  await expect(page.getByRole("heading", { name: "Chưa có quan sát VN-Index đã lưu", exact: true })).toBeVisible(); expect(historyCalls).toBe(beforeEmpty);
+  await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(""); await expect(page.getByRole("table")).toHaveCount(0);
+  discovery = "malformed"; await page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng VN-Index đã lưu mới nhất", exact: true })).toBeVisible(); expect(historyCalls).toBe(beforeEmpty); expect(fixtureCalls).toBe(0);
+  await noOverflow(page);
+});
+
 test("real fixture search → chart → private persisted watchlist → logout", async ({ page, browser }, testInfo) => {
   let pageErrors = 0;
   page.on("pageerror", () => { pageErrors += 1; });
