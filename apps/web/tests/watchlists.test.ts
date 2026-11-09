@@ -3,9 +3,10 @@ import { afterEach, test } from "node:test";
 import { readFileSync } from "node:fs";
 import { AccountSession, SESSION_KEY, type SessionStorage } from "../src/auth-session.js";
 import { fetchWatchlist, mutateWatchlist, isWatchlist, isWatchlistsResponse, watchlistName, WATCHLIST_SYMBOLS, WatchlistError, type Watchlist } from "../src/watchlist-api.js";
-import { WatchlistSession, type WatchlistServices } from "../src/watchlist-session.js";
+import { WatchlistSession, watchlistHref, watchlistMode, type WatchlistServices } from "../src/watchlist-session.js";
+import { ObservedError, type ObservedHistory, type ObservedLatestWindow, type ObservedRange } from "../src/observed-detail.js";
 import type { HistoryResponse } from "../src/stock-detail.js";
-import type { SearchResponse } from "../src/stock-search.js";
+import type { SearchResponse, SearchSource } from "../src/stock-search.js";
 import { isWatchlistsRoute } from "../src/Watchlists.js";
 
 const originalFetch = globalThis.fetch;
@@ -24,12 +25,44 @@ function history(): HistoryResponse {
   return { data: { ...fixture, assets: [fixture.assets[0]], candles: fixture.candles.filter((candle) => candle.assetId === "VN:HOSE:FPT"), quotes: [], indexObservations: [] }, meta: { status: "available", provider: "marketpulse-fixture", interval: "1d", requestedRange: { from: null, to: null }, availableRange: { from: "2026-09-21", to: "2026-09-23" }, asOf: "2026-09-23T15:00:00+07:00" } };
 }
 const searchResult: SearchResponse = { data: [], meta: { scope: "fixture equities", dataset: "fixture / unknown", label: "SYNTHETIC FIXTURE — NOT MARKET DATA", provider: "marketpulse-fixture", asOf: null } };
-function setup(services: Partial<WatchlistServices> = {}, clock: () => number = () => now) {
+const observedRange: ObservedRange = { from: "2026-10-04", to: "2026-11-02" };
+function observedWindow(range: ObservedRange | null = observedRange): ObservedLatestWindow {
+  return {
+    data: {
+      dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" },
+      asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" },
+    },
+    meta: {
+      status: range ? "available" : "no_data", provider: "KBS", interval: "1d", latestTradingDate: range?.to ?? null, range,
+      calendarDays: 30, sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date",
+    },
+  };
+}
+function observedHistoryResponse(close = "101000.123456789123456789", range: ObservedRange = observedRange): ObservedHistory {
+  return {
+    data: {
+      dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" },
+      asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" },
+      candles: close ? [{
+        assetId: "VN:HOSE:FPT", tradingDate: range.to, interval: "1d", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh", adjustmentBasis: "unknown",
+        open: "100000", high: "110000", low: "90000", close, volume: null, volumeUnit: "not_available",
+        providerTimeLabel: `${range.to} 00:00:00`, timeProvenance: "provider_naive_calendar_label", sourceAsOf: null, collectedAt: "2026-11-03T07:00:00.123456+07:00",
+        source: { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" }, barId: "a".repeat(64), contentDigest: "b".repeat(64),
+      }] : [],
+    },
+    meta: {
+      status: close ? "available" : "no_data", provider: "KBS", interval: "1d", requestedRange: range,
+      returnedRange: close ? { from: range.to, to: range.to } : null, sourceAsOf: null, completeness: "unknown",
+      selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest",
+    },
+  };
+}
+function setup(services: Partial<WatchlistServices> = {}, clock: () => number = () => now, source: SearchSource = "fixture") {
   const data = new Map<string, string>();
   const storage: SessionStorage = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => { data.set(key, value); }, removeItem: (key) => { data.delete(key); } };
   const account = new AccountSession(() => storage, clock);
   account.state = { phase: "authenticated", session: { token, expiresAt: "2026-10-04T08:00:00.000Z" }, user, notice: "", warning: "" };
-  const manager = new WatchlistSession(account, { read: async () => list, write: async () => list, search: async () => searchResult, history: async () => history(), ...services });
+  const manager = new WatchlistSession(account, { read: async () => list, write: async () => list, search: async () => searchResult, history: async () => history(), observedLatestWindow: async () => observedWindow(), observedHistory: async () => observedHistoryResponse(), ...services }, source);
   const unsubscribe = account.subscribe((state) => manager.acceptAccount(state));
   return { account, manager, storage, data, stop: () => { unsubscribe(); manager.stop(); account.stop(); } };
 }
@@ -37,6 +70,16 @@ function setup(services: Partial<WatchlistServices> = {}, clock: () => number = 
 test("watchlist route accepts only exact slash variants", () => {
   for (const path of ["/watchlists", "/watchlists/"]) assert.equal(isWatchlistsRoute(path), true);
   for (const path of ["/watchlists/a", "/watchlists//", "/Watchlists", "/watchlists%2F"]) assert.equal(isWatchlistsRoute(path), false);
+});
+test("watchlist source mode and href validate query parameters strictly", () => {
+  assert.deepEqual(watchlistMode(""), { kind: "fixture" });
+  assert.deepEqual(watchlistMode("?source=fixture"), { kind: "fixture" });
+  assert.deepEqual(watchlistMode("?source=observed"), { kind: "observed" });
+  assert.equal(watchlistHref("fixture"), "/watchlists");
+  assert.equal(watchlistHref("observed"), "/watchlists?source=observed");
+  for (const query of ["?source=unknown", "?source=observed&source=observed", "?source=observed&from=2026-10-01", "?q=FPT", "?window=latest"]) {
+    assert.equal(watchlistMode(query).kind, "invalid");
+  }
 });
 test("names use Unicode codepoint bounds and reject controls before trimming", () => {
   assert.equal(watchlistName("  Theo dõi 😀  "), "Theo dõi 😀"); assert.ok(watchlistName("😀".repeat(100)));
@@ -152,4 +195,90 @@ test("row errors are independent and explicit retry can return no observations",
   let calls = 0; const empty = history(); empty.data.candles = []; empty.meta.status = "no_data"; empty.meta.asOf = null;
   const env = setup({ history: async () => { if (++calls === 1) throw new Error("private raw error"); return empty; } });
   try { await settle(); assert.equal(env.manager.state.phase, "ready"); assert.equal(env.manager.state.rows.FPT.phase, "error"); assert.equal(env.manager.state.rows.FPT.message.includes("private"), false); await env.manager.loadRow("FPT"); assert.equal(env.manager.state.rows.FPT.phase, "ready"); assert.deepEqual(env.manager.state.rows.FPT.response?.data.candles, []); } finally { env.stop(); }
+});
+test("observed mode searches stored observed catalog, loads FPT latest window and history without fixture fallback, and marks non-FPT symbols unsupported", async () => {
+  const mixedList: Watchlist = { ...list, symbols: ["FPT", "HPG"] };
+  let fixtureHistoryCalls = 0, windowCalls = 0, historyCalls = 0;
+  const searchSources: SearchSource[] = [];
+  const observedSearchHit: SearchResponse = {
+    data: [{ asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", exchange: "HOSE", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"], reference: { origin: "curated_reference", officialSources: ["https://fpt.com/vi/nha-dau-tu/thong-tin-co-phieu"], reviewedOn: "2026-09-29" } }],
+    meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" }, sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
+  };
+  const env = setup({
+    read: async () => mixedList,
+    history: async () => { fixtureHistoryCalls++; return history(); },
+    search: async (query, _signal, _request, _timeoutMs, source = "fixture") => {
+      searchSources.push(source);
+      return query === "FPT" ? observedSearchHit : { data: [], meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: null, sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" } };
+    },
+    observedLatestWindow: async () => { windowCalls++; return observedWindow(); },
+    observedHistory: async (symbol, range) => {
+      historyCalls++; assert.equal(symbol, "FPT"); assert.deepEqual(range, observedRange);
+      return observedHistoryResponse("101000.123456789123456789", range);
+    },
+  }, () => now, "observed");
+  try {
+    await settle();
+    assert.equal(fixtureHistoryCalls, 0);
+    assert.equal(windowCalls, 1);
+    assert.equal(historyCalls, 1);
+    assert.equal(env.manager.state.rows.FPT.phase, "ready");
+    assert.equal(env.manager.state.rows.FPT.observedResponse?.data.candles[0]?.close, "101000.123456789123456789");
+    assert.equal(env.manager.state.rows.HPG.phase, "unsupported");
+    assert.equal(env.manager.state.rows.HPG.response, null);
+    assert.equal(env.manager.state.rows.HPG.observedResponse, null);
+    assert.match(env.manager.state.rows.HPG.message, /chỉ hỗ trợ FPT/u);
+    await env.manager.search("FPT");
+    assert.deepEqual(searchSources, ["observed"]);
+    assert.match(env.manager.state.search.message, /1 kết quả trong danh mục đã lưu \(FPT\)/u);
+    await env.manager.search("VCB");
+    assert.deepEqual(searchSources, ["observed", "observed"]);
+    assert.match(env.manager.state.search.message, /Chưa tìm thấy tài sản đã lưu khớp truy vấn trong phạm vi FPT/u);
+  } finally { env.stop(); }
+});
+test("observed FPT row handles latest-window error, retry, no_data window, empty history and late callback cancellation", async () => {
+  let step = 0, historyCalls = 0;
+  const env = setup({
+    observedLatestWindow: async () => {
+      step++;
+      if (step === 1) throw new ObservedError("unavailable");
+      if (step === 2) return observedWindow(null);
+      return observedWindow();
+    },
+    observedHistory: async (_symbol, range) => {
+      historyCalls++;
+      return observedHistoryResponse("", range);
+    },
+  }, () => now, "observed");
+  try {
+    await settle();
+    assert.equal(env.manager.state.rows.FPT.phase, "error");
+    assert.equal(historyCalls, 0);
+    assert.match(env.manager.state.rows.FPT.message, /Dữ liệu đã lưu tạm thời chưa sẵn sàng/u);
+    await env.manager.loadRow("FPT");
+    assert.equal(env.manager.state.rows.FPT.phase, "ready");
+    assert.equal(env.manager.state.rows.FPT.observedResponse, null);
+    assert.equal(historyCalls, 0);
+    assert.match(env.manager.state.rows.FPT.message, /Chưa có quan sát FPT đã lưu/u);
+    await env.manager.loadRow("FPT");
+    assert.equal(env.manager.state.rows.FPT.phase, "ready");
+    assert.equal(historyCalls, 1);
+    assert.deepEqual((env.manager.state.rows.FPT.observedResponse as ObservedHistory | null)?.data.candles, []);
+    assert.match(env.manager.state.rows.FPT.message, /Chưa có quan sát FPT đã lưu/u);
+  } finally { env.stop(); }
+  const slowWindow = deferred<ObservedLatestWindow>();
+  let lateHistoryCalls = 0;
+  const envLate = setup({
+    observedLatestWindow: async () => slowWindow.promise,
+    observedHistory: async () => { lateHistoryCalls++; return observedHistoryResponse(); },
+    write: async () => ({ ...list, symbols: [] }),
+  }, () => now, "observed");
+  try {
+    await settle();
+    await envLate.manager.mutate({ kind: "remove", id: list.id, symbol: "FPT" });
+    slowWindow.resolve(observedWindow());
+    await settle();
+    assert.equal(lateHistoryCalls, 0);
+    assert.deepEqual(envLate.manager.state.rows, {});
+  } finally { envLate.stop(); }
 });

@@ -53,7 +53,7 @@
 .wl-table-wrap { padding: 0 24px; }
 .wl-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
 .wl-table thead { font-size: 11px; text-transform: uppercase; color: var(--muted); }
-.wl-table th, .wl-table td { padding: 20px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.wl-table th, .wl-table td { padding: 20px 12px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
 .wl-table tbody th { text-align: left; width: 12%; }
 .wl-table td > span, .wl-table tbody th > span { display: block; margin-top: 6px; }
 .wl-table td > strong { display: block; font-weight: 600; }

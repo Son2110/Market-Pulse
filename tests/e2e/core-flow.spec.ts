@@ -270,6 +270,80 @@ test("latest stored VN-Index window handles discovery, retries, manual range nav
   await noOverflow(page);
 });
 
+test("observed watchlist handles source tabs, stored catalog search, exact FPT close, unsupported symbols and retry with explicit stubs", async ({ page }, testInfo) => {
+  const data = { asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" },
+    dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" } };
+  const range = { from: "2026-10-04", to: "2026-11-02" };
+  const meta = { status: "available", provider: "KBS", interval: "1d", latestTradingDate: range.to, range, calendarDays: 30,
+    sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" };
+  const candle = { assetId: "VN:HOSE:FPT", tradingDate: range.to, interval: "1d", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh", adjustmentBasis: "unknown",
+    open: "100000.123456789123456789", high: "110000", low: "90000", close: "101000.123456789123456789", volume: null, volumeUnit: "not_available",
+    providerTimeLabel: "2026-11-02 00:00:00", timeProvenance: "provider_naive_calendar_label", sourceAsOf: null, collectedAt: "2026-11-03T07:00:00.123456+07:00",
+    source: { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" }, barId: "a".repeat(64), contentDigest: "b".repeat(64) };
+  const searchBody = {
+    data: [{ asset: data.asset, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"],
+      reference: { origin: "curated_reference", officialSources: ["https://fpt.com/vi/nha-dau-tu/thong-tin-co-phieu"], reviewedOn: "2026-09-29" } }],
+    meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: data.dataset,
+      sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
+  };
+  let windowFails = true; let fixtureCalls = 0;
+  await page.route("**/api/observed/assets/search?*", async route => {
+    const q = new URL(route.request().url()).searchParams.get("q");
+    await route.fulfill({ json: q === "FPT" ? searchBody : { ...searchBody, data: [], meta: { ...searchBody.meta, dataset: null } } });
+  });
+  await page.route("**/api/observed/assets/FPT/latest-window", async route => {
+    if (windowFails) { await route.fulfill({ status: 503, json: { error: "observed_latest_window_unavailable" } }); return; }
+    await route.fulfill({ json: { data, meta } });
+  });
+  await page.route("**/api/observed/assets/FPT/history?*", async route => {
+    const params = new URL(route.request().url()).searchParams;
+    const requestedRange = { from: params.get("from"), to: params.get("to") };
+    await route.fulfill({ json: { data: { ...data, candles: [candle] }, meta: { status: "available", provider: "KBS", interval: "1d", requestedRange,
+      returnedRange: { from: range.to, to: range.to }, sourceAsOf: null, completeness: "unknown", selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" } } });
+  });
+  await register(page);
+  await page.getByRole("link", { name: "Mở danh sách theo dõi", exact: true }).click();
+  const listName = `Observed WL ${testInfo.project.name}`;
+  await page.getByLabel("Tên danh sách mới", { exact: true }).fill(listName);
+  await page.getByRole("button", { name: "Tạo danh sách", exact: true }).click();
+  await expect(page.getByRole("heading", { name: listName, exact: true })).toBeVisible();
+  await page.getByLabel("Mã hoặc tên doanh nghiệp", { exact: true }).fill("HPG");
+  await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+  await page.getByRole("button", { name: "Thêm HPG", exact: true }).click();
+  await expect(page.getByRole("table", { name: "Cổ phiếu theo dõi và giá đóng cửa từ fixture", exact: true }).getByRole("row", { name: /^HPG/ })).toBeVisible();
+
+  page.on("request", request => { if (/^\/api\/assets\//.test(new URL(request.url()).pathname)) fixtureCalls++; });
+  const observedTab = page.getByRole("navigation", { name: "Nguồn dữ liệu theo dõi", exact: true }).getByRole("link", { name: "Dữ liệu đã lưu · KBS · FPT", exact: true });
+  await expect(observedTab).toHaveAttribute("href", "/watchlists?source=observed");
+  await observedTab.click();
+  await expect(page).toHaveURL(/\/watchlists\?source=observed$/);
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tra cứu cổ phiếu", exact: true })).toHaveAttribute("href", "/?source=observed");
+  const table = page.getByRole("table", { name: "Cổ phiếu theo dõi và giá đóng cửa từ dữ liệu đã lưu", exact: true });
+  const hpgRow = table.getByRole("row", { name: /^HPG/ });
+  await expect(hpgRow).toContainText("Mã ngoài phạm vi dữ liệu đã lưu (hiện chỉ hỗ trợ FPT). Không chuyển sang dữ liệu minh họa.");
+  await page.getByLabel("Mã hoặc tên doanh nghiệp", { exact: true }).fill("VCB");
+  await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+  await expect(page.getByText("Chưa tìm thấy tài sản đã lưu khớp truy vấn trong phạm vi FPT.", { exact: true })).toBeVisible();
+  await page.getByLabel("Mã hoặc tên doanh nghiệp", { exact: true }).fill("FPT");
+  await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+  await expect(page.getByText("1 kết quả trong danh mục đã lưu (FPT).", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Thêm FPT", exact: true }).click();
+  const fptRow = table.getByRole("row", { name: /^FPT/ });
+  await expect(fptRow.getByRole("button", { name: "Tải lại giá FPT", exact: true })).toBeVisible();
+  windowFails = false;
+  await fptRow.getByRole("button", { name: "Tải lại giá FPT", exact: true }).click();
+  await expect(fptRow).toContainText(`${candle.close} VND`);
+  await expect(fptRow).toContainText("Không tính thay đổi / lợi nhuận");
+  await expect(fptRow).toContainText(candle.providerTimeLabel);
+  await expect(fptRow).toContainText(candle.collectedAt);
+  await expect(fptRow.getByRole("link", { name: "FPT ↗", exact: true })).toHaveAttribute("href", "/stocks/FPT?source=observed&window=latest&searchSource=observed");
+  expect(fixtureCalls).toBe(0);
+  await noOverflow(page);
+  await page.goto("/watchlists?source=unknown");
+  await expect(page.getByRole("heading", { name: "Nguồn danh sách theo dõi chưa hợp lệ", exact: true })).toBeVisible();
+  await noOverflow(page);
+});
+
 test("real fixture search → chart → private persisted watchlist → logout", async ({ page, browser }, testInfo) => {
   let pageErrors = 0;
   page.on("pageerror", () => { pageErrors += 1; });
