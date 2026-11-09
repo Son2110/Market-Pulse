@@ -92,7 +92,7 @@ export default function ObservedMarketOverview({ mode }: { mode: Exclude<Overvie
       : latestMode && windowState.status === "loaded" && !resolvedRange ? "Chưa có quan sát VN-Index đã lưu."
         : mode.kind === "invalid" ? mode.message : state.status === "loading" ? "Đang tải các quan sát VN-Index đã lưu…" : state.status === "error" ? state.message : response?.data.candles.length ? `Đã tải ${response.data.candles.length} quan sát VN-Index.` : "Không có quan sát trong khoảng đã chọn.";
   return <>
-    <a className="skip-link" href="#main">Đến nội dung tổng quan</a><SiteHeader active="market" marketHref={latestHref} searchHref="/?source=observed" watchlistHref={watchlistHref("observed")} />
+    <a className="skip-link" href="#main">Đến nội dung tổng quan</a><SiteHeader active="market" marketHref={latestHref} searchHref="/?source=observed" watchlistHref={watchlistHref("observed")} accountHref="/account?source=observed" />
     <main id="main" className="page overview-page observed-index">
       <div className="demo-notice overview-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu đã lưu · KBS · Không phải mức chỉ số hiện tại</strong><p>Thời điểm quan sát từ nguồn, độ mới và độ đầy đủ chưa xác định; lịch phiên chưa xác minh. Thông tin phục vụ nghiên cứu, không phải lời khuyên đầu tư.</p></div></div>
       <div className="overview-heading"><div><h1>Tổng quan thị trường (VN-Index)</h1><p className="intro">Các quan sát ngày đã lưu trong khoảng bạn chọn</p></div><OverviewSourceLinks selected="observed" /></div>

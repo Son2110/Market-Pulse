@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import SiteHeader from "./SiteHeader.js";
+import { searchHref } from "./stock-search.js";
 import ObservedCollectionStatus from "./ObservedCollectionStatus.js";
 import "./observed-detail.css";
 import { detailHref as buildDetailHref, searchReturnHref, validatedSearchSource, fetchObservedHistory, fetchObservedLatestWindow, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, type DetailMode, type ObservedCandle, type ObservedHistory, type ObservedLatestWindow } from "./observed-detail.js";
@@ -113,7 +114,7 @@ export default function ObservedStockDetail({ symbol, mode }: { symbol: string |
   }, [valid, symbol, from, to, attempt]);
   const response = valid && state.status === "loaded" ? state.response : null; const latest = response?.data.candles.at(-1);
   return <>
-    <a className="skip-link" href="#main">Đến nội dung chi tiết</a><SiteHeader marketHref={overviewHref("observed")} searchHref={backHref} watchlistHref={watchlistHref("observed")} />
+    <a className="skip-link" href="#main">Đến nội dung chi tiết</a><SiteHeader marketHref={overviewHref("observed")} searchHref={search ? searchHref(search, "observed") : "/?source=observed"} watchlistHref={watchlistHref("observed")} accountHref="/account?source=observed" />
     <main id="main" className="page detail-page observed-detail">
       <a className="back-link" href={backHref}>← Quay lại tìm kiếm</a>
       <div className="demo-notice detail-notice"><span aria-hidden="true">ⓘ</span><div><strong>Dữ liệu đã lưu · KBS · Không phải giá hiện tại</strong><p>Độ mới, thời điểm quan sát từ nguồn, lịch phiên và cơ sở điều chỉnh chưa xác minh. Thông tin phục vụ nghiên cứu.</p></div></div>

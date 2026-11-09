@@ -8,9 +8,9 @@ async function noOverflow(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Page must fit its viewport").toBe(true);
 }
 
-async function register(page: Page): Promise<void> {
+async function register(page: Page, openAccount = true): Promise<void> {
   const password = `E2e ${randomBytes(24).toString("hex")}`;
-  await page.goto("/account");
+  if (openAccount) await page.goto("/account");
   await page.getByRole("button", { name: "Đăng ký", exact: true }).click();
   await page.getByLabel("Email", { exact: true }).fill(`e2e-${randomUUID()}@example.com`);
   try {
@@ -201,6 +201,16 @@ test("latest stored FPT window handles discovery, retries, independent history/s
   await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(""); await expect(page.getByRole("table")).toHaveCount(0);
   discovery = "malformed"; await page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng đã lưu mới nhất", exact: true })).toBeVisible(); expect(historyCalls).toBe(beforeEmpty.historyCalls); expect(fixtureCalls).toBe(0);
+  const headerSearch = page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tra cứu cổ phiếu", exact: true });
+  const query = "FPT & công nghệ";
+  for (const origin of ["", "&searchSource=fixture"]) {
+    await page.goto(`/stocks/FPT?source=observed&window=latest&search=${encodeURIComponent(query)}${origin}`);
+    await expect(headerSearch).toHaveAttribute("href", `/?source=observed&q=${encodeURIComponent(query)}`);
+    await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", `/?q=${encodeURIComponent(query)}`);
+  }
+  await page.goto("/stocks/FPT?source=observed&window=latest");
+  await expect(headerSearch).toHaveAttribute("href", "/?source=observed");
+  await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", "/");
   await noOverflow(page);
 });
 
@@ -421,12 +431,14 @@ test("real fixture search → chart → private persisted watchlist → logout",
 });
 test("real stored observed search → detail/chart/collection-status/revision → overview → private watchlist/reload/recovery", async ({ page, browser }, testInfo) => {
   const mongoUrl = process.env.MP_E2E_MONGODB_URL;
-  expect(Boolean(mongoUrl && /^mongodb:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?\/marketpulse_e2e_[a-f0-9]{32}$/.test(mongoUrl))).toBe(true);
+  expect(Boolean(mongoUrl)).toBe(true);
+  const parsedMongoUrl = new URL(mongoUrl!);
+  expect(parsedMongoUrl.protocol).toBe("mongodb:");
+  expect(["127.0.0.1", "localhost", "[::1]"]).toContain(parsedMongoUrl.hostname);
+  expect(parsedMongoUrl.pathname).toMatch(/^\/marketpulse_e2e_[a-f0-9]{32}$/);
   const client = new MongoClient(mongoUrl!, { serverSelectionTimeoutMS: 2000, connectTimeoutMS: 2000, socketTimeoutMS: 3000 });
-  await client.connect();
   const db = client.db();
   const store = new IngestionStore(db);
-  await store.initialize();
 
   let pageErrors = 0;
   let fixtureApiCalls = 0;
@@ -485,20 +497,22 @@ test("real stored observed search → detail/chart/collection-status/revision �
   }
 
   try {
+    await client.connect();
+    await store.initialize();
     await persistObserved("e2e-fpt-batch-1", "FPT", "2026-10-28", "2026-11-02", [
       makeCandle("FPT", "2026-10-28", ["131000.25", "132500.5", "130000.125", "131800.75"], "2026-10-28 07:00", "2026-11-02T09:00:00.100000Z"),
       makeCandle("FPT", "2026-10-29", ["131800.75", "133200", "131200.5", "132450.125"], "2026-10-29 07:00", "2026-11-02T09:00:00.200000Z"),
       makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", "133100.5"], "2026-11-02 07:00", "2026-11-02T16:15:00.123456+07:00"),
     ], "success");
 
-    await persistObserved("e2e-fpt-older-revision", "FPT", "2026-11-02", "2026-11-02", [
-      makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", "132900.25"], "2026-11-02 07:00", "2026-11-02T08:30:00.000000Z"),
-    ], "success");
-
     const fptRevisedClose = "134250.875";
     const fptRevisedCollectedAt = "2026-11-02T17:45:00.654321+07:00";
     const fptWinningCandle = makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", fptRevisedClose], "2026-11-02 07:00", fptRevisedCollectedAt);
     await persistObserved("e2e-fpt-winning-revision", "FPT", "2026-11-02", "2026-11-02", [fptWinningCandle], "success");
+
+    await persistObserved("e2e-fpt-older-revision", "FPT", "2026-11-02", "2026-11-02", [
+      makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", "132900.25"], "2026-11-02 07:00", "2026-11-02T08:30:00.000000Z"),
+    ], "success");
 
     expect(await store.observed.revisions.countDocuments({ barId: fptWinningCandle.barId })).toBe(3);
 
@@ -602,9 +616,14 @@ test("real stored observed search → detail/chart/collection-status/revision �
     await expect(indexSource).toContainText("28/10/2026 – 02/11/2026");
     await noOverflow(page);
 
-    await register(page);
+    const accountLink = page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tài khoản", exact: true });
+    await expect(accountLink).toHaveAttribute("href", "/account?source=observed");
+    await accountLink.click();
+    await expect(page).toHaveURL(/\/account\?source=observed$/);
+    await register(page, false);
+    await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Theo dõi", exact: true })).toHaveAttribute("href", "/watchlists?source=observed");
+    await expect(page.getByRole("link", { name: "Mở danh sách theo dõi", exact: true })).toHaveAttribute("href", "/watchlists?source=observed");
     await page.getByRole("link", { name: "Mở danh sách theo dõi", exact: true }).click();
-    await page.getByRole("navigation", { name: "Nguồn dữ liệu theo dõi", exact: true }).getByRole("link", { name: "Dữ liệu đã lưu · KBS · FPT", exact: true }).click();
     await expect(page).toHaveURL(/\/watchlists\?source=observed$/);
     const listName = `Observed Real E2E ${testInfo.project.name}`;
     await page.getByLabel("Tên danh sách mới", { exact: true }).fill(listName);
@@ -646,6 +665,8 @@ test("real stored observed search → detail/chart/collection-status/revision �
     await expect(ohlcTable.locator("tbody tr")).toHaveCount(4);
     await expect(statusSection).toContainText("05/10/2026 – 03/11/2026");
     await expect(statusSection).toContainText("28/10/2026 – 03/11/2026");
+    await expect(statusSection.locator(".collection-status-counts > div").filter({ has: page.getByText("Xử lý thành công", { exact: true }) }).getByRole("definition")).toHaveText("3");
+    await expect(statusSection.locator(".collection-status-counts > div").filter({ has: page.getByText("Xử lý thất bại", { exact: true }) }).getByRole("definition")).toHaveText("1");
     await expect(statusSection).toContainText(`đến ${fptNewestCollectedAt}`);
     await noOverflow(page);
 
@@ -684,10 +705,13 @@ test("real stored observed search → detail/chart/collection-status/revision �
     expect(fixtureApiCalls, "Observed journey must not call fixture market routes").toBe(0);
     expect(pageErrors, "No uncaught browser errors across observed journey").toBe(0);
   } finally {
-    await store.observed.latest.deleteMany({});
-    await store.observed.revisions.deleteMany({});
-    await store.observed.assets.deleteMany({});
-    await store.deliveries.deleteMany({});
-    await client.close();
+    try {
+      await store.observed.latest.deleteMany({});
+      await store.observed.revisions.deleteMany({});
+      await store.observed.assets.deleteMany({});
+      await store.deliveries.deleteMany({});
+    } finally {
+      await client.close();
+    }
   }
 });

@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { normalizedEmail, passwordError, type AuthMode } from "./auth.js";
 import { AccountSession } from "./auth-session.js";
 import SiteHeader from "./SiteHeader.js";
+import { overviewHref } from "./observed-market-overview.js";
+import { watchlistHref } from "./watchlist-session.js";
+import type { SearchSource } from "./stock-search.js";
 
 function sessionTime(value: string): string {
   return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", dateStyle: "short", timeStyle: "medium", hour12: false }).format(new Date(value));
@@ -11,7 +14,9 @@ function EyeIcon({ visible }: { visible: boolean }) {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3-6 10-6 10 6 10 6-3 6-10 6S2 12 2 12Z" /><circle cx="12" cy="12" r="3" />{visible && <path d="m3 3 18 18" />}</svg>;
 }
 
-export default function Account() {
+export default function Account({ source = "fixture" }: { source?: SearchSource }) {
+  const observed = source === "observed";
+  const searchHref = observed ? "/?source=observed" : "/";
   const [manager] = useState(() => new AccountSession(() => window.sessionStorage));
   const [state, setState] = useState(manager.state);
   const [mode, setMode] = useState<AuthMode>("login");
@@ -88,7 +93,7 @@ export default function Account() {
 
   return <div className="account-shell">
     <a className="skip-link" href="#main">Đến nội dung tài khoản</a>
-    <SiteHeader active="account" />
+    <SiteHeader active="account" marketHref={observed ? overviewHref("observed") : "/market"} searchHref={searchHref} watchlistHref={watchlistHref(source)} accountHref={observed ? "/account?source=observed" : "/account"} />
     <main id="main" className="account-page">
       <section className="account-context" aria-labelledby="account-heading">
         <h1 id="account-heading">Tài khoản demo</h1>
@@ -98,7 +103,7 @@ export default function Account() {
           <div><span className="account-context-icon" aria-hidden="true">◇</span><div><h2>Tính năng thử nghiệm</h2><p>Tạo một danh sách theo dõi riêng, thêm hoặc bỏ cổ phiếu và xem giá đóng cửa từ dữ liệu minh họa.</p></div></div>
           <p className="account-scope-note">Tài khoản dùng cho bản demo cục bộ; dữ liệu thị trường là minh họa.</p>
         </div>
-        <a className="account-back" href="/">← Tiếp tục tra cứu cổ phiếu</a>
+        <a className="account-back" href={searchHref}>← Tiếp tục tra cứu cổ phiếu</a>
       </section>
       <section className="account-card" aria-label="Đăng nhập và quản lý phiên" aria-busy={busy}>
         {!state.session && <>
@@ -120,10 +125,10 @@ export default function Account() {
           <p className="small muted">Phiên hết hạn lúc (Việt Nam · UTC+7)</p><p className="account-expiry">{sessionTime(state.session.expiresAt)}</p>
           <p className="small muted">Thời điểm tài khoản và phiên, không phải thời điểm dữ liệu thị trường. Phiên chỉ được lưu trong tab; tài khoản được lưu trên máy chủ demo.</p>
           {state.phase === "unverified" && <button className="primary-button" type="button" onClick={() => void sessionAction("verify")}>Kiểm tra phiên lại</button>}
-          {state.phase === "authenticated" && <a className="primary-button" href="/watchlists">Mở danh sách theo dõi</a>}
+          {state.phase === "authenticated" && <a className="primary-button" href={watchlistHref(source)}>Mở danh sách theo dõi</a>}
           <button className="secondary-button" type="button" disabled={busy} onClick={() => void sessionAction("logout")}>{state.phase === "logging-out" ? "Đang đăng xuất…" : "Đăng xuất"}</button>
         </div>}
-        <a className="account-public-link" href="/">{state.session ? "Tiếp tục tra cứu cổ phiếu" : "Tiếp tục tra cứu mà không cần đăng nhập"}</a>
+        <a className="account-public-link" href={searchHref}>{state.session ? "Tiếp tục tra cứu cổ phiếu" : "Tiếp tục tra cứu mà không cần đăng nhập"}</a>
       </section>
     </main>
     <footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ minh họa và nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>
