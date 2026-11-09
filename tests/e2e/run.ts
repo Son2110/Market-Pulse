@@ -119,7 +119,7 @@ try {
   for (const key of ["PATH", "Path", "SystemRoot", "WINDIR", "ComSpec", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "HOME", "LOCALAPPDATA", "APPDATA", "CI", "PLAYWRIGHT_BROWSERS_PATH"]) {
     if (process.env[key] !== undefined) env[key] = process.env[key];
   }
-  Object.assign(env, { HOST: "127.0.0.1", PORT: String(apiPort), MONGODB_URL: mongoUrl.toString(), REDIS_URL: redisUrl.toString(), INGESTION_SECRET: "", OBSERVED_READS_ENABLED: "false", CONNECT_ATTEMPTS: "2", CONNECT_DELAY_MS: "100", API_PROXY_TARGET: apiURL, MP_E2E_BASE_URL: webURL, NO_COLOR: "1", PLAYWRIGHT_NO_COPY_PROMPT: "1" });
+  Object.assign(env, { HOST: "127.0.0.1", PORT: String(apiPort), MONGODB_URL: mongoUrl.toString(), REDIS_URL: redisUrl.toString(), INGESTION_SECRET: "", OBSERVED_READS_ENABLED: "true", MP_E2E_MONGODB_URL: mongoUrl.toString(), CONNECT_ATTEMPTS: "2", CONNECT_DELAY_MS: "100", API_PROXY_TARGET: apiURL, MP_E2E_BASE_URL: webURL, NO_COLOR: "1", PLAYWRIGHT_NO_COPY_PROMPT: "1" });
   const api = start(["--import", "tsx", "apps/api/src/server.ts"], env, false, JSON.stringify({ event: "api_listening", port: apiPort }));
   await ready(`${apiURL}/health/ready`, api);
   const web = start(["node_modules/vite/bin/vite.js", "apps/web", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", String(webPort), "--strictPort"], env, false, `${webURL}/`);

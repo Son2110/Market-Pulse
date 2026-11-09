@@ -1,13 +1,16 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
+import { MongoClient } from "mongodb";
+import { digest, observedContent, validatePayload, type Json } from "../../apps/api/src/ingestion-contract.js";
+import { IngestionStore } from "../../apps/api/src/ingestion-store.js";
 
 async function noOverflow(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "Page must fit its viewport").toBe(true);
 }
 
-async function register(page: Page): Promise<void> {
+async function register(page: Page, openAccount = true): Promise<void> {
   const password = `E2e ${randomBytes(24).toString("hex")}`;
-  await page.goto("/account");
+  if (openAccount) await page.goto("/account");
   await page.getByRole("button", { name: "Đăng ký", exact: true }).click();
   await page.getByLabel("Email", { exact: true }).fill(`e2e-${randomUUID()}@example.com`);
   try {
@@ -198,6 +201,16 @@ test("latest stored FPT window handles discovery, retries, independent history/s
   await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue(""); await expect(page.getByRole("table")).toHaveCount(0);
   discovery = "malformed"; await page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng đã lưu mới nhất", exact: true })).toBeVisible(); expect(historyCalls).toBe(beforeEmpty.historyCalls); expect(fixtureCalls).toBe(0);
+  const headerSearch = page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tra cứu cổ phiếu", exact: true });
+  const query = "FPT & công nghệ";
+  for (const origin of ["", "&searchSource=fixture"]) {
+    await page.goto(`/stocks/FPT?source=observed&window=latest&search=${encodeURIComponent(query)}${origin}`);
+    await expect(headerSearch).toHaveAttribute("href", `/?source=observed&q=${encodeURIComponent(query)}`);
+    await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", `/?q=${encodeURIComponent(query)}`);
+  }
+  await page.goto("/stocks/FPT?source=observed&window=latest");
+  await expect(headerSearch).toHaveAttribute("href", "/?source=observed");
+  await expect(page.getByRole("link", { name: "← Quay lại tìm kiếm", exact: true })).toHaveAttribute("href", "/");
   await noOverflow(page);
 });
 
@@ -415,4 +428,290 @@ test("real fixture search → chart → private persisted watchlist → logout",
   await expect(page.getByRole("button", { name: "Bỏ FPT khỏi danh sách", exact: true })).toHaveCount(0);
   await noOverflow(page);
   expect(pageErrors, "No uncaught browser errors across either account").toBe(0);
+});
+test("real stored observed search → detail/chart/collection-status/revision → overview → private watchlist/reload/recovery", async ({ page, browser }, testInfo) => {
+  const mongoUrl = process.env.MP_E2E_MONGODB_URL;
+  expect(Boolean(mongoUrl)).toBe(true);
+  const parsedMongoUrl = new URL(mongoUrl!);
+  expect(parsedMongoUrl.protocol).toBe("mongodb:");
+  expect(["127.0.0.1", "localhost", "[::1]"]).toContain(parsedMongoUrl.hostname);
+  expect(parsedMongoUrl.pathname).toMatch(/^\/marketpulse_e2e_[a-f0-9]{32}$/);
+  const client = new MongoClient(mongoUrl!, { serverSelectionTimeoutMS: 2000, connectTimeoutMS: 2000, socketTimeoutMS: 3000 });
+  const db = client.db();
+  const store = new IngestionStore(db);
+
+  let pageErrors = 0;
+  let fixtureApiCalls = 0;
+  page.on("pageerror", () => { pageErrors += 1; });
+  page.on("request", request => {
+    const pathname = new URL(request.url()).pathname;
+    if (/^\/api\/assets\//.test(pathname)) fixtureApiCalls += 1;
+  });
+
+  const dataset = { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" };
+  const source = { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" };
+  const fptAsset = { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+  const vnindexAsset = { assetId: "VN:INDEX:VNINDEX", symbol: "VNINDEX", assetType: "index", currency: null, unit: "index_point", timezone: "Asia/Ho_Chi_Minh" };
+
+  function makeCandle(symbol: "FPT" | "VNINDEX", tradingDate: string, ohlc: [string, string, string, string], providerTimeLabel: string, collectedAt: string) {
+    const isEquity = symbol === "FPT";
+    const assetId = isEquity ? "VN:HOSE:FPT" : "VN:INDEX:VNINDEX";
+    const adjustmentBasis = isEquity ? "unknown" : "not_applicable";
+    const row = {
+      assetId,
+      tradingDate,
+      interval: "1d",
+      currency: isEquity ? "VND" : null,
+      unit: isEquity ? "VND" : "index_point",
+      timezone: "Asia/Ho_Chi_Minh",
+      adjustmentBasis,
+      open: ohlc[0],
+      high: ohlc[1],
+      low: ohlc[2],
+      close: ohlc[3],
+      volume: null,
+      volumeUnit: "not_available",
+      providerTimeLabel,
+      timeProvenance: "provider_naive_calendar_label",
+      sourceAsOf: null,
+      collectedAt,
+      source,
+      barId: digest(["KBS", assetId, "1d", tradingDate, adjustmentBasis]),
+      contentDigest: "",
+    };
+    row.contentDigest = digest(observedContent(row));
+    return row;
+  }
+
+  async function persistObserved(id: string, symbol: "FPT" | "VNINDEX", start: string, end: string, candles: ReturnType<typeof makeCandle>[], status: "success" | "failure" = "success") {
+    const payload = {
+      schemaVersion: "2.0.0" as const,
+      dataset,
+      request: { symbol, start, end, interval: "1d" },
+      assets: [symbol === "FPT" ? fptAsset : vnindexAsset],
+      candles,
+    };
+    const delivery = await store.accept(id, digest(payload as unknown as Json), validatePayload(payload as unknown as Json));
+    await store.persist(delivery);
+    await store.deliveries.updateOne({ _id: delivery._id }, { $set: { status, finishedAt: new Date(), updatedAt: new Date() } });
+  }
+
+  try {
+    await client.connect();
+    await store.initialize();
+    await persistObserved("e2e-fpt-batch-1", "FPT", "2026-10-28", "2026-11-02", [
+      makeCandle("FPT", "2026-10-28", ["131000.25", "132500.5", "130000.125", "131800.75"], "2026-10-28 07:00", "2026-11-02T09:00:00.100000Z"),
+      makeCandle("FPT", "2026-10-29", ["131800.75", "133200", "131200.5", "132450.125"], "2026-10-29 07:00", "2026-11-02T09:00:00.200000Z"),
+      makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", "133100.5"], "2026-11-02 07:00", "2026-11-02T16:15:00.123456+07:00"),
+    ], "success");
+
+    const fptRevisedClose = "134250.875";
+    const fptRevisedCollectedAt = "2026-11-02T17:45:00.654321+07:00";
+    const fptWinningCandle = makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", fptRevisedClose], "2026-11-02 07:00", fptRevisedCollectedAt);
+    await persistObserved("e2e-fpt-winning-revision", "FPT", "2026-11-02", "2026-11-02", [fptWinningCandle], "success");
+
+    await persistObserved("e2e-fpt-older-revision", "FPT", "2026-11-02", "2026-11-02", [
+      makeCandle("FPT", "2026-11-02", ["132500", "134900", "132100", "132900.25"], "2026-11-02 07:00", "2026-11-02T08:30:00.000000Z"),
+    ], "success");
+
+    expect(await store.observed.revisions.countDocuments({ barId: fptWinningCandle.barId })).toBe(3);
+
+    const vnindexLatestClose = "1264.875";
+    const vnindexLatestCollectedAt = "2026-11-02T17:50:00.654321+07:00";
+    await persistObserved("e2e-vnindex-batch-1", "VNINDEX", "2026-10-28", "2026-11-02", [
+      makeCandle("VNINDEX", "2026-10-28", ["1250.25", "1258.5", "1248.125", "1254.75"], "2026-10-28 07:00", "2026-11-02T09:05:00.100000Z"),
+      makeCandle("VNINDEX", "2026-10-29", ["1254.75", "1261", "1252.5", "1259.125"], "2026-10-29 07:00", "2026-11-02T09:05:00.200000Z"),
+      makeCandle("VNINDEX", "2026-11-02", ["1260", "1268.5", "1258.25", vnindexLatestClose], "2026-11-02 07:00", vnindexLatestCollectedAt),
+    ], "success");
+
+    await page.goto("/?source=observed");
+    await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tổng quan", exact: true })).toHaveAttribute("href", "/market?source=observed&window=latest");
+    await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Theo dõi", exact: true })).toHaveAttribute("href", "/watchlists?source=observed");
+    const searchInput = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
+    await searchInput.fill("VCB");
+    await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Chưa tìm thấy kết quả", exact: true })).toBeVisible();
+    await expect(page.getByText("Chưa có tài sản đã lưu khớp truy vấn trong phạm vi FPT. Không tìm sang dữ liệu minh họa.", { exact: true })).toBeVisible();
+
+    await searchInput.fill("FPT");
+    const observedSearchResponse = page.waitForResponse(res => new URL(res.url()).pathname === "/api/observed/assets/search" && res.status() === 200);
+    await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+    expect(new URL((await observedSearchResponse).url()).origin).toBe(new URL(page.url()).origin);
+    await expect(page.getByRole("button", { name: /^Xem thông tin FPT/ })).toHaveAttribute("aria-pressed", "true");
+    const referencePanel = page.getByRole("complementary", { name: "Công ty Cổ phần FPT", exact: true });
+    await expect(referencePanel).toContainText("Danh mục tài sản đã lưu · KBS · Chỉ FPT");
+    await expect(referencePanel).toContainText("Độ mới chưa xác định; chưa có thời điểm quan sát thị trường.");
+    await expect(referencePanel).toContainText("tham chiếu do dự án tuyển chọn");
+    await noOverflow(page);
+
+    await page.getByRole("link", { name: "Xem chi tiết & biểu đồ ngày →", exact: true }).click();
+    await expect(page).toHaveURL(/\/stocks\/FPT\?source=observed&window=latest&search=FPT&searchSource=observed$/);
+    await expect(page.getByRole("heading", { name: "Giá đóng cửa cuối khoảng có dữ liệu", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue("2026-10-04");
+    await expect(page.getByLabel("Đến ngày", { exact: true })).toHaveValue("2026-11-02");
+    await expect(page.getByRole("region", { name: "Giá đóng cửa cuối khoảng có dữ liệu", exact: true })).toContainText(`${fptRevisedClose} VND`);
+    await expect(page.getByRole("region", { name: "Giá đóng cửa cuối khoảng có dữ liệu", exact: true })).toContainText("Không tính thay đổi / lợi nhuận");
+
+    const observedChart = page.getByRole("img", { name: /^Giá đóng cửa đã lưu theo ngày, biểu đồ xấp xỉ/ });
+    await expect(observedChart).toBeVisible();
+    await expect(observedChart.locator("circle")).toHaveCount(3);
+    await expect(observedChart.locator("polyline")).toHaveCount(1);
+    await expect(observedChart.locator("desc")).toContainText(`28/10/2026: 131800.75 VND; 29/10/2026: 132450.125 VND; 02/11/2026: ${fptRevisedClose} VND`);
+    await expect(page.getByText("Đường được ngắt qua khoảng cách hơn một ngày lịch.", { exact: false })).toBeVisible();
+
+    const ohlcTable = page.getByRole("table", { name: /OHLC chính xác bằng VND/ });
+    await expect(ohlcTable.locator("tbody tr")).toHaveCount(3);
+    const latestFptRow = ohlcTable.getByRole("row", { name: /^02\/11\/2026/ });
+    await expect(latestFptRow).toContainText(fptRevisedClose);
+    await expect(latestFptRow).not.toContainText("133100.5");
+    await expect(latestFptRow).not.toContainText("132900.25");
+    await expect(latestFptRow).toContainText("Không có dữ liệu");
+    await expect(latestFptRow).toContainText("2026-11-02 07:00");
+    await expect(latestFptRow).toContainText(fptRevisedCollectedAt);
+
+    const statusSection = page.getByRole("region", { name: "Trạng thái thu thập trong khoảng đã chọn", exact: true });
+    await expect(statusSection).toContainText("04/10/2026 – 02/11/2026");
+    await expect(statusSection).toContainText("28/10/2026 – 02/11/2026");
+    await expect(statusSection).toContainText("2026-11-02T09:00:00.100000Z");
+    await expect(statusSection).toContainText(`đến ${fptRevisedCollectedAt}`);
+
+    const detailSource = page.getByRole("complementary", { name: "Nguồn & thông tin dữ liệu", exact: true });
+    await expect(detailSource).toContainText("KBS · dữ liệu đã lưu");
+    await expect(detailSource).toContainText("vnstock 4.0.8 · vnai 2.6.2");
+    await expect(detailSource).toContainText("VND");
+    await expect(detailSource).toContainText("Asia/Ho_Chi_Minh");
+    await expect(detailSource).toContainText("Chưa xác định");
+    await expect(detailSource).toContainText("Chưa xác minh");
+    await expect(detailSource).toContainText("04/10/2026 – 02/11/2026");
+    await expect(detailSource).toContainText("28/10/2026 – 02/11/2026");
+    await noOverflow(page);
+
+    await page.getByRole("link", { name: "Khoảng mẫu 28/09–07/10/2026", exact: true }).click();
+    await expect(page).toHaveURL(/\/stocks\/FPT\?source=observed&from=2026-09-28&to=2026-10-07&search=FPT&searchSource=observed$/);
+    await expect(page.getByRole("heading", { name: "Không có quan sát trong khoảng đã chọn", exact: true })).toBeVisible();
+    await expect(statusSection).toContainText("Không có quan sát đã lưu được chọn trong khoảng này.");
+    await page.getByRole("link", { name: "Xem khoảng đã lưu mới nhất", exact: true }).click();
+    await expect(page).toHaveURL(/\/stocks\/FPT\?source=observed&window=latest&search=FPT&searchSource=observed$/);
+    await expect(ohlcTable.locator("tbody tr")).toHaveCount(3);
+
+    await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tổng quan", exact: true }).click();
+    await expect(page).toHaveURL(/\/market\?source=observed&window=latest$/);
+    await expect(page.getByRole("heading", { name: "Mức đóng cửa cuối khoảng có dữ liệu", exact: true })).toBeVisible();
+    await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue("2026-10-04");
+    await expect(page.getByLabel("Đến ngày", { exact: true })).toHaveValue("2026-11-02");
+    await expect(page.getByRole("region", { name: "Mức đóng cửa cuối khoảng có dữ liệu", exact: true })).toContainText(`${vnindexLatestClose} điểm`);
+    await expect(page.getByRole("region", { name: "Mức đóng cửa cuối khoảng có dữ liệu", exact: true })).toContainText("Không tính thay đổi / lợi nhuận");
+    const indexTable = page.getByRole("table", { name: /Mức đóng cửa VN-Index chính xác theo ngày/ });
+    await expect(indexTable.locator("tbody tr")).toHaveCount(3);
+    const latestIndexRow = indexTable.getByRole("row", { name: /^02\/11\/2026/ });
+    await expect(latestIndexRow).toContainText(vnindexLatestClose);
+    await expect(latestIndexRow).toContainText("2026-11-02 07:00");
+    await expect(latestIndexRow).toContainText(vnindexLatestCollectedAt);
+    const indexSource = page.getByRole("complementary", { name: "Nguồn & phạm vi", exact: true });
+    await expect(indexSource).toContainText("KBS qua Vnstock 4.0.8 / vnai 2.6.2");
+    await expect(indexSource).toContainText("Điểm chỉ số");
+    await expect(indexSource).toContainText("Không áp dụng");
+    await expect(indexSource).toContainText("Không có dữ liệu");
+    await expect(indexSource).toContainText("04/10/2026 – 02/11/2026");
+    await expect(indexSource).toContainText("28/10/2026 – 02/11/2026");
+    await noOverflow(page);
+
+    const accountLink = page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tài khoản", exact: true });
+    await expect(accountLink).toHaveAttribute("href", "/account?source=observed");
+    await accountLink.click();
+    await expect(page).toHaveURL(/\/account\?source=observed$/);
+    await register(page, false);
+    await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Theo dõi", exact: true })).toHaveAttribute("href", "/watchlists?source=observed");
+    await expect(page.getByRole("link", { name: "Mở danh sách theo dõi", exact: true })).toHaveAttribute("href", "/watchlists?source=observed");
+    await page.getByRole("link", { name: "Mở danh sách theo dõi", exact: true }).click();
+    await expect(page).toHaveURL(/\/watchlists\?source=observed$/);
+    const listName = `Observed Real E2E ${testInfo.project.name}`;
+    await page.getByLabel("Tên danh sách mới", { exact: true }).fill(listName);
+    await page.getByRole("button", { name: "Tạo danh sách", exact: true }).click();
+    await expect(page.getByRole("heading", { name: listName, exact: true })).toBeVisible();
+    await page.getByLabel("Mã hoặc tên doanh nghiệp", { exact: true }).fill("FPT");
+    await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+    await expect(page.getByText("1 kết quả trong danh mục đã lưu (FPT).", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Thêm FPT", exact: true }).click();
+    const wlTable = page.getByRole("table", { name: "Cổ phiếu theo dõi và giá đóng cửa từ dữ liệu đã lưu", exact: true });
+    const fptWlRow = wlTable.getByRole("row", { name: /^FPT/ });
+    await expect(fptWlRow).toContainText(`${fptRevisedClose} VND`);
+    await expect(fptWlRow).toContainText("Quan sát: 2026-11-02");
+    await expect(fptWlRow).toContainText("Không tính thay đổi / lợi nhuận");
+    await expect(fptWlRow).toContainText("2026-11-02 07:00");
+    await expect(fptWlRow).toContainText(fptRevisedCollectedAt);
+    await noOverflow(page);
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: listName, exact: true })).toBeVisible();
+    await expect(fptWlRow).toContainText(`${fptRevisedClose} VND`);
+
+    const fptNewestClose = "135999.95";
+    const fptNewestCollectedAt = "2026-11-03T18:00:00.123456+07:00";
+    await persistObserved("e2e-fpt-new-day-failed-batch", "FPT", "2026-11-03", "2026-11-03", [
+      makeCandle("FPT", "2026-11-03", ["134500", "136200", "134000", fptNewestClose], "2026-11-03 07:00", fptNewestCollectedAt),
+    ], "failure");
+
+    await page.reload();
+    await expect(fptWlRow).toContainText(`${fptNewestClose} VND`);
+    await expect(fptWlRow).toContainText("Quan sát: 2026-11-03");
+    await expect(fptWlRow).toContainText(fptNewestCollectedAt);
+
+    await fptWlRow.getByRole("link", { name: "FPT ↗", exact: true }).click();
+    await expect(page).toHaveURL(/\/stocks\/FPT\?source=observed&window=latest&searchSource=observed$/);
+    await expect(page.getByLabel("Từ ngày", { exact: true })).toHaveValue("2026-10-05");
+    await expect(page.getByLabel("Đến ngày", { exact: true })).toHaveValue("2026-11-03");
+    await expect(page.getByRole("region", { name: "Giá đóng cửa cuối khoảng có dữ liệu", exact: true })).toContainText(`${fptNewestClose} VND`);
+    await expect(ohlcTable.locator("tbody tr")).toHaveCount(4);
+    await expect(statusSection).toContainText("05/10/2026 – 03/11/2026");
+    await expect(statusSection).toContainText("28/10/2026 – 03/11/2026");
+    await expect(statusSection.locator(".collection-status-counts > div").filter({ has: page.getByText("Xử lý thành công", { exact: true }) }).getByRole("definition")).toHaveText("3");
+    await expect(statusSection.locator(".collection-status-counts > div").filter({ has: page.getByText("Xử lý thất bại", { exact: true }) }).getByRole("definition")).toHaveText("1");
+    await expect(statusSection).toContainText(`đến ${fptNewestCollectedAt}`);
+    await noOverflow(page);
+
+    const storedFptAsset = await store.observed.assets.findOne({ _id: "VN:HOSE:FPT" });
+    expect(Boolean(storedFptAsset)).toBe(true);
+    await store.observed.assets.updateOne({ _id: "VN:HOSE:FPT" }, { $set: { rowDigest: "0".repeat(64) } }, { bypassDocumentValidation: true });
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Chưa thể xác định khoảng đã lưu mới nhất", exact: true })).toBeVisible();
+    await store.observed.assets.replaceOne({ _id: "VN:HOSE:FPT" }, storedFptAsset!, { bypassDocumentValidation: true });
+    await page.getByRole("button", { name: "Thử lại khoảng mới nhất", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Giá đóng cửa cuối khoảng có dữ liệu", exact: true })).toBeVisible();
+    await expect(ohlcTable.locator("tbody tr")).toHaveCount(4);
+    await noOverflow(page);
+
+    const other = await browser.newContext({ viewport: testInfo.project.use.viewport });
+    try {
+      const otherPage = await other.newPage();
+      otherPage.on("pageerror", () => { pageErrors += 1; });
+      await register(otherPage);
+      await otherPage.goto("/watchlists?source=observed");
+      await expect(otherPage.getByRole("heading", { name: "Tạo danh sách đầu tiên", exact: true })).toBeVisible();
+      await expect(otherPage.getByRole("heading", { name: listName, exact: true })).toHaveCount(0);
+      await noOverflow(otherPage);
+    } finally {
+      await other.close();
+    }
+
+    await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tài khoản", exact: true }).click();
+    await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Đã đăng xuất và vô hiệu hóa phiên trên máy chủ.");
+    await page.goto("/watchlists?source=observed");
+    await expect(page.getByRole("heading", { name: "Danh sách dành riêng cho bạn", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: listName, exact: true })).toHaveCount(0);
+    await noOverflow(page);
+
+    expect(fixtureApiCalls, "Observed journey must not call fixture market routes").toBe(0);
+    expect(pageErrors, "No uncaught browser errors across observed journey").toBe(0);
+  } finally {
+    try {
+      await store.observed.latest.deleteMany({});
+      await store.observed.revisions.deleteMany({});
+      await store.observed.assets.deleteMany({});
+      await store.deliveries.deleteMany({});
+    } finally {
+      await client.close();
+    }
+  }
 });
