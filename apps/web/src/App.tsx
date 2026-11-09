@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Watchlists, { isWatchlistsRoute } from "./Watchlists.js";
 import { errorMessage, fetchSearch, queryError, searchHref, searchSource, type SearchResponse, type SearchResult } from "./stock-search.js";
 import { detailHref } from "./observed-detail.js";
+import { overviewHref } from "./observed-market-overview.js";
+import { watchlistHref } from "./watchlist-session.js";
 import StockDetail from "./StockDetail.js";
 import { stockRoute } from "./stock-detail.js";
 import MarketOverview from "./MarketOverview.js";
@@ -114,7 +116,7 @@ function SearchPage() {
 
   return <>
     <a className="skip-link" href="#main">Đến nội dung tìm kiếm</a>
-    <SiteHeader active="search" />
+    <SiteHeader active="search" marketHref={observed ? overviewHref("observed") : "/market"} searchHref={observed ? (committedQuery ? searchHref(committedQuery, "observed") : "/?source=observed") : "/"} watchlistHref={observed ? watchlistHref("observed") : "/watchlists"} />
     <main id="main" className="page">
       <section className="search-hero" aria-labelledby="page-heading">
         <p className="eyebrow">Tra cứu doanh nghiệp</p>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AccountSession } from "./auth-session.js";
 import { detailHref, type ObservedHistory } from "./observed-detail.js";
+import { overviewHref } from "./observed-market-overview.js";
 import { WatchlistSession, watchlistHref, watchlistMode } from "./watchlist-session.js";
 import { watchlistName, type WatchlistMutation } from "./watchlist-api.js";
 import { closingSummary, type HistoryResponse } from "./stock-detail.js";
@@ -93,7 +94,7 @@ function WatchlistView({ source }: { source: "fixture" | "observed" }) {
   function nameForm(create: boolean) {
     return <form className="wl-name-form" onSubmit={submitName} noValidate><div><label htmlFor="wl-name">{create ? "Tên danh sách mới" : "Tên mới"}</label><input ref={nameInput} id="wl-name" value={name} disabled={disabled} onChange={(event) => { setName(event.target.value); setInvalid(""); }} aria-invalid={!!invalid} aria-describedby="wl-status" placeholder="Cổ phiếu quan tâm" /></div><button type="submit" className="primary-button" disabled={disabled}>{create ? "Tạo danh sách" : "Lưu tên"}</button>{!create && <button type="button" className="secondary-button" disabled={disabled} onClick={() => { setRename(false); setInvalid(""); }}>Hủy đổi tên</button>}</form>;
   }
-  return <div className="account-shell"><a className="skip-link" href="#main">Đến danh sách theo dõi</a><SiteHeader active="watchlists" searchHref={observed ? "/?source=observed" : "/"} watchlistHref={watchlistHref(source)} />
+  return <div className="account-shell"><a className="skip-link" href="#main">Đến danh sách theo dõi</a><SiteHeader active="watchlists" marketHref={observed ? overviewHref("observed") : "/market"} searchHref={observed ? "/?source=observed" : "/"} watchlistHref={watchlistHref(source)} />
     <main id="main" className="page wl-page"><div className="wl-heading"><div><p className="eyebrow">Không gian nghiên cứu</p><h1>Danh sách theo dõi</h1><p className="intro">{observed ? "Một danh sách riêng của tài khoản; chế độ dữ liệu đã lưu chỉ đọc danh mục và quan sát FPT đã lưu từ KBS." : "Một danh sách riêng, tối đa 10 cổ phiếu trong danh mục demo."}</p><WatchlistSourceLinks selected={source} /></div><a href="/account">Quản lý tài khoản →</a></div>
       <div className="wl-notice">{observed ? <><strong>Dữ liệu đã lưu · KBS · Không phải giá thị trường hiện tại.</strong><p>OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN · KBS (vnstock 4.0.8 / vnai 2.6.2) · VND · Việt Nam (UTC+7). Thời điểm nguồn, độ mới, độ đầy đủ và cơ sở điều chỉnh chưa xác định; lịch phiên chưa xác minh. Phạm vi dữ liệu đã lưu hiện chỉ hỗ trợ FPT; không chuyển sang dữ liệu minh họa.</p></> : <><strong>Dữ liệu minh họa — không phải giá thị trường hiện tại.</strong><p>SYNTHETIC FIXTURE — NOT MARKET DATA · marketpulse-fixture · VND · Việt Nam (UTC+7). Độ mới: fixture / unknown. Lịch phiên chưa xác minh.</p></>}</div>
       <section className="wl-card" aria-label="Danh sách của bạn" aria-busy={state.busy}>
