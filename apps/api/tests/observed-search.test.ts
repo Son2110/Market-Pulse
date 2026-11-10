@@ -18,9 +18,10 @@ test("observed catalog reads exact indexed FPT identity with projection and boun
   const asset = stored(); let calls = 0;
   const db = { collection: (name: string) => {
     assert.equal(name, "observed_assets");
-    return { findOne: async (filter: unknown, options: unknown) => {
-      calls++; assert.deepEqual(filter, { _id: "VN:HOSE:FPT" });
-      assert.deepEqual(options, { projection: observedAssetProjection, maxTimeMS: 123 }); return asset;
+    return { find: (filter: unknown, options: unknown) => {
+      calls++; assert.deepEqual(filter, { _id: { $in: ["VN:HOSE:FPT"] } });
+      assert.deepEqual(options, { projection: observedAssetProjection, maxTimeMS: 123, singleBatch: true });
+      return { limit: (size: number) => { assert.equal(size, 1); return { toArray: async () => [{ ...asset, _id: "VN:HOSE:FPT" }] }; } };
     } };
   } } as unknown as Db;
   const service = new ObservedSearchService(db, 123);
@@ -37,7 +38,7 @@ test("observed catalog reads exact indexed FPT identity with projection and boun
 
 test("observed catalog distinguishes absent assets from corrupt stored contracts", async () => {
   let document: unknown = null;
-  const service = new ObservedSearchService({ collection: () => ({ findOne: async () => document }) } as unknown as Db);
+  const service = new ObservedSearchService({ collection: () => ({ find: () => ({ limit: () => ({ toArray: async () => document ? [{ ...(document as object), _id: "VN:HOSE:FPT" }] : [] }) }) }) } as unknown as Db);
   assert.deepEqual((await service.search("FPT")).data, []);
   assert.equal((await service.search("FPT")).meta.dataset, null);
   for (const mutate of [
@@ -54,14 +55,14 @@ test("observed catalog distinguishes absent assets from corrupt stored contracts
 
 test("observed catalog bounds a Mongo operation that never settles", async t => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
-  const service = new ObservedSearchService({ collection: () => ({ findOne: () => new Promise(() => undefined) }) } as unknown as Db, 25);
+  const service = new ObservedSearchService({ collection: () => ({ find: () => ({ limit: () => ({ toArray: () => new Promise(() => undefined) }) }) }) } as unknown as Db, 25);
   const rejection = assert.rejects(service.search("FPT"), DependencyTimeoutError);
   t.mock.timers.tick(25);
   await rejection;
 });
 
 test("observed catalog returns sanitized 503 when Mongo remains pending", async t => {
-  const service = new ObservedSearchService({ collection: () => ({ findOne: () => new Promise(() => undefined) }) } as unknown as Db, 25);
+  const service = new ObservedSearchService({ collection: () => ({ find: () => ({ limit: () => ({ toArray: () => new Promise(() => undefined) }) }) }) } as unknown as Db, 25);
   const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, observedSearchRouter: createObservedSearchRouter(service) }));
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise<void>(resolve => server.close(() => resolve())));

@@ -3,6 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
 import { validateGoldPayload, type GoldDataset, type GoldPayload } from "./gold-contract.js";
 import { ContractError, canonicalJson, digest, type Json } from "./platform/contracts/json.js";
+import { symbolProfile } from "./symbol-registry.js";
 
 export { ContractError, canonicalJson, digest, strictJson, type Json } from "./platform/contracts/json.js";
 
@@ -126,8 +127,8 @@ export function validateObservedPayload(input: Json): ObservedPayload {
   const { request, candles } = payload;
   const days = (Date.parse(request.end) - Date.parse(request.start)) / 86400_000;
   if (days < 0 || days > 31) fail();
-  const equity = request.symbol === "FPT";
-  const expected = { assetId: `VN:${equity ? "HOSE" : "INDEX"}:${request.symbol}`, symbol: request.symbol, assetType: equity ? "equity" : "index", currency: equity ? "VND" : null, unit: equity ? "VND" : "index_point", timezone: "Asia/Ho_Chi_Minh" };
+  const profile = symbolProfile(request.symbol); if (!profile) fail();
+  const expected = { assetId: profile.assetId, symbol: profile.symbol, assetType: profile.assetType, currency: profile.currency, unit: profile.unit, timezone: "Asia/Ho_Chi_Minh" };
   if (canonicalJson(payload.assets[0]!) !== canonicalJson(expected)) fail();
   let previous = "";
   for (const row of candles) {
@@ -136,7 +137,7 @@ export function validateObservedPayload(input: Json): ObservedPayload {
     previous = row.tradingDate;
     const label = row.providerTimeLabel as string;
     if (!validTime(`${label.replace(" ", "T")}${label.length === 16 ? ":00" : ""}Z`) || label.slice(0, 10) !== row.tradingDate) fail();
-    if (["assetId", "currency", "unit", "timezone"].some(key => row[key] !== expected[key as keyof typeof expected]) || row.adjustmentBasis !== (equity ? "unknown" : "not_applicable")) fail();
+    if (["assetId", "currency", "unit", "timezone"].some(key => row[key] !== expected[key as keyof typeof expected]) || row.adjustmentBasis !== profile.adjustmentBasis) fail();
     const values = ["open", "high", "low", "close"].map(key => new Decimal(row[key] as string));
     const [open, high, low, close] = values as [Decimal, Decimal, Decimal, Decimal];
     if (values.some(value => value.lte(0)) || low.gt(open) || low.gt(close) || high.lt(open) || high.lt(close)) fail();

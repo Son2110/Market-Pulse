@@ -36,9 +36,9 @@ test("real Mongo observed catalog verifies stored-only FPT presence, corrupt rec
   assert(!/(firstDeliveryId|rowDigest|_id|candles|collectedOrder)/.test(JSON.stringify(body.data)));
   client.off("commandStarted", capture);
   assert.equal(commands.length, 1); const command = commands[0]!.command;
-  assert.equal(command.find, "observed_assets"); assert.deepEqual(command.filter, { _id: "VN:HOSE:FPT" });
+  assert.equal(command.find, "observed_assets"); assert.deepEqual(command.filter, { _id: { $in: ["VN:HOSE:FPT"] } });
   assert.deepEqual(command.projection, observedAssetProjection); assert.equal(command.limit, 1); assert.equal(command.singleBatch, true); assert.equal(command.maxTimeMS, 456);
-  const explanation = await db.collection("observed_assets").find({ _id: "VN:HOSE:FPT" } as never).explain("executionStats");
+  const explanation = await db.collection("observed_assets").find({ _id: { $in: ["VN:HOSE:FPT"] } } as never).explain("executionStats");
   assert.equal(explanation.executionStats.totalDocsExamined, 1); assert.equal(explanation.executionStats.totalKeysExamined, 1);
   for (const query of ["VCB", "VNINDEX", ".*"]) assert.deepEqual((await (await get(query)).json()).data, []);
   const asset = await db.collection("observed_assets").findOne({ "record.symbol": "FPT" }); assert(asset);

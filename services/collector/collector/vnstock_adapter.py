@@ -12,11 +12,12 @@ import re
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 
+from scripts.symbol_registry import REGISTERED_SYMBOLS, symbol_profile
 from scripts.validate_observed_candles import validate_observed_candles
 
 
 VERSIONS = {"vnstock": "4.0.8", "vnai": "2.6.2"}
-SYMBOLS = {"FPT", "VNINDEX"}
+SYMBOLS = frozenset(REGISTERED_SYMBOLS)
 LABEL = "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN"
 
 
@@ -68,10 +69,9 @@ def normalize_rows(rows: object, symbol: str, start: str, end: str, collected_at
     validate_request(symbol, start, end)
     if not isinstance(rows, list) or len(rows) > 32:
         raise AdapterError("malformed_provider_response")
-    equity = symbol == "FPT"
-    asset = {"assetId": f"VN:{'HOSE' if equity else 'INDEX'}:{symbol}", "symbol": symbol,
-             "assetType": "equity" if equity else "index", "currency": "VND" if equity else None,
-             "unit": "VND" if equity else "index_point", "timezone": "Asia/Ho_Chi_Minh"}
+    profile = symbol_profile(symbol)
+    asset = {"assetId": profile["assetId"], "symbol": symbol, "assetType": profile["assetType"],
+             "currency": profile["currency"], "unit": profile["unit"], "timezone": "Asia/Ho_Chi_Minh"}
     candles = []
     for raw in rows:
         if not isinstance(raw, dict) or not {"t", "o", "h", "l", "c"} <= raw.keys():
@@ -79,7 +79,7 @@ def normalize_rows(rows: object, symbol: str, start: str, end: str, collected_at
         trading_date = provider_date(raw["t"])
         candle = {"assetId": asset["assetId"], "tradingDate": trading_date, "interval": "1d",
                   "currency": asset["currency"], "unit": asset["unit"], "timezone": asset["timezone"],
-                  "adjustmentBasis": "unknown" if equity else "not_applicable",
+                  "adjustmentBasis": profile["adjustmentBasis"],
                   **{key: decimal_text(raw[field]) for key, field in (("open", "o"), ("high", "h"), ("low", "l"), ("close", "c"))},
                   "volume": None, "volumeUnit": "not_available",
                   "providerTimeLabel": raw["t"], "timeProvenance": "provider_naive_calendar_label",
