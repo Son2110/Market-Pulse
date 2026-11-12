@@ -258,10 +258,11 @@ test("real Mongo multi-symbol registry proof persists and serves VCB alongside F
   const searchRes = await fetch(`${base}/api/observed/assets/search?q=Vietcombank`);
   assert.equal(searchRes.status, 200);
   const searchJson = await searchRes.json();
-  assert.deepEqual(searchJson.meta.coverage, ["FPT", "VCB"]);
-  assert.equal(searchJson.meta.label, "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT, VCB");
+  assert.deepEqual(searchJson.meta.coverage, ["FPT", "VCB", "SHS"]);
+  assert.equal(searchJson.meta.label, "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT, VCB, SHS");
   assert.equal(searchJson.data.length, 1);
   assert.equal(searchJson.data[0].asset.symbol, "VCB");
+  assert.equal(searchJson.data[0].hasData, true);
 
   const vcbWindowRes = await fetch(`${base}/api/observed/assets/vcb/latest-window`);
   assert.equal(vcbWindowRes.status, 200);

@@ -198,11 +198,18 @@ test("row errors are independent and explicit retry can return no observations",
   try { await settle(); assert.equal(env.manager.state.phase, "ready"); assert.equal(env.manager.state.rows.FPT.phase, "error"); assert.equal(env.manager.state.rows.FPT.message.includes("private"), false); await env.manager.loadRow("FPT"); assert.equal(env.manager.state.rows.FPT.phase, "ready"); assert.deepEqual(env.manager.state.rows.FPT.response?.data.candles, []); } finally { env.stop(); }
 });
 test("observed mode searches stored observed catalog, loads FPT latest window and history without fixture fallback, and marks non-FPT symbols unsupported", async () => {
+  const fptOnlyRegistry = createSymbolRegistry({
+    version: 1,
+    symbols: [
+      { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    ],
+  });
   const mixedList: Watchlist = { ...list, symbols: ["FPT", "HPG"] };
   let fixtureHistoryCalls = 0, windowCalls = 0, historyCalls = 0;
   const searchSources: SearchSource[] = [];
   const observedSearchHit: SearchResponse = {
-    data: [{ asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", exchange: "HOSE", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"], reference: { origin: "curated_reference", officialSources: ["https://fpt.com/vi/nha-dau-tu/thong-tin-co-phieu"], reviewedOn: "2026-09-29" } }],
+    data: [{ asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", exchange: "HOSE", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"], hasData: true, reference: { origin: "curated_reference", officialSources: ["https://fpt.com/vi/nha-dau-tu/thong-tin-co-phieu"], reviewedOn: "2026-09-29" } }],
     meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" }, sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
   };
   const env = setup({
@@ -217,7 +224,7 @@ test("observed mode searches stored observed catalog, loads FPT latest window an
       historyCalls++; assert.equal(symbol, "FPT"); assert.deepEqual(range, observedRange);
       return observedHistoryResponse("101000.123456789123456789", range);
     },
-  }, () => now, "observed");
+  }, () => now, "observed", fptOnlyRegistry);
   try {
     await settle();
     assert.equal(fixtureHistoryCalls, 0);

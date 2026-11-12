@@ -8,6 +8,7 @@ export interface SymbolProfile {
   currency: "VND" | null;
   unit: "VND" | "index_point";
   adjustmentBasis: "unknown" | "not_applicable";
+  hotBasket?: boolean;
 }
 
 export interface SymbolRegistry {
@@ -18,16 +19,17 @@ export interface SymbolRegistry {
 
 export interface SymbolRegistryDocument {
   version: number;
-  symbols: Array<{ symbol: string; assetType: string; exchange: string }>;
+  symbols: Array<{ symbol: string; assetType: string; exchange: string; hotBasket?: boolean }>;
 }
 
 const SYMBOL = /^[A-Z0-9]{1,12}$/u;
 const EXCHANGES = new Set(["HOSE", "HNX", "UPCOM", "INDEX"]);
 
 /** Validates a raw symbol registry entry and derives its canonical asset profile. */
-function profile(entry: { symbol: string; assetType: string; exchange: string }): SymbolProfile {
+function profile(entry: { symbol: string; assetType: string; exchange: string; hotBasket?: boolean }): SymbolProfile {
   const index = entry.assetType === "index";
-  if (!SYMBOL.test(entry.symbol) || !EXCHANGES.has(entry.exchange) || (entry.assetType !== "equity" && !index) || (index !== (entry.exchange === "INDEX"))) {
+  if (!SYMBOL.test(entry.symbol) || !EXCHANGES.has(entry.exchange) || (entry.assetType !== "equity" && !index)
+    || (index !== (entry.exchange === "INDEX")) || (entry.hotBasket !== undefined && typeof entry.hotBasket !== "boolean")) {
     throw new Error("Invalid symbol registry entry");
   }
   return {
@@ -38,6 +40,7 @@ function profile(entry: { symbol: string; assetType: string; exchange: string })
     currency: index ? null : "VND",
     unit: index ? "index_point" : "VND",
     adjustmentBasis: index ? "not_applicable" : "unknown",
+    ...(entry.hotBasket === undefined ? {} : { hotBasket: entry.hotBasket }),
   };
 }
 
@@ -63,8 +66,40 @@ export function createSymbolRegistry(document: SymbolRegistryDocument): SymbolRe
 const DEFAULT_DOCUMENT: SymbolRegistryDocument = {
   version: 1,
   symbols: [
-    { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
-    { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    { symbol: "ACB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "BCM", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "BID", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "BVH", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "CTG", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "FPT", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "GAS", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "GVR", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "HDB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "HPG", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "MBB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "MSN", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "MWG", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "PLX", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "POW", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "SAB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "SHB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "SSB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "SSI", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "STB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "TCB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "TPB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VCB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VHM", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VIB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VIC", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VJC", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VNM", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VPB", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "VRE", assetType: "equity", exchange: "HOSE", hotBasket: true },
+    { symbol: "SHS", assetType: "equity", exchange: "HNX", hotBasket: false },
+    { symbol: "PVS", assetType: "equity", exchange: "HNX", hotBasket: false },
+    { symbol: "BSR", assetType: "equity", exchange: "UPCOM", hotBasket: false },
+    { symbol: "VNINDEX", assetType: "index", exchange: "INDEX", hotBasket: true },
   ],
 };
 

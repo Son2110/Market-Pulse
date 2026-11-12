@@ -91,7 +91,7 @@ test("fetch uses exact same-origin status route, no-store and JSON Accept; inval
     return Response.json(value);
   };
   assert.deepEqual(await fetchObservedCollectionStatus("FPT", sampleRange, new AbortController().signal, request), value);
-  for (const [symbol, range] of [["VNINDEX", sampleRange], ["VCB", sampleRange], ["FPT", { from: "2026-01-01", to: "2026-02-02" }], ["FPT", { from: "2026-02-30", to: "2026-03-01" }]] as const)
+  for (const [symbol, range] of [["VNINDEX", sampleRange], ["AAA", sampleRange], ["FPT", { from: "2026-01-01", to: "2026-02-02" }], ["FPT", { from: "2026-02-30", to: "2026-03-01" }]] as const)
     await assert.rejects(fetchObservedCollectionStatus(symbol, range, new AbortController().signal, async () => { throw new Error("Must not fetch"); }), error => error instanceof CollectionStatusError && error.kind === "invalid");
 });
 test("fetch separates 400/404/503, JSON/contract/network errors, timeout and caller abort", async () => {

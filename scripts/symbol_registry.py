@@ -15,12 +15,17 @@ _EXCHANGES = {"HOSE", "HNX", "UPCOM", "INDEX"}
 def _profile(entry: dict) -> dict:
     """Validate a raw symbol registry entry and derive its canonical asset profile."""
     index = entry["assetType"] == "index"
+    hot_basket = entry.get("hotBasket")
     if (not isinstance(entry["symbol"], str) or not _SYMBOL.fullmatch(entry["symbol"]) or entry["exchange"] not in _EXCHANGES
-            or entry["assetType"] not in {"equity", "index"} or index != (entry["exchange"] == "INDEX")):
+            or entry["assetType"] not in {"equity", "index"} or index != (entry["exchange"] == "INDEX")
+            or (hot_basket is not None and not isinstance(hot_basket, bool))):
         raise ValueError("invalid symbol registry entry")
-    return {"symbol": entry["symbol"], "assetType": "index" if index else "equity", "exchange": entry["exchange"],
-            "assetId": f"VN:{entry['exchange']}:{entry['symbol']}", "currency": None if index else "VND",
-            "unit": "index_point" if index else "VND", "adjustmentBasis": "not_applicable" if index else "unknown"}
+    result = {"symbol": entry["symbol"], "assetType": "index" if index else "equity", "exchange": entry["exchange"],
+              "assetId": f"VN:{entry['exchange']}:{entry['symbol']}", "currency": None if index else "VND",
+              "unit": "index_point" if index else "VND", "adjustmentBasis": "not_applicable" if index else "unknown"}
+    if hot_basket is not None:
+        result["hotBasket"] = hot_basket
+    return result
 
 
 def create_registry(document: dict) -> dict[str, dict]:

@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type RequestHandler, type Response, Router } from "express";
 import { ObjectId, type Collection, type Db, type WithId } from "mongodb";
 import type { AssetCatalogProvider } from "./market-data.js";
+import { DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "./symbol-registry.js";
 
 interface WatchlistRecord {
   userId: ObjectId;
@@ -16,6 +17,7 @@ export interface WatchlistOptions {
   provider: AssetCatalogProvider;
   isReady: () => boolean;
   now?: () => number;
+  registry?: SymbolRegistry;
 }
 
 function jsonError(response: Response, status: number, error: string): void {
@@ -164,6 +166,10 @@ export function createWatchlistApi(options: WatchlistOptions): { router: Router;
         throw new Error("Watchlist catalog unavailable");
       }
       await collection.createIndex({ userId: 1 }, { unique: true, name: "watchlist_user_unique" });
+      const registry = options.registry ?? DEFAULT_SYMBOL_REGISTRY;
+      for (const profile of registry.symbols) {
+        if (profile.assetType === "equity") symbols.add(profile.symbol);
+      }
       allowedSymbols = symbols;
     },
   };

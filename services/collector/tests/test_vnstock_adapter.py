@@ -87,7 +87,7 @@ class VnstockAdapterTests(unittest.TestCase):
                 document(rows=rows)
 
     def test_requests_reject_unsupported_symbols_intervals_and_date_ranges(self):
-        for args in (("VCB", "2026-10-01", "2026-10-06"), ("FPT", "2026-10-01", "2026-10-06", "1h"),
+        for args in (("AAA", "2026-10-01", "2026-10-06"), ("FPT", "2026-10-01", "2026-10-06", "1h"),
                      ("FPT", "2026-10-07", "2026-10-06"), ("FPT", "2026-08-01", "2026-10-06"),
                      ("FPT", "2026-02-30", "2026-10-06")):
             with self.subTest(args=args), self.assertRaises(adapter.AdapterError):

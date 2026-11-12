@@ -19,14 +19,16 @@ function series(prices: string[], dates = ["2026-09-28", "2026-09-29", "2026-10-
   return prices.map((close, index) => ({ ...response().data.candles[0], open: close, high: close, low: close, close, tradingDate: dates[index] }));
 }
 
-test("detail defaults to fixture and explicit observed requires FPT, dates and one source", () => {
+test("detail defaults to fixture and explicit observed requires registered equity, dates and one source", () => {
   assert.deepEqual(detailMode("", "FPT"), { kind: "fixture" });
   assert.deepEqual(detailMode("?search=fpt", "VCB"), { kind: "fixture" });
   assert.deepEqual(detailMode("?source=fixture&search=FPT", "FPT"), { kind: "fixture" });
   assert.deepEqual(detailMode("?source=observed&from=2026-09-28&to=2026-10-07", "FPT"), { kind: "observed", range: sampleRange });
+  assert.deepEqual(detailMode("?source=observed&from=2026-09-28&to=2026-10-07", "VCB"), { kind: "observed", range: sampleRange });
+  assert.deepEqual(detailMode("?source=observed&from=2026-09-28&to=2026-10-07", "SHS"), { kind: "observed", range: sampleRange });
   for (const query of ["?source=", "?source=unknown", "?from=2026-09-28", "?source=fixture&to=2026-10-07", "?source=observed", "?source=observed&source=fixture&from=2026-09-28&to=2026-10-07", "?source=observed&from=2026-09-28&from=2026-09-28&to=2026-10-07", "?source=observed&from=2026-09-28&to=2026-10-07&to=2026-10-07", "?source=observed&from=2026-09-28&to=2026-10-07&interval=5d"])
     assert.equal(detailMode(query, "FPT").kind, "invalid", query);
-  for (const symbol of [null, "VCB", "VNINDEX"]) assert.equal(detailMode("?source=observed&from=2026-09-28&to=2026-10-07", symbol).kind, "invalid");
+  for (const symbol of [null, "AAA", "VNINDEX"]) assert.equal(detailMode("?source=observed&from=2026-09-28&to=2026-10-07", symbol).kind, "invalid");
 });
 test("inclusive range accepts 31 day difference and leap dates, rejects 32 and rollover", () => {
   assert.equal(validObservedRange({ from: "2026-01-01", to: "2026-02-01" }), true);
@@ -47,11 +49,13 @@ function latestWindow(): ObservedLatestWindow {
   return { data: { asset, dataset }, meta: { status: "available", provider: "KBS", interval: "1d", latestTradingDate: "2024-03-01", range: { from: "2024-02-01", to: "2024-03-01" },
     calendarDays: 30, sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" } };
 }
-test("latest mode is explicit, FPT-only and incompatible with manual ranges", () => {
+test("latest mode is explicit, registered-equity-only and incompatible with manual ranges", () => {
   assert.deepEqual(detailMode("?source=observed&window=latest&search=FPT&searchSource=observed", "FPT"), { kind: "latest" });
+  assert.deepEqual(detailMode("?source=observed&window=latest", "VCB"), { kind: "latest" });
+  assert.deepEqual(detailMode("?source=observed&window=latest", "BSR"), { kind: "latest" });
   for (const query of ["?window=latest", "?source=fixture&window=latest", "?source=observed&window=", "?source=observed&window=latest&window=latest", "?source=observed&window=latest&from=2026-10-01", "?source=observed&window=latest&to=2026-10-01", "?source=observed&window=latest&cursor=x"])
     assert.equal(detailMode(query, "FPT").kind, "invalid", query);
-  for (const symbol of [null, "VCB", "VNINDEX"]) assert.equal(detailMode("?source=observed&window=latest", symbol).kind, "invalid");
+  for (const symbol of [null, "AAA", "VNINDEX"]) assert.equal(detailMode("?source=observed&window=latest", symbol).kind, "invalid");
 });
 test("latest window guard enforces exact public identity and 30 inclusive calendar dates including leap and minimum year", () => {
   assert(isObservedLatestWindow(latestWindow()));
@@ -149,7 +153,7 @@ test("fetch uses bounded observed URL, no-store, and validates input before requ
     assert.equal(url, "/api/observed/assets/FPT/history?from=2026-09-28&to=2026-10-07"); assert.equal(options?.cache, "no-store"); assert.equal((options?.headers as Record<string, string>).Accept, "application/json"); return Response.json(body);
   };
   assert.deepEqual(await fetchObservedHistory("FPT", sampleRange, new AbortController().signal, request), body);
-  for (const [symbol, range] of [["VCB", sampleRange], ["FPT", { from: "2026-01-01", to: "2026-02-02" }]] as const)
+  for (const [symbol, range] of [["AAA", sampleRange], ["FPT", { from: "2026-01-01", to: "2026-02-02" }]] as const)
     await assert.rejects(fetchObservedHistory(symbol, range, new AbortController().signal, async () => { throw new Error("Must not fetch"); }), error => error instanceof ObservedError && error.kind === "invalid");
 });
 test("fetch distinguishes errors, 404 wording does not guess flag status, cancellation and timeout", async () => {
@@ -161,9 +165,12 @@ test("fetch distinguishes errors, 404 wording does not guess flag status, cancel
   const controller = new AbortController(); const pending = fetchObservedHistory("FPT", sampleRange, controller.signal, waiting); controller.abort(); await assert.rejects(pending, error => error instanceof DOMException && error.name === "AbortError");
 });
 test("web symbol registry matches schema file and generalizes detail mode, latest-window and history to multi-symbol equities", async () => {
-  const schemaDoc = JSON.parse(readFileSync(new URL("../../../packages/schemas/symbol-registry-v1.json", import.meta.url), "utf8")) as { version: number; symbols: Array<{ symbol: string; assetType: string; exchange: string }> };
-  assert.deepEqual(REGISTERED_SYMBOLS.map(({ symbol, assetType, exchange }) => ({ symbol, assetType, exchange })), schemaDoc.symbols);
-  assert.deepEqual(REGISTERED_EQUITY_SYMBOLS, ["FPT"]);
+  const schemaDoc = JSON.parse(readFileSync(new URL("../../../packages/schemas/symbol-registry-v1.json", import.meta.url), "utf8")) as { version: number; symbols: Array<{ symbol: string; assetType: string; exchange: string; hotBasket?: boolean }> };
+  assert.deepEqual(REGISTERED_SYMBOLS.map(({ symbol, assetType, exchange, hotBasket }) => ({ symbol, assetType, exchange, ...(hotBasket === undefined ? {} : { hotBasket }) })), schemaDoc.symbols);
+  assert.equal(REGISTERED_EQUITY_SYMBOLS.length, 33);
+  assert.equal(REGISTERED_EQUITY_SYMBOLS.includes("FPT"), true);
+  assert.equal(REGISTERED_EQUITY_SYMBOLS.includes("SHS"), true);
+  assert.equal(REGISTERED_EQUITY_SYMBOLS.includes("BSR"), true);
   assert.equal(DEFAULT_SYMBOL_REGISTRY.profile("VNINDEX")?.assetType, "index");
 
   const multiRegistry = createSymbolRegistry({

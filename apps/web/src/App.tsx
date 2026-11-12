@@ -23,19 +23,26 @@ function SearchIcon() {
   return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>;
 }
 
+/** Extracts the exchange code from an asset's explicit exchange property or canonical assetId. */
+function assetExchange(asset: SearchResult["asset"]): string {
+  return asset.exchange ?? (/^VN:(HOSE|HNX|UPCOM):/.exec(asset.assetId)?.[1] ?? "HOSE");
+}
+
 function CompanyReference({ company, response }: { company: SearchResult; response: SearchResponse }) {
   const observed = response.meta.scope === "stored observed equities";
   const query = new URLSearchParams(window.location.search).get("q") ?? company.asset.symbol;
+  const exchange = assetExchange(company.asset);
   return <aside className="company-panel" aria-labelledby="company-heading">
     <span className="symbol-tag">{company.asset.symbol}</span>
     <h2 id="company-heading">{company.companyName}</h2>
-    <p className="muted">Cổ phiếu · {company.asset.exchange ?? "HOSE"}</p>
+    <p className="muted">Cổ phiếu · {exchange}{observed && company.hasData !== undefined ? (company.hasData ? " · Đã có dữ liệu lưu" : " · Chưa thu thập dữ liệu") : ""}</p>
     <a className="detail-link" href={observed ? detailHref(company.asset.symbol, "observed", query, undefined, "observed") : `/stocks/${encodeURIComponent(company.asset.symbol)}?search=${encodeURIComponent(query)}`}>Xem chi tiết & biểu đồ ngày →</a>
     <div className="panel-section">
       <h3>Thông tin tham chiếu</h3>
       <dl>
         <div><dt>Mã cổ phiếu</dt><dd>{company.asset.symbol}</dd></div>
-        <div><dt>Sàn</dt><dd>{company.asset.exchange ?? "HOSE"}</dd></div>
+        <div><dt>Sàn</dt><dd>{exchange}</dd></div>
+        {observed && company.hasData !== undefined && <div><dt>Trạng thái dữ liệu lưu</dt><dd>{company.hasData ? "Đã có dữ liệu lưu" : "Chưa thu thập dữ liệu"}</dd></div>}
         <div><dt>Tiền tệ / đơn vị</dt><dd>{company.asset.currency === company.asset.unit ? company.asset.currency : `${company.asset.currency} / ${company.asset.unit}`}</dd></div>
         <div><dt>Múi giờ</dt><dd>{company.asset.timezone === "Asia/Ho_Chi_Minh" ? "Việt Nam (UTC+7)" : company.asset.timezone}</dd></div>
         <div><dt>Ngày rà soát nguồn</dt><dd>{company.reference.reviewedOn.split("-").reverse().join("/")}</dd></div>
@@ -141,8 +148,10 @@ function SearchPage() {
           {state.status === "results" ? <>
             <ul className="result-list">{state.response.data.map((company) => {
               const selected = company.asset.assetId === selectedId;
+              const exchange = assetExchange(company.asset);
+              const dataBadge = observed && company.hasData !== undefined ? (company.hasData ? " · Đã có dữ liệu lưu" : " · Chưa thu thập dữ liệu") : "";
               return <li key={company.asset.assetId}><button className={`result-card${selected ? " selected" : ""}`} type="button" aria-pressed={selected} aria-label={`Xem thông tin ${company.asset.symbol} — ${company.companyName}`} onClick={() => setSelectedId(company.asset.assetId)}>
-                <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{company.asset.exchange ?? "HOSE"} · Cổ phiếu</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
+                <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{exchange} · Cổ phiếu{dataBadge}</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
               </button></li>;
             })}</ul>
             <p className="scope-note">{observed ? "Danh mục đã lưu hiện chỉ FPT. Kết quả chỉ xác nhận tài sản, không xác nhận có giá hoặc lịch sử. Chi tiết tìm khoảng 30 ngày lịch kết thúc ở ngày có quan sát đã lưu lớn nhất; không xác nhận giá hiện tại hoặc độ mới." : "Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày."}</p>

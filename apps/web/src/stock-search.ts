@@ -10,6 +10,7 @@ export interface SearchResult {
   };
   companyName: string;
   aliases: string[];
+  hasData?: boolean;
   reference: { origin?: "curated_reference"; officialSources: string[]; reviewedOn: string };
 }
 
@@ -101,7 +102,7 @@ export function isSearchResponse(value: unknown): value is SearchResponse {
 export function isObservedSearchResponse(value: unknown): value is SearchResponse {
   if (!record(value) || !record(value.meta) || !Array.isArray(value.data)) return false;
   const meta = value.meta;
-  if (!Array.isArray(meta.coverage) || meta.coverage.length === 0 || meta.coverage.length > 32
+  if (!Array.isArray(meta.coverage) || meta.coverage.length === 0 || meta.coverage.length > 64
     || !meta.coverage.every((symbol): symbol is string => typeof symbol === "string" && /^[A-Z0-9]{1,12}$/.test(symbol) && symbol !== "VNINDEX")
     || new Set(meta.coverage).size !== meta.coverage.length) return false;
   const coverage = new Set(meta.coverage);
@@ -109,11 +110,13 @@ export function isObservedSearchResponse(value: unknown): value is SearchRespons
     || meta.provider !== "KBS" || meta.sourceAsOf !== null || meta.collectedAt !== null || meta.freshness !== "unknown"
     || meta.availability !== "catalog_only" || meta.assetOrigin !== "stored_observed_asset" || value.data.length > meta.coverage.length) return false;
   const dataset = meta.dataset;
-  if (dataset === null ? value.data.length !== 0 : !record(dataset) || dataset.mode !== "observed"
+  const hasStoredHit = value.data.some((item: unknown) => record(item) && (item.hasData === undefined || item.hasData === true));
+  if (dataset === null ? hasStoredHit : !record(dataset) || dataset.mode !== "observed"
     || dataset.label !== "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN" || dataset.freshness !== "unknown" || dataset.sessionCalendar !== "unverified") return false;
   const symbols = new Set<string>();
   return value.data.every((item: unknown) => {
     if (!record(item) || !record(item.asset) || !record(item.reference) || item.reference.origin !== "curated_reference") return false;
+    if (item.hasData !== undefined && typeof item.hasData !== "boolean") return false;
     const asset = item.asset;
     const match = typeof asset.assetId === "string" ? /^VN:(HOSE|HNX|UPCOM):([A-Z0-9]{1,12})$/.exec(asset.assetId) : null;
     if (Object.keys(asset).sort().join(",") !== "assetId,assetType,currency,symbol,timezone,unit"

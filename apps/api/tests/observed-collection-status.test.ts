@@ -92,7 +92,7 @@ test("collection status HTTP validates input, normalizes symbols and sanitizes s
   t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === "object");
   const base = `http://127.0.0.1:${address.port}/api/observed/assets`;
-  for (const [path, status, error] of [["FPT/collection-status", 400, "invalid_query"], ["%ZZ/collection-status?from=2026-10-01&to=2026-10-06", 400, "invalid_symbol"], ["VCB/collection-status?from=2026-10-01&to=2026-10-06", 404, "asset_not_found"], ["fpt/collection-status?from=2026-10-01&to=2026-10-06", 503, "observed_collection_status_unavailable"], ["FPT/collection-status?from=2026-10-01&to=2026-10-01&from=2026-10-01", 400, "invalid_query"], ["FPT/collection-status?from=2026-10-01&to=2026-11-02", 400, "invalid_query"]] as const) {
+  for (const [path, status, error] of [["FPT/collection-status", 400, "invalid_query"], ["%ZZ/collection-status?from=2026-10-01&to=2026-10-06", 400, "invalid_symbol"], ["AAA/collection-status?from=2026-10-01&to=2026-10-06", 404, "asset_not_found"], ["fpt/collection-status?from=2026-10-01&to=2026-10-06", 503, "observed_collection_status_unavailable"], ["FPT/collection-status?from=2026-10-01&to=2026-10-01&from=2026-10-01", 400, "invalid_query"], ["FPT/collection-status?from=2026-10-01&to=2026-11-02", 400, "invalid_query"]] as const) {
     const response = await fetch(`${base}/${path}`); assert.equal(response.status, status); assert.equal(response.headers.get("cache-control"), "no-store"); assert.deepEqual(await response.json(), { error });
   }
   assert.equal(calls, 1); ready = false;

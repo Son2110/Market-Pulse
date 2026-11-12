@@ -5,6 +5,8 @@ import type { Db } from "mongodb";
 import { createApp } from "../src/health.js";
 import { digest } from "../src/ingestion-contract.js";
 import { observedAssetProjection } from "../src/observed-history-contract.js";
+import { OBSERVED_STOCK_REFERENCE_CATALOG } from "../src/stock-reference-catalog.js";
+import { REGISTERED_SYMBOLS } from "../src/symbol-registry.js";
 import { createObservedSearchRouter, ObservedSearchService } from "../src/observed-search.js";
 import { DependencyTimeoutError } from "../src/platform/health/dependency-probes.js";
 import { observed } from "./observed-test-data.js";
@@ -14,33 +16,49 @@ function stored() {
   return { record: payload.assets[0], rowDigest: digest(payload.assets[0]!), dataset: payload.dataset, schemaVersion: payload.schemaVersion, firstDeliveryId: "private" };
 }
 
-test("observed catalog reads exact indexed FPT identity with projection and bound, then matches normalized curated terms", async () => {
+test("observed catalog reads exact indexed equity identities with projection and bound, then matches normalized curated terms with hasData", async () => {
   const asset = stored(); let calls = 0;
+  const expectedIds = REGISTERED_SYMBOLS.filter(item => item.assetType === "equity").map(item => item.assetId);
+  assert.equal(expectedIds.length, 33);
+  assert.equal(OBSERVED_STOCK_REFERENCE_CATALOG.length, 33);
   const db = { collection: (name: string) => {
     assert.equal(name, "observed_assets");
     return { find: (filter: unknown, options: unknown) => {
-      calls++; assert.deepEqual(filter, { _id: { $in: ["VN:HOSE:FPT"] } });
+      calls++; assert.deepEqual(filter, { _id: { $in: expectedIds } });
       assert.deepEqual(options, { projection: observedAssetProjection, maxTimeMS: 123, singleBatch: true });
-      return { limit: (size: number) => { assert.equal(size, 1); return { toArray: async () => [{ ...asset, _id: "VN:HOSE:FPT" }] }; } };
+      return { limit: (size: number) => { assert.equal(size, expectedIds.length); return { toArray: async () => [{ ...asset, _id: "VN:HOSE:FPT" }] }; } };
     } };
   } } as unknown as Db;
   const service = new ObservedSearchService(db, 123);
   for (const query of [" FpT ", "cong ty co phan fpt", "CÔNG TY CỔ PHẦN FPT", "F"]) {
     const response = await service.search(query); assert.equal(response.data.length, 1);
     assert.deepEqual(response.data[0]!.asset, observed().assets[0]);
+    assert.equal(response.data[0]!.hasData, true);
     assert.equal(response.data[0]!.reference.origin, "curated_reference");
     assert.equal(response.meta.availability, "catalog_only"); assert.equal(response.meta.collectedAt, null);
     assert(!JSON.stringify(response).includes("private"));
   }
-  for (const query of ["VNINDEX", "VCB", ".*", "$where", "[FPT]"]) assert.deepEqual((await service.search(query)).data, []);
-  assert.equal(calls, 9);
+  const vcb = await service.search("VCB");
+  assert.equal(vcb.data.length, 1);
+  assert.equal(vcb.data[0]!.asset.symbol, "VCB");
+  assert.equal(vcb.data[0]!.hasData, false);
+  assert.deepEqual(vcb.meta.dataset, observed().dataset);
+  const shs = await service.search("SHS");
+  assert.equal(shs.data.length, 1);
+  assert.equal(shs.data[0]!.asset.assetId, "VN:HNX:SHS");
+  assert.equal(shs.data[0]!.hasData, false);
+  for (const query of ["VNINDEX", "AAA", ".*", "$where", "[FPT]"]) assert.deepEqual((await service.search(query)).data, []);
+  assert.equal(calls, 11);
 });
 
-test("observed catalog distinguishes absent assets from corrupt stored contracts", async () => {
+test("observed catalog distinguishes uncollected catalog assets (hasData: false) from corrupt stored contracts", async () => {
   let document: unknown = null;
   const service = new ObservedSearchService({ collection: () => ({ find: () => ({ limit: () => ({ toArray: async () => document ? [{ ...(document as object), _id: "VN:HOSE:FPT" }] : [] }) }) }) } as unknown as Db);
-  assert.deepEqual((await service.search("FPT")).data, []);
-  assert.equal((await service.search("FPT")).meta.dataset, null);
+  const uncollected = await service.search("FPT");
+  assert.equal(uncollected.data.length, 1);
+  assert.equal(uncollected.data[0]!.asset.symbol, "FPT");
+  assert.equal(uncollected.data[0]!.hasData, false);
+  assert.equal(uncollected.meta.dataset, null);
   for (const mutate of [
     (row: ReturnType<typeof stored>) => { row.rowDigest = "bad"; },
     (row: ReturnType<typeof stored>) => { row.schemaVersion = "1.0.0" as never; },

@@ -4,21 +4,24 @@ export type SymbolAssetType = "equity" | "index";
 export interface SymbolProfile {
   symbol: string; assetType: SymbolAssetType; exchange: string; assetId: string;
   currency: "VND" | null; unit: "VND" | "index_point"; adjustmentBasis: "unknown" | "not_applicable";
+  hotBasket?: boolean;
 }
 
 const SYMBOL = /^[A-Z0-9]{1,12}$/u;
 const EXCHANGES = new Set(["HOSE", "HNX", "UPCOM", "INDEX"]);
 
 /** Validates a raw symbol registry entry and derives its canonical asset profile. */
-function profile(entry: { symbol: string; assetType: string; exchange: string }): SymbolProfile {
+function profile(entry: { symbol: string; assetType: string; exchange: string; hotBasket?: boolean }): SymbolProfile {
   const index = entry.assetType === "index";
-  if (!SYMBOL.test(entry.symbol) || !EXCHANGES.has(entry.exchange) || (entry.assetType !== "equity" && !index) || (index !== (entry.exchange === "INDEX"))) {
+  if (!SYMBOL.test(entry.symbol) || !EXCHANGES.has(entry.exchange) || (entry.assetType !== "equity" && !index)
+    || (index !== (entry.exchange === "INDEX")) || (entry.hotBasket !== undefined && typeof entry.hotBasket !== "boolean")) {
     throw new Error("Invalid symbol registry entry");
   }
   return {
     symbol: entry.symbol, assetType: index ? "index" : "equity", exchange: entry.exchange,
     assetId: `VN:${entry.exchange}:${entry.symbol}`, currency: index ? null : "VND",
     unit: index ? "index_point" : "VND", adjustmentBasis: index ? "not_applicable" : "unknown",
+    ...(entry.hotBasket === undefined ? {} : { hotBasket: entry.hotBasket }),
   };
 }
 
@@ -27,7 +30,10 @@ export interface SymbolRegistry {
   profile(symbol: string): SymbolProfile | null;
   profileByAssetId(assetId: string): SymbolProfile | null;
 }
-export interface SymbolRegistryDocument { version: number; symbols: Array<{ symbol: string; assetType: string; exchange: string }> }
+export interface SymbolRegistryDocument {
+  version: number;
+  symbols: Array<{ symbol: string; assetType: string; exchange: string; hotBasket?: boolean }>;
+}
 
 /** Validates a registry document and derives each symbol's canonical profile. */
 export function createSymbolRegistry(document: SymbolRegistryDocument): SymbolRegistry {

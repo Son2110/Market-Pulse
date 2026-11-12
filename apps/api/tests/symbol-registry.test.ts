@@ -4,14 +4,20 @@ import { digest, observedContent, validateObservedPayload, type Json } from "../
 import { REGISTERED_SYMBOLS, createSymbolRegistry, symbolProfile, symbolProfileByAssetId } from "../src/symbol-registry.js";
 import { observed } from "./observed-test-data.js";
 
-test("registry derives canonical equity and index profiles for FPT and VNINDEX", () => {
-  assert.deepEqual(REGISTERED_SYMBOLS.map(item => item.symbol), ["FPT", "VNINDEX"]);
-  assert.deepEqual(symbolProfile("FPT"), { symbol: "FPT", assetType: "equity", exchange: "HOSE", assetId: "VN:HOSE:FPT", currency: "VND", unit: "VND", adjustmentBasis: "unknown" });
-  assert.deepEqual(symbolProfile("VNINDEX"), { symbol: "VNINDEX", assetType: "index", exchange: "INDEX", assetId: "VN:INDEX:VNINDEX", currency: null, unit: "index_point", adjustmentBasis: "not_applicable" });
+test("registry derives canonical equity and index profiles for VN30, representative HNX/UPCOM equities and VNINDEX", () => {
+  assert.equal(REGISTERED_SYMBOLS.length, 34);
+  assert.equal(REGISTERED_SYMBOLS.filter(item => item.hotBasket === true).length, 31);
+  assert.deepEqual(REGISTERED_SYMBOLS.filter(item => item.hotBasket === false).map(item => item.symbol), ["SHS", "PVS", "BSR"]);
+  assert.deepEqual(symbolProfile("FPT"), { symbol: "FPT", assetType: "equity", exchange: "HOSE", assetId: "VN:HOSE:FPT", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: true });
+  assert.deepEqual(symbolProfile("SHS"), { symbol: "SHS", assetType: "equity", exchange: "HNX", assetId: "VN:HNX:SHS", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: false });
+  assert.deepEqual(symbolProfile("BSR"), { symbol: "BSR", assetType: "equity", exchange: "UPCOM", assetId: "VN:UPCOM:BSR", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: false });
+  assert.deepEqual(symbolProfile("VNINDEX"), { symbol: "VNINDEX", assetType: "index", exchange: "INDEX", assetId: "VN:INDEX:VNINDEX", currency: null, unit: "index_point", adjustmentBasis: "not_applicable", hotBasket: true });
   assert.equal(symbolProfileByAssetId("VN:HOSE:FPT")?.symbol, "FPT");
+  assert.equal(symbolProfileByAssetId("VN:HNX:SHS")?.symbol, "SHS");
+  assert.equal(symbolProfileByAssetId("VN:UPCOM:BSR")?.symbol, "BSR");
   assert.equal(symbolProfile("fpt"), null);
-  assert.equal(symbolProfile("VCB"), null);
-  assert.equal(symbolProfileByAssetId("VN:HOSE:VCB"), null);
+  assert.equal(symbolProfile("AAA"), null);
+  assert.equal(symbolProfileByAssetId("VN:HOSE:AAA"), null);
 });
 
 test("registry factory supports other exchanges and rejects malformed or duplicate entries", () => {
@@ -44,11 +50,11 @@ test("observed contract accepts registered symbols unchanged, preserves exact FP
     assert.match(digest(payload as unknown as Json), /^[a-f0-9]{64}$/);
   }
   const payload = observed();
-  payload.request.symbol = "VCB";
-  payload.assets[0]!.symbol = "VCB";
-  payload.assets[0]!.assetId = "VN:HOSE:VCB";
+  payload.request.symbol = "AAA";
+  payload.assets[0]!.symbol = "AAA";
+  payload.assets[0]!.assetId = "VN:HOSE:AAA";
   for (const row of payload.candles) {
-    row.assetId = "VN:HOSE:VCB";
+    row.assetId = "VN:HOSE:AAA";
     row.barId = digest(["KBS", row.assetId, row.interval, row.tradingDate, row.adjustmentBasis]);
     row.contentDigest = digest(observedContent(row));
   }
@@ -57,7 +63,7 @@ test("observed contract accepts registered symbols unchanged, preserves exact FP
     version: 1,
     symbols: [
       { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
-      { symbol: "VCB", assetType: "equity", exchange: "HOSE" },
+      { symbol: "AAA", assetType: "equity", exchange: "HOSE" },
       { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
     ],
   });
