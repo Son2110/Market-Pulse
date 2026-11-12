@@ -1,4 +1,5 @@
 import { validObservedDate, validObservedRange, type ObservedHistory, type ObservedRange } from "./observed-detail.js";
+import { DEFAULT_SYMBOL_REGISTRY, equityProfile, observedEquityAsset, type SymbolRegistry } from "./symbol-registry.js";
 
 export const deliveryStatuses = ["accepted", "queued", "running", "success", "failure", "unknown"] as const;
 export type DeliveryStatus = typeof deliveryStatuses[number];
@@ -18,7 +19,6 @@ function keys(value: unknown, expected: string[]): value is Record<string, unkno
 function exact(value: unknown, expected: Record<string, unknown>): boolean {
   return keys(value, Object.keys(expected)) && Object.entries(expected).every(([key, field]) => value[key] === field);
 }
-const asset = { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
 const dataset = { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" };
 const metaKeys = ["status", "provider", "interval", "requestedRange", "returnedRange", "sourceAsOf", "completeness", "selectionSemantics", "freshness", "sessionCalendar", "selectedCandleCount", "collectedAtRange", "candleCountsByDeliveryStatus", "statusSemantics", "consistency"];
 const days = (range: ObservedRange) => (Date.parse(range.to) - Date.parse(range.from)) / 86400_000 + 1;
@@ -35,7 +35,11 @@ function timestamp(value: unknown): bigint | null {
   // Keep sub-millisecond ordering and normalize offsets without changing displayed text.
   return BigInt(milliseconds) * 1000n + BigInt((match[5] ?? "").padEnd(6, "0"));
 }
-export function isObservedCollectionStatus(value: unknown, range: ObservedRange): value is ObservedCollectionStatus {
+/** Validates an observed collection-status response payload against the requested range and equity symbol profile. */
+export function isObservedCollectionStatus(value: unknown, range: ObservedRange, symbol = "FPT", registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): value is ObservedCollectionStatus {
+  const profileItem = equityProfile(symbol, registry);
+  if (!profileItem) return false;
+  const asset = observedEquityAsset(profileItem);
   if (!validObservedRange(range) || !keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset"])
     || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset) || !keys(value.meta, metaKeys)) return false;
   const meta = value.meta;
@@ -58,16 +62,17 @@ export function isObservedCollectionStatus(value: unknown, range: ObservedRange)
 }
 export type CollectionStatusErrorKind = "invalid" | "missing" | "unavailable" | "timeout" | "network" | "response";
 export class CollectionStatusError extends Error { constructor(public readonly kind: CollectionStatusErrorKind) { super(kind); } }
-export async function fetchObservedCollectionStatus(symbol: string, range: ObservedRange, signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000): Promise<ObservedCollectionStatus> {
-  if (symbol !== "FPT" || !validObservedRange(range)) throw new CollectionStatusError("invalid");
+/** Fetches and validates observed collection-status metadata for a registered equity symbol over a bounded range. */
+export async function fetchObservedCollectionStatus(symbol: string, range: ObservedRange, signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): Promise<ObservedCollectionStatus> {
+  if (!equityProfile(symbol, registry) || !validObservedRange(range)) throw new CollectionStatusError("invalid");
   const timeout = new AbortController(); const timer = setTimeout(() => timeout.abort(), timeoutMs);
   try {
-    const response = await request(`/api/observed/assets/FPT/collection-status?${new URLSearchParams({ ...range })}`, { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
+    const response = await request(`/api/observed/assets/${encodeURIComponent(symbol)}/collection-status?${new URLSearchParams({ ...range })}`, { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
     if (response.status === 400) throw new CollectionStatusError("invalid");
     if (response.status === 404) throw new CollectionStatusError("missing");
     if (!response.ok) throw new CollectionStatusError("unavailable");
     let body: unknown; try { body = await response.json(); } catch { throw new CollectionStatusError("response"); }
-    if (!isObservedCollectionStatus(body, range)) throw new CollectionStatusError("response");
+    if (!isObservedCollectionStatus(body, range, symbol, registry)) throw new CollectionStatusError("response");
     return body;
   } catch (error) {
     if (signal.aborted) throw error;

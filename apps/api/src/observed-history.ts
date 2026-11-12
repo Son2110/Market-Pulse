@@ -3,7 +3,7 @@ import type { Db, Document } from "mongodb";
 import { latestObservedRange, observedAssetProjection, observedCandleProjection, observedHistoryResponse, parseObservedHistoryQuery, validatedObservedAsset, type ObservedHistoryRange, type ObservedHistoryResponse, type ObservedLatestWindowResponse } from "./observed-history-contract.js";
 import { observedCollectionStatusResponse, observedDeliveryStatusProjection, selectedDeliveryId, type ObservedCollectionStatusResponse } from "./observed-collection-status-contract.js";
 import { DependencyTimeoutError, withinTimeout } from "./platform/health/dependency-probes.js";
-import { symbolProfile } from "./symbol-registry.js";
+import { DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "./symbol-registry.js";
 
 export interface ObservedHistoryReader {
   read(symbol: string, range: ObservedHistoryRange): Promise<ObservedHistoryResponse | null>;
@@ -12,11 +12,15 @@ export interface ObservedHistoryReader {
 }
 
 export class ObservedHistoryService implements ObservedHistoryReader {
-  constructor(private readonly db: Db, private readonly timeoutMs = 1000) {}
+  constructor(
+    private readonly db: Db,
+    private readonly timeoutMs = 1000,
+    private readonly registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY,
+  ) {}
   /** Discovers the latest 30-calendar-day stored trading window for a registered observed symbol. */
   async latestWindow(symbol = "FPT"): Promise<ObservedLatestWindowResponse | null> {
     const normalized = symbol.toUpperCase();
-    const profile = symbolProfile(normalized);
+    const profile = this.registry.profile(normalized);
     if (!profile) return null;
     const { assetId, adjustmentBasis } = profile;
     const deadline = performance.now() + Math.max(1, Math.trunc(this.timeoutMs));
@@ -32,7 +36,7 @@ export class ObservedHistoryService implements ObservedHistoryReader {
         .findOne({ _id: assetId }, { projection: observedAssetProjection, maxTimeMS: assetTimeout, timeoutMS: assetTimeout });
       remainingMs();
       if (!asset) return null;
-      const data = validatedObservedAsset(normalized, asset);
+      const data = validatedObservedAsset(normalized, asset, this.registry);
       const candleTimeout = remainingMs();
       const cursor = this.db.collection("observed_candles_latest").find({
         "record.assetId": assetId, "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": adjustmentBasis,
@@ -44,7 +48,7 @@ export class ObservedHistoryService implements ObservedHistoryReader {
       remainingMs();
       const date: unknown = rows[0]?.record?.tradingDate;
       const range = rows.length ? latestObservedRange(typeof date === "string" ? date : "") : null;
-      if (range) observedHistoryResponse(normalized, range, asset, rows);
+      if (range) observedHistoryResponse(normalized, range, asset, rows, this.registry);
       return { data, meta: { status: range ? "available" : "no_data", provider: "KBS", interval: "1d", latestTradingDate: range?.to ?? null,
         range, calendarDays: 30, sourceAsOf: null, freshness: "unknown", completeness: "unknown", selectionSemantics: "max_stored_trading_date" } };
     }, this.timeoutMs);
@@ -63,7 +67,7 @@ export class ObservedHistoryService implements ObservedHistoryReader {
   }
   /** Selects and validates stored observed asset and latest candle projections for a registered symbol and date range. */
   private async select(symbol: string, range: ObservedHistoryRange, withDelivery: boolean) {
-    const profile = symbolProfile(symbol);
+    const profile = this.registry.profile(symbol);
     if (!profile) return null;
     const assetId = profile.assetId;
     const asset = await this.db.collection<Document & { _id: string }>("observed_assets").findOne({ _id: assetId }, { projection: observedAssetProjection, maxTimeMS: this.timeoutMs });
@@ -72,19 +76,23 @@ export class ObservedHistoryService implements ObservedHistoryReader {
       "record.assetId": assetId, "record.tradingDate": { $gte: range.from, $lte: range.to },
       "record.source.provider": "KBS", "record.interval": "1d", "record.adjustmentBasis": profile.adjustmentBasis,
     }, { projection: withDelivery ? { ...observedCandleProjection, deliveryId: 1 } : observedCandleProjection, maxTimeMS: this.timeoutMs }).sort({ "record.tradingDate": 1 }).limit(33).toArray();
-    return { history: observedHistoryResponse(symbol, range, asset, candles), candles };
+    return { history: observedHistoryResponse(symbol, range, asset, candles, this.registry), candles };
   }
 }
 
 /** Creates the Express router for observed latest-window, history, and collection-status read endpoints. */
-export function createObservedHistoryRouter(reader: ObservedHistoryReader, isReady: () => boolean = () => true) {
+export function createObservedHistoryRouter(
+  reader: ObservedHistoryReader,
+  isReady: () => boolean = () => true,
+  registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY,
+) {
   const router = Router();
   router.get("/:symbol/latest-window", async (request, response) => {
     response.set("Cache-Control", "no-store");
     if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/.test(request.params.symbol)) { response.status(400).json({ error: "invalid_symbol" }); return; }
     if (new URL(request.originalUrl, "http://localhost").searchParams.size) { response.status(400).json({ error: "invalid_query" }); return; }
     const normalized = request.params.symbol.toUpperCase();
-    if (!symbolProfile(normalized)) { response.status(404).json({ error: "asset_not_found" }); return; }
+    if (!registry.profile(normalized)) { response.status(404).json({ error: "asset_not_found" }); return; }
     try {
       if (!isReady()) throw new Error("not_ready");
       const result = await reader.latestWindow?.(normalized);
@@ -99,7 +107,7 @@ export function createObservedHistoryRouter(reader: ObservedHistoryReader, isRea
     const range = parseObservedHistoryQuery(request.originalUrl);
     if (!range) { response.status(400).json({ error: "invalid_query" }); return; }
     const normalized = symbol.toUpperCase();
-    if (!symbolProfile(normalized)) { response.status(404).json({ error: "asset_not_found" }); return; }
+    if (!registry.profile(normalized)) { response.status(404).json({ error: "asset_not_found" }); return; }
     try {
       if (!isReady()) throw new Error("not_ready");
       const history = endpoint === "history" ? await reader.read(normalized, range) : await reader.collectionStatus?.(normalized, range);

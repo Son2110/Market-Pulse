@@ -13,6 +13,8 @@ import { createApp } from "../src/health.js";
 import { digest, validatePayload, type Json, type ObservedPayload } from "../src/ingestion-contract.js";
 import { IngestionStore } from "../src/ingestion-store.js";
 import { createObservedHistoryRouter, ObservedHistoryService } from "../src/observed-history.js";
+import { createObservedSearchRouter, ObservedSearchService } from "../src/observed-search.js";
+import { createSymbolRegistry } from "../src/symbol-registry.js";
 import { observed, rehash } from "./observed-test-data.js";
 
 const mongoUrl = process.env.MONGODB_URL ?? "mongodb://127.0.0.1:27017/marketpulse";
@@ -199,4 +201,97 @@ test("latest-window CSOT expires an exhausted pool checkout without running queu
   assert.deepEqual(commands, []);
   assert.equal((await new ObservedHistoryService(db).latestWindow())?.meta.latestTradingDate, "2026-10-02");
   assert.deepEqual(commands, ["observed_assets", "observed_candles_latest"]);
+});
+
+test("real Mongo multi-symbol registry proof persists and serves VCB alongside FPT while failing closed on unregistered symbols", async t => {
+  const c = await setup(); t.after(c.close);
+  const multiRegistry = createSymbolRegistry({
+    version: 1,
+    symbols: [
+      { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VCB", assetType: "equity", exchange: "HOSE" },
+      { symbol: "SHS", assetType: "equity", exchange: "HNX" },
+      { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    ],
+  });
+  const store = new IngestionStore(c.db, multiRegistry);
+  const historyReader = new ObservedHistoryService(c.db, 1000, multiRegistry);
+  const searchReader = new ObservedSearchService(c.db, 1000, multiRegistry);
+  const server = createServer(createApp({
+    checks: { mongo: async () => true, redis: async () => true },
+    observedHistoryRouter: createObservedHistoryRouter(historyReader, () => true, multiRegistry),
+    observedSearchRouter: createObservedSearchRouter(searchReader),
+  }));
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
+  const address = server.address(); assert(address && typeof address === "object");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const fptPayload = observed();
+  const fptDelivery = await store.accept("multi-fpt", digest(fptPayload as unknown as Json), validatePayload(fptPayload as unknown as Json, multiRegistry));
+  await store.persist(fptDelivery);
+  await store.terminal("multi-fpt", "success", { assets: 1, observations: 1 });
+
+  const vcbPayload = observed();
+  vcbPayload.request.symbol = "VCB";
+  vcbPayload.assets[0] = { assetId: "VN:HOSE:VCB", symbol: "VCB", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+  vcbPayload.candles[0]!.assetId = "VN:HOSE:VCB";
+  vcbPayload.candles[0]!.tradingDate = "2026-10-03";
+  vcbPayload.candles[0]!.providerTimeLabel = "2026-10-03 07:00";
+  vcbPayload.candles[0]!.open = "91000";
+  vcbPayload.candles[0]!.high = "92500";
+  vcbPayload.candles[0]!.low = "90500";
+  vcbPayload.candles[0]!.close = "91200.5";
+  vcbPayload.candles[0]!.barId = digest(["KBS", "VN:HOSE:VCB", "1d", "2026-10-03", "unknown"]);
+  rehash(vcbPayload);
+  const vcbDelivery = await store.accept("multi-vcb", digest(vcbPayload as unknown as Json), validatePayload(vcbPayload as unknown as Json, multiRegistry));
+  await store.persist(vcbDelivery);
+  await store.terminal("multi-vcb", "success", { assets: 1, observations: 1 });
+
+  const shsEmptyPayload = observed();
+  shsEmptyPayload.request.symbol = "SHS";
+  shsEmptyPayload.assets[0] = { assetId: "VN:HNX:SHS", symbol: "SHS", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+  shsEmptyPayload.candles = [];
+  const shsDelivery = await store.accept("multi-shs-empty", digest(shsEmptyPayload as unknown as Json), validatePayload(shsEmptyPayload as unknown as Json, multiRegistry));
+  await store.persist(shsDelivery);
+
+  const searchRes = await fetch(`${base}/api/observed/assets/search?q=Vietcombank`);
+  assert.equal(searchRes.status, 200);
+  const searchJson = await searchRes.json();
+  assert.deepEqual(searchJson.meta.coverage, ["FPT", "VCB"]);
+  assert.equal(searchJson.meta.label, "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT, VCB");
+  assert.equal(searchJson.data.length, 1);
+  assert.equal(searchJson.data[0].asset.symbol, "VCB");
+
+  const vcbWindowRes = await fetch(`${base}/api/observed/assets/vcb/latest-window`);
+  assert.equal(vcbWindowRes.status, 200);
+  const vcbWindow = await vcbWindowRes.json();
+  assert.equal(vcbWindow.data.asset.assetId, "VN:HOSE:VCB");
+  assert.deepEqual(vcbWindow.meta.range, { from: "2026-09-04", to: "2026-10-03" });
+
+  const vcbHistoryRes = await fetch(`${base}/api/observed/assets/vcb/history?from=2026-10-01&to=2026-10-06`);
+  assert.equal(vcbHistoryRes.status, 200);
+  const vcbHistory = await vcbHistoryRes.json();
+  assert.equal(vcbHistory.data.asset.symbol, "VCB");
+  assert.equal(vcbHistory.data.candles.length, 1);
+  assert.equal(vcbHistory.data.candles[0].close, "91200.5");
+
+  const vcbStatusRes = await fetch(`${base}/api/observed/assets/vcb/collection-status?from=2026-10-01&to=2026-10-06`);
+  assert.equal(vcbStatusRes.status, 200);
+  const vcbStatus = await vcbStatusRes.json();
+  assert.equal(vcbStatus.data.asset.symbol, "VCB");
+  assert.equal(vcbStatus.meta.selectedCandleCount, 1);
+  assert.equal(vcbStatus.meta.candleCountsByDeliveryStatus.success, 1);
+
+  const shsWindowRes = await fetch(`${base}/api/observed/assets/shs/latest-window`);
+  assert.equal(shsWindowRes.status, 200);
+  const shsWindow = await shsWindowRes.json();
+  assert.equal(shsWindow.meta.status, "no_data");
+  assert.equal(shsWindow.meta.range, null);
+
+  for (const endpoint of ["latest-window", "history?from=2026-10-01&to=2026-10-06", "collection-status?from=2026-10-01&to=2026-10-06"]) {
+    const hpgRes = await fetch(`${base}/api/observed/assets/HPG/${endpoint}`);
+    assert.equal(hpgRes.status, 404);
+    assert.deepEqual(await hpgRes.json(), { error: "asset_not_found" });
+  }
 });

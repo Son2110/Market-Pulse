@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateObservedPayload, type Json } from "../src/ingestion-contract.js";
+import { digest, observedContent, validateObservedPayload, type Json } from "../src/ingestion-contract.js";
 import { REGISTERED_SYMBOLS, createSymbolRegistry, symbolProfile, symbolProfileByAssetId } from "../src/symbol-registry.js";
 import { observed } from "./observed-test-data.js";
 
@@ -31,13 +31,35 @@ test("registry factory supports other exchanges and rejects malformed or duplica
   ]) assert.throws(() => createSymbolRegistry(document));
 });
 
-test("observed contract accepts registered symbols unchanged and rejects schema-valid unregistered symbols", () => {
-  assert.doesNotThrow(() => validateObservedPayload(observed() as unknown as Json));
-  assert.doesNotThrow(() => validateObservedPayload(observed(true) as unknown as Json));
+test("observed contract accepts registered symbols unchanged, preserves exact FPT and VNINDEX digests, and allows custom registries", () => {
+  const fpt = observed();
+  const vnindex = observed(true);
+  assert.doesNotThrow(() => validateObservedPayload(fpt as unknown as Json));
+  assert.doesNotThrow(() => validateObservedPayload(vnindex as unknown as Json));
+  for (const payload of [fpt, vnindex]) {
+    for (const row of payload.candles) {
+      assert.equal(row.barId, digest(["KBS", row.assetId, row.interval, row.tradingDate, row.adjustmentBasis]));
+      assert.equal(row.contentDigest, digest(observedContent(row)));
+    }
+    assert.match(digest(payload as unknown as Json), /^[a-f0-9]{64}$/);
+  }
   const payload = observed();
   payload.request.symbol = "VCB";
   payload.assets[0]!.symbol = "VCB";
   payload.assets[0]!.assetId = "VN:HOSE:VCB";
-  for (const row of payload.candles) row.assetId = "VN:HOSE:VCB";
+  for (const row of payload.candles) {
+    row.assetId = "VN:HOSE:VCB";
+    row.barId = digest(["KBS", row.assetId, row.interval, row.tradingDate, row.adjustmentBasis]);
+    row.contentDigest = digest(observedContent(row));
+  }
   assert.throws(() => validateObservedPayload(payload as unknown as Json));
+  const customRegistry = createSymbolRegistry({
+    version: 1,
+    symbols: [
+      { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VCB", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    ],
+  });
+  assert.doesNotThrow(() => validateObservedPayload(payload as unknown as Json, customRegistry));
 });

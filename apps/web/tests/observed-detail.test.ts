@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { compareDecimal, detailHref, detailMode, fetchObservedHistory, fetchObservedLatestWindow, isObservedHistory, isObservedLatestWindow, observedChart, ObservedError, observedErrorMessage, sampleRange, validatedSearch, validObservedRange, type ObservedCandle, type ObservedHistory, type ObservedLatestWindow } from "../src/observed-detail.js";
+import { createSymbolRegistry, DEFAULT_SYMBOL_REGISTRY, REGISTERED_EQUITY_SYMBOLS, REGISTERED_SYMBOLS } from "../src/symbol-registry.js";
+import { readFileSync } from "node:fs";
 
 function response(): ObservedHistory {
   const candle: ObservedCandle = {
@@ -157,4 +159,44 @@ test("fetch distinguishes errors, 404 wording does not guess flag status, cancel
   const waiting: typeof fetch = async (_url, options) => new Promise((_resolve, reject) => { const signal = options?.signal; if (signal?.aborted) reject(signal.reason); else signal?.addEventListener("abort", () => reject(signal.reason), { once: true }); });
   await assert.rejects(fetchObservedHistory("FPT", sampleRange, new AbortController().signal, waiting, 5), error => error instanceof ObservedError && error.kind === "timeout");
   const controller = new AbortController(); const pending = fetchObservedHistory("FPT", sampleRange, controller.signal, waiting); controller.abort(); await assert.rejects(pending, error => error instanceof DOMException && error.name === "AbortError");
+});
+test("web symbol registry matches schema file and generalizes detail mode, latest-window and history to multi-symbol equities", async () => {
+  const schemaDoc = JSON.parse(readFileSync(new URL("../../../packages/schemas/symbol-registry-v1.json", import.meta.url), "utf8")) as { version: number; symbols: Array<{ symbol: string; assetType: string; exchange: string }> };
+  assert.deepEqual(REGISTERED_SYMBOLS.map(({ symbol, assetType, exchange }) => ({ symbol, assetType, exchange })), schemaDoc.symbols);
+  assert.deepEqual(REGISTERED_EQUITY_SYMBOLS, ["FPT"]);
+  assert.equal(DEFAULT_SYMBOL_REGISTRY.profile("VNINDEX")?.assetType, "index");
+
+  const multiRegistry = createSymbolRegistry({
+    version: 1,
+    symbols: [
+      { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VCB", assetType: "equity", exchange: "HOSE" },
+      { symbol: "SHS", assetType: "equity", exchange: "HNX" },
+      { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    ],
+  });
+  assert.deepEqual(detailMode("?source=observed&window=latest", "VCB", multiRegistry), { kind: "latest" });
+  assert.deepEqual(detailMode("?source=observed&from=2026-09-28&to=2026-10-07", "SHS", multiRegistry), { kind: "observed", range: sampleRange });
+  assert.equal(detailMode("?source=observed&window=latest", "VNINDEX", multiRegistry).kind, "invalid");
+
+  const shsWindow = latestWindow();
+  shsWindow.data.asset = { assetId: "VN:HNX:SHS", symbol: "SHS", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+  assert.equal(isObservedLatestWindow(shsWindow, "SHS", multiRegistry), true);
+  assert.equal(isObservedLatestWindow(shsWindow, "FPT", multiRegistry), false);
+
+  const shsHistory = response();
+  shsHistory.data.asset = { assetId: "VN:HNX:SHS", symbol: "SHS", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+  shsHistory.data.candles[0] = { ...shsHistory.data.candles[0], assetId: "VN:HNX:SHS" };
+  assert.equal(isObservedHistory(shsHistory, sampleRange, "SHS", multiRegistry), true);
+  assert.equal(isObservedHistory(shsHistory, sampleRange, "FPT", multiRegistry), false);
+
+  const signal = new AbortController().signal;
+  assert.deepEqual(await fetchObservedLatestWindow(signal, async (url) => {
+    assert.equal(url, "/api/observed/assets/SHS/latest-window");
+    return Response.json(shsWindow);
+  }, 10_000, "SHS", multiRegistry), shsWindow);
+  assert.deepEqual(await fetchObservedHistory("SHS", sampleRange, signal, async (url) => {
+    assert.equal(url, "/api/observed/assets/SHS/history?from=2026-09-28&to=2026-10-07");
+    return Response.json(shsHistory);
+  }, 10_000, multiRegistry), shsHistory);
 });

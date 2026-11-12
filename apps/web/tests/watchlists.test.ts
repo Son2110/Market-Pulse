@@ -7,6 +7,7 @@ import { WatchlistSession, watchlistHref, watchlistMode, type WatchlistServices 
 import { ObservedError, type ObservedHistory, type ObservedLatestWindow, type ObservedRange } from "../src/observed-detail.js";
 import type { HistoryResponse } from "../src/stock-detail.js";
 import type { SearchResponse, SearchSource } from "../src/stock-search.js";
+import { createSymbolRegistry, DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "../src/symbol-registry.js";
 import { isWatchlistsRoute } from "../src/Watchlists.js";
 
 const originalFetch = globalThis.fetch;
@@ -57,12 +58,12 @@ function observedHistoryResponse(close = "101000.123456789123456789", range: Obs
     },
   };
 }
-function setup(services: Partial<WatchlistServices> = {}, clock: () => number = () => now, source: SearchSource = "fixture") {
+function setup(services: Partial<WatchlistServices> = {}, clock: () => number = () => now, source: SearchSource = "fixture", registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY) {
   const data = new Map<string, string>();
   const storage: SessionStorage = { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => { data.set(key, value); }, removeItem: (key) => { data.delete(key); } };
   const account = new AccountSession(() => storage, clock);
   account.state = { phase: "authenticated", session: { token, expiresAt: "2026-10-04T08:00:00.000Z" }, user, notice: "", warning: "" };
-  const manager = new WatchlistSession(account, { read: async () => list, write: async () => list, search: async () => searchResult, history: async () => history(), observedLatestWindow: async () => observedWindow(), observedHistory: async () => observedHistoryResponse(), ...services }, source);
+  const manager = new WatchlistSession(account, { read: async () => list, write: async () => list, search: async () => searchResult, history: async () => history(), observedLatestWindow: async () => observedWindow(), observedHistory: async () => observedHistoryResponse(), ...services }, source, registry);
   const unsubscribe = account.subscribe((state) => manager.acceptAccount(state));
   return { account, manager, storage, data, stop: () => { unsubscribe(); manager.stop(); account.stop(); } };
 }
@@ -281,4 +282,39 @@ test("observed FPT row handles latest-window error, retry, no_data window, empty
     assert.equal(lateHistoryCalls, 0);
     assert.deepEqual(envLate.manager.state.rows, {});
   } finally { envLate.stop(); }
+});
+test("observed watchlist loads multiple registered equities and marks unregistered symbols unsupported", async () => {
+  const multiRegistry = createSymbolRegistry({
+    version: 1,
+    symbols: [
+      { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VCB", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    ],
+  });
+  const multiList: Watchlist = { ...list, symbols: ["FPT", "HPG", "VCB"] };
+  const windowSymbols: string[] = [];
+  const historySymbols: string[] = [];
+  const env = setup({
+    read: async () => multiList,
+    observedLatestWindow: async (_signal, _request, _timeoutMs, symbol = "FPT") => {
+      windowSymbols.push(symbol);
+      const win = observedWindow(symbol === "VCB" ? null : observedRange);
+      win.data.asset = { assetId: `VN:HOSE:${symbol}`, symbol, assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+      return win;
+    },
+    observedHistory: async (symbol, range) => {
+      historySymbols.push(symbol);
+      return observedHistoryResponse("101000.123456789123456789", range);
+    },
+  }, () => now, "observed", multiRegistry);
+  try {
+    await settle();
+    assert.deepEqual(windowSymbols.sort(), ["FPT", "VCB"]);
+    assert.deepEqual(historySymbols, ["FPT"]);
+    assert.equal(env.manager.state.rows.FPT.phase, "ready");
+    assert.equal(env.manager.state.rows.VCB.phase, "ready");
+    assert.match(env.manager.state.rows.VCB.message, /Chưa có quan sát VCB đã lưu/u);
+    assert.equal(env.manager.state.rows.HPG.phase, "unsupported");
+  } finally { env.stop(); }
 });

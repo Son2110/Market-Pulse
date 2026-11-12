@@ -2,6 +2,7 @@ import type { AccountSession, AccountState } from "./auth-session.js";
 import { fetchObservedHistory, fetchObservedLatestWindow, observedErrorMessage, type ObservedHistory, type ObservedLatestWindow } from "./observed-detail.js";
 import { fetchHistory, detailErrorMessage, type HistoryResponse } from "./stock-detail.js";
 import { fetchSearch, errorMessage, queryError, type SearchResponse, type SearchSource } from "./stock-search.js";
+import { DEFAULT_SYMBOL_REGISTRY, equityProfile, type SymbolRegistry } from "./symbol-registry.js";
 import { fetchWatchlist, mutateWatchlist, WatchlistError, watchlistErrorMessage, type Watchlist, type WatchlistMutation } from "./watchlist-api.js";
 
 export type WatchlistMode = { kind: SearchSource } | { kind: "invalid"; message: string };
@@ -37,7 +38,12 @@ export class WatchlistSession {
   private searchController: AbortController | null = null;
   private rowControllers = new Map<string, AbortController>();
   private readonly services: Required<WatchlistServices>;
-  constructor(private readonly account: AccountSession, services: WatchlistServices = { read: fetchWatchlist, write: mutateWatchlist, search: fetchSearch, history: fetchHistory }, private readonly source: SearchSource = "fixture") {
+  constructor(
+    private readonly account: AccountSession,
+    services: WatchlistServices = { read: fetchWatchlist, write: mutateWatchlist, search: fetchSearch, history: fetchHistory },
+    private readonly source: SearchSource = "fixture",
+    private readonly registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY,
+  ) {
     this.services = { observedLatestWindow: fetchObservedLatestWindow, observedHistory: fetchObservedHistory, ...services };
   }
   subscribe(listener: (state: WatchlistState) => void): () => void { this.listeners.add(listener); listener(this.state); return () => { this.listeners.delete(listener); }; }
@@ -115,11 +121,12 @@ export class WatchlistSession {
       if (this.current(generation) && this.searchController === controller && this.state.list) this.update({ search: { phase: "error", query, response: null, message: errorMessage(error) } });
     } finally { this.controllers.delete(controller); }
   }
+  /** Loads the latest closing observation for a single watchlist row in fixture or observed mode. */
   async loadRow(symbol: string): Promise<void> {
     const generation = this.generation, listId = this.state.list?.id;
     if (!this.current(generation) || !this.state.list?.symbols.includes(symbol) || this.state.phase !== "ready") return;
     this.rowControllers.get(symbol)?.abort();
-    if (this.source === "observed" && symbol !== "FPT") {
+    if (this.source === "observed" && !equityProfile(symbol, this.registry)) {
       this.rowControllers.delete(symbol);
       this.update({ rows: { ...this.state.rows, [symbol]: { phase: "unsupported", response: null, observedResponse: null, message: "Mã ngoài phạm vi dữ liệu đã lưu (hiện chỉ hỗ trợ FPT). Không chuyển sang dữ liệu minh họa." } } });
       return;
@@ -129,14 +136,14 @@ export class WatchlistSession {
     const currentRow = () => this.current(generation) && this.rowControllers.get(symbol) === controller && this.state.phase === "ready" && this.state.list?.id === listId && !!this.state.list?.symbols.includes(symbol);
     try {
       if (this.source === "observed") {
-        const latestWindow: ObservedLatestWindow = await this.services.observedLatestWindow(controller.signal);
+        const latestWindow: ObservedLatestWindow = await this.services.observedLatestWindow(controller.signal, fetch, 10_000, symbol, this.registry);
         if (!currentRow()) return;
         if (!latestWindow.meta.range) {
-          this.update({ rows: { ...this.state.rows, [symbol]: { phase: "ready", response: null, observedResponse: null, message: "Chưa có quan sát FPT đã lưu. Không có giá đóng cửa để hiển thị." } } });
+          this.update({ rows: { ...this.state.rows, [symbol]: { phase: "ready", response: null, observedResponse: null, message: `Chưa có quan sát ${symbol} đã lưu. Không có giá đóng cửa để hiển thị.` } } });
           return;
         }
-        const observedResponse = await this.services.observedHistory(symbol, latestWindow.meta.range, controller.signal);
-        if (currentRow()) this.update({ rows: { ...this.state.rows, [symbol]: { phase: "ready", response: null, observedResponse, message: observedResponse.data.candles.length ? "" : "Chưa có quan sát FPT đã lưu. Không có giá đóng cửa để hiển thị." } } });
+        const observedResponse = await this.services.observedHistory(symbol, latestWindow.meta.range, controller.signal, fetch, 10_000, this.registry);
+        if (currentRow()) this.update({ rows: { ...this.state.rows, [symbol]: { phase: "ready", response: null, observedResponse, message: observedResponse.data.candles.length ? "" : `Chưa có quan sát ${symbol} đã lưu. Không có giá đóng cửa để hiển thị.` } } });
         return;
       }
       const response = await this.services.history(symbol, controller.signal);
