@@ -87,7 +87,7 @@ When an ingestion secret is configured, API readiness also requires successful i
 
 ## Observed v2 storage and ordering
 
-Gold is selected first by its exclusive observation envelope; otherwise the exact version selects fixture v1 or observed v2. None of these schemas is relaxed to accept another family. Observed requests contain one FPT or VNINDEX asset and at most 32 daily candles across a range of 0–31 days. Both validators check OHLC bounds, canonical decimal strings (no exponent, leading zero or trailing fractional zero), asset/unit/provenance consistency, ordered unique dates and identity/content hashes. `collectedAt` accepts at most six fractional digits, rejects invalid dates/offsets and UTC normalization outside years 0001–9999, and preserves its original representation.
+Gold is selected first by its exclusive observation envelope; otherwise the exact version selects fixture v1 or observed v2. None of these schemas is relaxed to accept another family. Observed requests contain one registered equity or index asset from [`packages/schemas/symbol-registry-v1.json`](../packages/schemas/symbol-registry-v1.json) (defaulting to `FPT` and `VNINDEX`) and at most 32 daily candles across a range of 0–31 days. Both validators check OHLC bounds, canonical decimal strings (no exponent, leading zero or trailing fractional zero), asset/unit/provenance consistency against the symbol registry profile, ordered unique dates and identity/content hashes. `collectedAt` accepts at most six fractional digits, rejects invalid dates/offsets and UTC normalization outside years 0001–9999, and preserves its original representation.
 
 | Collection | Unique identity | Stored content |
 |---|---|---|

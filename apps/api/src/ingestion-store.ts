@@ -3,6 +3,7 @@ import { classifyPayload, type ClassifiedPayload, type FixturePayload, type Payl
 import { ContractError, canonicalJson, digest, type Json } from "./platform/contracts/json.js";
 import { ObservedStore, observedCollectionSchemas } from "./observed-store.js";
 import { GoldStore, goldCollectionSchemas } from "./gold-store.js";
+import { DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "./symbol-registry.js";
 
 export const ACTIVE_STATUSES: DeliveryStatus[] = ["accepted", "queued", "running"];
 export const MAX_ATTEMPTS = 3;
@@ -18,8 +19,12 @@ export class IdentityConflict extends Error { constructor() { super("canonical_i
 export class DeliveryConflict extends Error { constructor() { super("delivery_identity_conflict"); } }
 function duplicate(error: unknown): boolean { return error instanceof MongoServerError && error.code === 11000; }
 
-export function classifyDelivery(delivery: Pick<Delivery, "payload" | "payloadDigest" | "provider" | "schemaVersion" | "dataset" | "family">): ClassifiedPayload {
-  const classified = classifyPayload(delivery.payload);
+/** Validates a stored delivery record against its payload digest, provider, schema version, and dataset metadata. */
+export function classifyDelivery(
+  delivery: Pick<Delivery, "payload" | "payloadDigest" | "provider" | "schemaVersion" | "dataset" | "family">,
+  registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY,
+): ClassifiedPayload {
+  const classified = classifyPayload(delivery.payload, registry);
   if (!delivery.dataset || typeof delivery.dataset !== "object" || Array.isArray(delivery.dataset)) throw new ContractError();
   if (
     digest(classified.payload as unknown as Json) !== delivery.payloadDigest ||
@@ -37,7 +42,7 @@ export class IngestionStore {
   readonly observations: Collection<Canonical>;
   readonly observed: ObservedStore;
   readonly gold: GoldStore;
-  constructor(readonly db: Db) {
+  constructor(readonly db: Db, private readonly registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY) {
     this.deliveries = db.collection<Delivery>("ingestion_deliveries");
     this.assets = db.collection<Canonical>("canonical_assets");
     this.observations = db.collection<Canonical>("canonical_observations");
@@ -66,8 +71,9 @@ export class IngestionStore {
     await this.observed.initialize();
     await this.gold.initialize();
   }
+  /** Accepts and durably records an ingestion delivery or returns an existing idempotent delivery. */
   async accept(id: string, payloadDigest: string, payload: Payload): Promise<Delivery> {
-    const classified = classifyPayload(payload);
+    const classified = classifyPayload(payload, this.registry);
     if (digest(classified.payload as unknown as Json) !== payloadDigest) throw new ContractError();
     const now = new Date();
     const delivery: Delivery = { _id: id, payloadDigest, family: classified.family, payload: classified.payload, provider: classified.provider, schemaVersion: classified.schemaVersion,
@@ -79,15 +85,16 @@ export class IngestionStore {
       if (!existing || existing.payloadDigest !== payloadDigest) throw new DeliveryConflict();
       // Preserve legacy unknown/null family failure receipts while validating their stored payload and identity.
       const family: unknown = existing.family;
-      classifyDelivery(existing.status === "failure" && existing.errorCode === "invalid_contract" && (family === "unknown" || family === null) ? { ...existing, family: undefined } : existing);
+      classifyDelivery(existing.status === "failure" && existing.errorCode === "invalid_contract" && (family === "unknown" || family === null) ? { ...existing, family: undefined } : existing, this.registry);
       return existing;
     }
   }
   async terminal(id: string, status: "success" | "failure", counts: Counts, errorCode?: string, attempt?: number): Promise<void> {
     await this.deliveries.updateOne({ _id: id, status: { $in: ACTIVE_STATUSES }, ...(attempt === undefined ? {} : { attempts: attempt }) }, { $set: { status, counts, finishedAt: new Date(), updatedAt: new Date(), ...(errorCode ? { errorCode } : {}) }, ...(errorCode ? {} : { $unset: { errorCode: "" } }) });
   }
+  /** Persists canonical assets and observations for an accepted delivery across its storage family. */
   async persist(delivery: Delivery, afterWrite?: (count: number) => Promise<void>, afterRevision?: () => Promise<void>, afterSnapshot?: () => Promise<void>): Promise<Counts> {
-    const classified = classifyDelivery(delivery);
+    const classified = classifyDelivery(delivery, this.registry);
     const counts = { assets: 0, observations: 0 };
     const progress = async (kind: "assets" | "observations") => {
       counts[kind]++;

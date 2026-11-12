@@ -3,7 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
 import { collectedOrder, observedContent, type Dataset, type ObservedAsset, type ObservedCandle } from "./ingestion-contract.js";
 import { canonicalJson, digest, type Json } from "./platform/contracts/json.js";
-import { symbolProfile } from "./symbol-registry.js";
+import { DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "./symbol-registry.js";
 
 export interface ObservedHistoryRange { from: string; to: string }
 export interface ObservedLatestWindowResponse {
@@ -72,11 +72,11 @@ function pick(value: unknown, fields: string[]): Record<string, Json> {
 }
 
 /** Validates a stored observed asset document against the registered symbol profile and row digest. */
-export function validatedObservedAsset(symbol: string, assetDocument: unknown): { asset: ObservedAsset; dataset: Dataset } {
+export function validatedObservedAsset(symbol: string, assetDocument: unknown, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): { asset: ObservedAsset; dataset: Dataset } {
   const storedAsset = object(assetDocument);
   const asset = pick(storedAsset.record, assetFields) as ObservedAsset;
   const dataset = pick(storedAsset.dataset, datasetFields) as Dataset;
-  const profile = symbolProfile(symbol); if (!profile) return invalid();
+  const profile = registry.profile(symbol); if (!profile) return invalid();
   const expected = { assetId: profile.assetId, symbol, assetType: profile.assetType, currency: profile.currency, unit: profile.unit, timezone: "Asia/Ho_Chi_Minh" };
   if (storedAsset.schemaVersion !== "2.0.0" || !assetShape(asset) || !datasetShape(dataset)
     || canonicalJson(asset) !== canonicalJson(expected) || storedAsset.rowDigest !== digest(asset)) invalid();
@@ -85,9 +85,15 @@ export function validatedObservedAsset(symbol: string, assetDocument: unknown): 
 
 // Only the explicit public contract is projected; internal delivery/storage fields never escape.
 /** Validates stored observed asset and candle documents and constructs the public history response envelope. */
-export function observedHistoryResponse(symbol: string, range: ObservedHistoryRange, assetDocument: unknown, documents: unknown[]): ObservedHistoryResponse {
-  const { asset, dataset } = validatedObservedAsset(symbol, assetDocument);
-  const adjustmentBasis = symbolProfile(symbol)!.adjustmentBasis;
+export function observedHistoryResponse(
+  symbol: string,
+  range: ObservedHistoryRange,
+  assetDocument: unknown,
+  documents: unknown[],
+  registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY,
+): ObservedHistoryResponse {
+  const { asset, dataset } = validatedObservedAsset(symbol, assetDocument, registry);
+  const adjustmentBasis = registry.profile(symbol)!.adjustmentBasis;
   if (documents.length > 32) invalid();
   let previous = "";
   const candles = documents.map(document => {

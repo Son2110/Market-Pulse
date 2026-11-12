@@ -44,6 +44,8 @@ export function createSymbolRegistry(document: SymbolRegistryDocument): SymbolRe
 
 const registry = createSymbolRegistry(JSON.parse(readFileSync(new URL("../../../packages/schemas/symbol-registry-v1.json", import.meta.url), "utf8")) as SymbolRegistryDocument);
 
+/** Default API symbol registry loaded from packages/schemas/symbol-registry-v1.json. */
+export const DEFAULT_SYMBOL_REGISTRY: SymbolRegistry = registry;
 /** Registered symbols in registry order. */
 export const REGISTERED_SYMBOLS: readonly SymbolProfile[] = registry.symbols;
 /** Look up an already-normalized upper-case symbol; unregistered symbols return null. */

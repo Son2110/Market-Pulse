@@ -1,4 +1,5 @@
 import { queryError, searchHref, type SearchSource } from "./stock-search.js";
+import { DEFAULT_SYMBOL_REGISTRY, equityProfile, observedEquityAsset, type SymbolRegistry } from "./symbol-registry.js";
 
 export const sampleRange = { from: "2026-09-28", to: "2026-10-07" };
 export interface ObservedRange { from: string; to: string }
@@ -25,7 +26,8 @@ export function searchReturnHref(search: string): string {
   const source = validatedSearchSource(search);
   return query ? searchHref(query, source) : source === "observed" ? "/?source=observed" : "/";
 }
-export function detailMode(search: string, symbol: string | null): DetailMode {
+/** Resolves the stock detail page mode from URL query parameters and the requested symbol. */
+export function detailMode(search: string, symbol: string | null, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): DetailMode {
   const parameters = new URLSearchParams(search);
   const invalid: DetailMode = { kind: "invalid", message: "Nguồn hoặc khoảng ngày không hợp lệ. Chọn một nguồn và hai ngày hợp lệ, chênh lệch tối đa 31 ngày (32 ngày lịch)." };
   if (parameters.getAll("searchSource").length > 1 || (parameters.has("searchSource") && !["fixture", "observed"].includes(parameters.get("searchSource")!))) return invalid;
@@ -33,7 +35,7 @@ export function detailMode(search: string, symbol: string | null): DetailMode {
   const source = parameters.get("source");
   if (source === null || source === "fixture") return parameters.has("from") || parameters.has("to") || parameters.has("window") ? invalid : { kind: "fixture" };
   if (source !== "observed") return invalid;
-  if (symbol !== "FPT") return { kind: "invalid", message: "Trang dữ liệu đã lưu hiện chỉ hỗ trợ cổ phiếu FPT." };
+  if (!symbol || !equityProfile(symbol, registry)) return { kind: "invalid", message: "Trang dữ liệu đã lưu hiện chỉ hỗ trợ cổ phiếu FPT." };
   if ([...parameters.keys()].some(key => !["source", "from", "to", "window", "search", "searchSource"].includes(key))) return invalid;
   if (parameters.has("window")) return parameters.get("window") === "latest" && !parameters.has("from") && !parameters.has("to") ? { kind: "latest" } : invalid;
   const range = { from: parameters.get("from") ?? "", to: parameters.get("to") ?? "" };
@@ -48,7 +50,7 @@ export function detailHref(symbol: string, source: "fixture" | "observed", searc
 }
 
 export interface ObservedCandle {
-  assetId: "VN:HOSE:FPT"; tradingDate: string; interval: "1d"; currency: "VND"; unit: "VND"; timezone: "Asia/Ho_Chi_Minh"; adjustmentBasis: "unknown";
+  assetId: string; tradingDate: string; interval: "1d"; currency: "VND"; unit: "VND"; timezone: "Asia/Ho_Chi_Minh"; adjustmentBasis: "unknown";
   open: string; high: string; low: string; close: string; volume: null; volumeUnit: "not_available";
   providerTimeLabel: string; timeProvenance: "provider_naive_calendar_label"; sourceAsOf: null; collectedAt: string;
   source: { provider: "KBS"; connector: "vnstock"; connectorVersion: "4.0.8"; dependencyVersion: "2.6.2"; mode: "observed" };
@@ -56,7 +58,7 @@ export interface ObservedCandle {
 }
 export interface ObservedHistory {
   data: { dataset: { mode: "observed"; label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN"; freshness: "unknown"; sessionCalendar: "unverified" };
-    asset: { assetId: "VN:HOSE:FPT"; symbol: "FPT"; assetType: "equity"; currency: "VND"; unit: "VND"; timezone: "Asia/Ho_Chi_Minh" }; candles: ObservedCandle[] };
+    asset: { assetId: string; symbol: string; assetType: "equity"; currency: "VND"; unit: "VND"; timezone: "Asia/Ho_Chi_Minh" }; candles: ObservedCandle[] };
   meta: { status: "available" | "no_data"; provider: "KBS"; interval: "1d"; requestedRange: ObservedRange; returnedRange: ObservedRange | null;
     sourceAsOf: null; completeness: "unknown"; selectionSemantics: "per_bar_max_collected_at_utc_microseconds_then_content_digest" };
 }
@@ -89,7 +91,6 @@ function collectedTimestamp(value: unknown): value is string {
   const utcYear = new Date(value).getUTCFullYear();
   return utcYear >= 1 && utcYear <= 9999;
 }
-const asset = { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
 const dataset = { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" };
 const source = { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" };
 const candleKeys = ["assetId", "tradingDate", "interval", "currency", "unit", "timezone", "adjustmentBasis", "open", "high", "low", "close", "volume", "volumeUnit", "providerTimeLabel", "timeProvenance", "sourceAsOf", "collectedAt", "source", "barId", "contentDigest"];
@@ -98,7 +99,11 @@ export interface ObservedLatestWindow {
   meta: { status: "available" | "no_data"; provider: "KBS"; interval: "1d"; latestTradingDate: string | null; range: ObservedRange | null;
     calendarDays: 30; sourceAsOf: null; freshness: "unknown"; completeness: "unknown"; selectionSemantics: "max_stored_trading_date" };
 }
-export function isObservedLatestWindow(value: unknown): value is ObservedLatestWindow {
+/** Validates the latest-window response payload for a registered equity symbol. */
+export function isObservedLatestWindow(value: unknown, symbol = "FPT", registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): value is ObservedLatestWindow {
+  const profileItem = equityProfile(symbol, registry);
+  if (!profileItem) return false;
+  const asset = observedEquityAsset(profileItem);
   if (!keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset"]) || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset)
     || !keys(value.meta, ["status", "provider", "interval", "latestTradingDate", "range", "calendarDays", "sourceAsOf", "freshness", "completeness", "selectionSemantics"])) return false;
   const meta = value.meta;
@@ -110,15 +115,17 @@ export function isObservedLatestWindow(value: unknown): value is ObservedLatestW
   return exact(meta.range, { from, to: meta.latestTradingDate });
 }
 
-export async function fetchObservedLatestWindow(signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000): Promise<ObservedLatestWindow> {
+/** Fetches and validates the latest 30-calendar-day window for a registered equity symbol. */
+export async function fetchObservedLatestWindow(signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000, symbol = "FPT", registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): Promise<ObservedLatestWindow> {
+  if (!equityProfile(symbol, registry)) throw new ObservedError("invalid");
   const timeout = new AbortController(); const timer = setTimeout(() => timeout.abort(), timeoutMs);
   try {
-    const response = await request("/api/observed/assets/FPT/latest-window", { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
+    const response = await request(`/api/observed/assets/${encodeURIComponent(symbol)}/latest-window`, { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
     if (response.status === 400) throw new ObservedError("invalid");
     if (response.status === 404) throw new ObservedError("missing");
     if (!response.ok) throw new ObservedError("unavailable");
     let body: unknown; try { body = await response.json(); } catch { throw new ObservedError("response"); }
-    if (!isObservedLatestWindow(body)) throw new ObservedError("response");
+    if (!isObservedLatestWindow(body, symbol, registry)) throw new ObservedError("response");
     return body;
   } catch (error) {
     if (signal.aborted) throw error;
@@ -127,7 +134,11 @@ export async function fetchObservedLatestWindow(signal: AbortSignal, request: ty
     throw new ObservedError("network");
   } finally { clearTimeout(timer); }
 }
-export function isObservedHistory(value: unknown, range: ObservedRange): value is ObservedHistory {
+/** Validates an observed daily candle history response against the requested range and equity symbol profile. */
+export function isObservedHistory(value: unknown, range: ObservedRange, symbol = "FPT", registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): value is ObservedHistory {
+  const profileItem = equityProfile(symbol, registry);
+  if (!profileItem) return false;
+  const asset = observedEquityAsset(profileItem);
   if (!validObservedRange(range) || !keys(value, ["data", "meta"]) || !keys(value.data, ["dataset", "asset", "candles"]) || !exact(value.data.asset, asset) || !exact(value.data.dataset, dataset)
     || !Array.isArray(value.data.candles) || value.data.candles.length > 32 || !keys(value.meta, ["status", "provider", "interval", "requestedRange", "returnedRange", "sourceAsOf", "completeness", "selectionSemantics"])) return false;
   const { candles } = value.data; const meta = value.meta;
@@ -176,16 +187,17 @@ export function observedChart(candles: ObservedCandle[], width = 720) {
 }
 export type ObservedErrorKind = "invalid" | "missing" | "unavailable" | "timeout" | "network" | "response";
 export class ObservedError extends Error { constructor(public readonly kind: ObservedErrorKind) { super(kind); } }
-export async function fetchObservedHistory(symbol: string, range: ObservedRange, signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000): Promise<ObservedHistory> {
-  if (symbol !== "FPT" || !validObservedRange(range)) throw new ObservedError("invalid");
+/** Fetches and validates observed daily candle history for a registered equity symbol over a bounded range. */
+export async function fetchObservedHistory(symbol: string, range: ObservedRange, signal: AbortSignal, request: typeof fetch = fetch, timeoutMs = 10_000, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): Promise<ObservedHistory> {
+  if (!equityProfile(symbol, registry) || !validObservedRange(range)) throw new ObservedError("invalid");
   const timeout = new AbortController(); const timer = setTimeout(() => timeout.abort(), timeoutMs);
   try {
-    const response = await request(`/api/observed/assets/FPT/history?${new URLSearchParams({ ...range })}`, { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
+    const response = await request(`/api/observed/assets/${encodeURIComponent(symbol)}/history?${new URLSearchParams({ ...range })}`, { signal: AbortSignal.any([signal, timeout.signal]), cache: "no-store", headers: { Accept: "application/json" } });
     if (response.status === 400) throw new ObservedError("invalid");
     if (response.status === 404) throw new ObservedError("missing");
     if (!response.ok) throw new ObservedError("unavailable");
     let body: unknown; try { body = await response.json(); } catch { throw new ObservedError("response"); }
-    if (!isObservedHistory(body, range)) throw new ObservedError("response");
+    if (!isObservedHistory(body, range, symbol, registry)) throw new ObservedError("response");
     return body;
   } catch (error) {
     if (signal.aborted) throw error;

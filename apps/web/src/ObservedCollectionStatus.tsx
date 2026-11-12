@@ -6,22 +6,23 @@ const labels: Record<DeliveryStatus, string> = { accepted: "Đã tiếp nhận",
 const date = (value: string) => value.split("-").reverse().join("/");
 const rangeText = (range: ObservedRange) => `${date(range.from)} – ${date(range.to)}`;
 type State = { status: "loading" } | { status: "loaded"; response: Response } | { status: "error"; message: string; retry: boolean };
-export default function ObservedCollectionStatus({ range }: { range: ObservedRange }) {
+/** Renders the independent observed collection-status card for a selected equity symbol and date range. */
+export default function ObservedCollectionStatus({ symbol = "FPT", range }: { symbol?: string; range: ObservedRange }) {
   const [state, setState] = useState<State>({ status: "loading" }); const [attempt, setAttempt] = useState(0); const requestId = useRef(0);
   const { from, to } = range;
   useEffect(() => {
     const id = ++requestId.current; const controller = new AbortController(); setState({ status: "loading" });
-    void fetchObservedCollectionStatus("FPT", { from, to }, controller.signal).then(response => {
+    void fetchObservedCollectionStatus(symbol, { from, to }, controller.signal).then(response => {
       if (id === requestId.current && !controller.signal.aborted) setState({ status: "loaded", response });
     }).catch((error: unknown) => {
       if (id !== requestId.current || controller.signal.aborted) return;
       setState({ status: "error", message: collectionStatusErrorMessage(error), retry: !(error instanceof CollectionStatusError && error.kind === "invalid") });
     });
     return () => { requestId.current += 1; controller.abort(); };
-  }, [from, to, attempt]);
+  }, [symbol, from, to, attempt]);
   const meta = state.status === "loaded" ? state.response.meta : null;
   return <section className="detail-card collection-status-card" aria-labelledby="collection-status-heading" aria-busy={state.status === "loading"}>
-    <div className="detail-section-heading"><div><h2 id="collection-status-heading">Trạng thái thu thập trong khoảng đã chọn</h2><p className="small muted">FPT · KBS · Dữ liệu ngày · VND · Múi giờ tài sản: Việt Nam (UTC+7), Asia/Ho_Chi_Minh</p></div></div>
+    <div className="detail-section-heading"><div><h2 id="collection-status-heading">Trạng thái thu thập trong khoảng đã chọn</h2><p className="small muted">{symbol} · KBS · Dữ liệu ngày · VND · Múi giờ tài sản: Việt Nam (UTC+7), Asia/Ho_Chi_Minh</p></div></div>
     <p className="reference-note collection-status-notice"><strong>Dữ liệu và trạng thái không được đọc cùng một thời điểm.</strong> Lần đọc trạng thái độc lập từ các quan sát và đợt thu thập đã lưu có thể khác lịch sử đang hiển thị.</p>
     {state.status === "loading" ? <p className="collection-status-state" role="status">Đang tải trạng thái thu thập…</p>
       : state.status === "error" ? <div className="collection-status-state"><p role="alert">{state.message}</p>{state.retry && <button className="secondary-button" type="button" onClick={() => setAttempt(value => value + 1)}>Thử lại trạng thái thu thập</button>}</div>

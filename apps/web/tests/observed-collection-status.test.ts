@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { CollectionStatusError, collectionStatusErrorMessage, fetchObservedCollectionStatus, isObservedCollectionStatus, type ObservedCollectionStatus } from "../src/observed-collection-status.js";
 import { sampleRange } from "../src/observed-detail.js";
+import { createSymbolRegistry } from "../src/symbol-registry.js";
 
 function response(): ObservedCollectionStatus {
   return { data: { asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" },
@@ -101,4 +102,28 @@ test("fetch separates 400/404/503, JSON/contract/network errors, timeout and cal
   await assert.rejects(fetchObservedCollectionStatus("FPT", sampleRange, new AbortController().signal, waiting, 5), error => error instanceof CollectionStatusError && error.kind === "timeout");
   const controller = new AbortController(); const pending = fetchObservedCollectionStatus("FPT", sampleRange, controller.signal, waiting); controller.abort();
   await assert.rejects(pending, error => error instanceof DOMException && error.name === "AbortError");
+});
+test("collection status guard and fetch generalize across custom symbol registry equities", async () => {
+  const multiRegistry = createSymbolRegistry({
+    version: 1,
+    symbols: [
+      { symbol: "FPT", assetType: "equity", exchange: "HOSE" },
+      { symbol: "VCB", assetType: "equity", exchange: "HOSE" },
+      { symbol: "SHS", assetType: "equity", exchange: "HNX" },
+      { symbol: "VNINDEX", assetType: "index", exchange: "INDEX" },
+    ],
+  });
+  const vcbStatus = response();
+  vcbStatus.data.asset = { assetId: "VN:HOSE:VCB", symbol: "VCB", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" };
+  assert.equal(isObservedCollectionStatus(vcbStatus, sampleRange, "VCB", multiRegistry), true);
+  assert.equal(isObservedCollectionStatus(vcbStatus, sampleRange, "FPT", multiRegistry), false);
+
+  const signal = new AbortController().signal;
+  assert.deepEqual(await fetchObservedCollectionStatus("VCB", sampleRange, signal, async (url) => {
+    assert.equal(url, "/api/observed/assets/VCB/collection-status?from=2026-09-28&to=2026-10-07");
+    return Response.json(vcbStatus);
+  }, 10_000, multiRegistry), vcbStatus);
+  await assert.rejects(fetchObservedCollectionStatus("VNINDEX", sampleRange, signal, async () => {
+    throw new Error("Must not fetch index on equity collection-status");
+  }, 10_000, multiRegistry), error => error instanceof CollectionStatusError && error.kind === "invalid");
 });

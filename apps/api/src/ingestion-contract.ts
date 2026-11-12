@@ -3,7 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
 import { validateGoldPayload, type GoldDataset, type GoldPayload } from "./gold-contract.js";
 import { ContractError, canonicalJson, digest, type Json } from "./platform/contracts/json.js";
-import { symbolProfile } from "./symbol-registry.js";
+import { DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "./symbol-registry.js";
 
 export { ContractError, canonicalJson, digest, strictJson, type Json } from "./platform/contracts/json.js";
 
@@ -48,9 +48,10 @@ function micros(value: string): bigint {
   return BigInt(Date.parse(whole)) * 1000n + BigInt(fraction.slice(0, 6).padEnd(6, "0"));
 }
 
-export function validatePayload(input: Json): Payload {
+/** Validates an incoming ingestion payload against fixture, observed, or synthetic gold contracts. */
+export function validatePayload(input: Json, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): Payload {
   if (input !== null && !Array.isArray(input) && typeof input === "object" && Object.hasOwn(input, "observations")) return validateGoldPayload(input);
-  if (input !== null && !Array.isArray(input) && typeof input === "object" && (Object.hasOwn(input, "request") || (input.schemaVersion === "2.0.0" && !Object.hasOwn(input, "quotes") && !Object.hasOwn(input, "indexObservations")))) return validateObservedPayload(input);
+  if (input !== null && !Array.isArray(input) && typeof input === "object" && (Object.hasOwn(input, "request") || (input.schemaVersion === "2.0.0" && !Object.hasOwn(input, "quotes") && !Object.hasOwn(input, "indexObservations")))) return validateObservedPayload(input, registry);
   if (!validateSchema(input)) fail();
   const payload = input as unknown as FixturePayload;
   const { dataset, assets, candles, quotes, indexObservations } = payload;
@@ -102,8 +103,9 @@ export function validatePayload(input: Json): Payload {
   return payload;
 }
 
-export function classifyPayload(input: Json | Payload): ClassifiedPayload {
-  const payload = validatePayload(input as unknown as Json);
+/** Validates and classifies an ingestion payload into its storage family and provider metadata. */
+export function classifyPayload(input: Json | Payload, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): ClassifiedPayload {
+  const payload = validatePayload(input as unknown as Json, registry);
   if (isGoldPayload(payload)) return { family: "synthetic-gold", provider: "marketpulse-fixture", schemaVersion: payload.schemaVersion, dataset: payload.dataset, payload };
   if (isObservedPayload(payload)) return { family: "observed-candle", provider: "KBS", schemaVersion: payload.schemaVersion, dataset: payload.dataset, payload };
   if (isFixturePayload(payload)) return { family: "fixture-market", provider: "marketpulse-fixture", schemaVersion: payload.schemaVersion, dataset: payload.dataset, payload };
@@ -122,13 +124,13 @@ export function observedContent(row: ObservedCandle): { [key: string]: Json } {
   return Object.fromEntries(Object.entries(row).filter(([key]) => !["collectedAt", "barId", "contentDigest"].includes(key)));
 }
 /** Validates a v2 observed candle payload against schema, registered symbol profile, and bar/content digests. */
-export function validateObservedPayload(input: Json): ObservedPayload {
+export function validateObservedPayload(input: Json, registry: SymbolRegistry = DEFAULT_SYMBOL_REGISTRY): ObservedPayload {
   if (!validateObservedSchema(input)) fail();
   const payload = input as unknown as ObservedPayload;
   const { request, candles } = payload;
   const days = (Date.parse(request.end) - Date.parse(request.start)) / 86400_000;
   if (days < 0 || days > 31) fail();
-  const profile = symbolProfile(request.symbol); if (!profile) fail();
+  const profile = registry.profile(request.symbol); if (!profile) fail();
   const expected = { assetId: profile.assetId, symbol: profile.symbol, assetType: profile.assetType, currency: profile.currency, unit: profile.unit, timezone: "Asia/Ho_Chi_Minh" };
   if (canonicalJson(payload.assets[0]!) !== canonicalJson(expected)) fail();
   let previous = "";
