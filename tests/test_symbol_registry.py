@@ -19,7 +19,7 @@ class SymbolRegistryTests(unittest.TestCase):
                                            "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown", "hotBasket": True})
         self.assertEqual(PROFILES["SHS"], {"symbol": "SHS", "assetType": "equity", "exchange": "HNX", "assetId": "VN:HNX:SHS",
                                            "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown", "hotBasket": False})
-        self.assertEqual(PROFILES["BSR"], {"symbol": "BSR", "assetType": "equity", "exchange": "UPCOM", "assetId": "VN:UPCOM:BSR",
+        self.assertEqual(PROFILES["BSR"], {"symbol": "BSR", "assetType": "equity", "exchange": "HOSE", "assetId": "VN:HOSE:BSR",
                                            "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown", "hotBasket": False})
         self.assertEqual(PROFILES["VNINDEX"], {"symbol": "VNINDEX", "assetType": "index", "exchange": "INDEX", "assetId": "VN:INDEX:VNINDEX",
                                                "currency": None, "unit": "index_point", "adjustmentBasis": "not_applicable", "hotBasket": True})

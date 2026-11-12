@@ -55,9 +55,9 @@ function CompanyReference({ company, response }: { company: SearchResult; respon
         <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">Nguồn {index + 1} · {new URL(url).hostname}<span aria-hidden="true"> ↗</span><span className="sr-only"> (mở trong tab mới)</span></a></li>)}</ul>
     </div>
     <div className="reference-note">
-      <p>{observed ? "Danh mục tài sản đã lưu · KBS · Chỉ FPT" : "Dữ liệu minh họa — không phải dữ liệu thị trường"}</p>
+      <p>{observed ? "Danh mục cổ phiếu observed · KBS" : "Dữ liệu minh họa — không phải dữ liệu thị trường"}</p>
       <p className="small">{observed ? "Nguồn danh mục" : "Nguồn demo"}: {response.meta.provider === "marketpulse-fixture" ? "MarketPulse VN (dữ liệu minh họa)" : response.meta.provider}. Độ mới chưa xác định; chưa có thời điểm quan sát thị trường.</p>
-      {observed && <p className="small">Mã và đơn vị đọc từ tài sản đã lưu. Tên doanh nghiệp, bí danh và liên kết là tham chiếu do dự án tuyển chọn, không phải thông tin doanh nghiệp do KBS cung cấp. Chưa có thời điểm thu thập riêng cho tài sản; kết quả không xác nhận có giá hoặc lịch sử trong khoảng ngày nào.</p>}
+      {observed && <p className="small">{company.hasData === false ? "Mã và đơn vị lấy từ hồ sơ chuẩn trong registry qua canonicalObservedEquityAsset(profile) vì tài sản chưa được thu thập." : "Mã và đơn vị đọc từ tài sản đã lưu."} Tên doanh nghiệp, bí danh và liên kết là tham chiếu do dự án tuyển chọn, không phải thông tin doanh nghiệp do KBS cung cấp. Chưa có thời điểm thu thập riêng cho tài sản; kết quả không xác nhận có giá hoặc lịch sử trong khoảng ngày nào.</p>}
       <p className="small">Thông tin tham khảo không xác nhận tình trạng đăng ký hiện tại của doanh nghiệp.</p>
     </div>
   </aside>;
@@ -128,10 +128,10 @@ function SearchPage() {
       <section className="search-hero" aria-labelledby="page-heading">
         <p className="eyebrow">Tra cứu doanh nghiệp</p>
         <h1 id="page-heading">Tìm doanh nghiệp bạn quan tâm</h1>
-        <p className="intro">{observed ? "Tra cứu tài sản đã lưu từ luồng KBS. Phạm vi hiện tại chỉ FPT; không xác nhận có giá hoặc lịch sử." : "Tra cứu mã cổ phiếu hoặc tên công ty trong danh mục 10 mã demo."}</p>
+        <p className="intro">{observed ? "Tra cứu cổ phiếu trong danh mục tham chiếu observed và kiểm tra trạng thái dữ liệu đã lưu từ luồng KBS; danh mục tra cứu không đồng nghĩa toàn bộ mã đã thu thập dữ liệu hoặc có lịch sử giá." : "Tra cứu mã cổ phiếu hoặc tên công ty trong danh mục 10 mã demo."}</p>
         <nav className="observed-source-tabs" aria-label="Nguồn tìm kiếm">
           <a href={committedQuery ? searchHref(committedQuery, "fixture") : "/"} aria-current={source === "fixture" ? "page" : undefined}>Dữ liệu minh họa</a>
-          <a href={committedQuery ? searchHref(committedQuery, "observed") : "/?source=observed"} aria-current={observed ? "page" : undefined}>Danh mục đã lưu · KBS · FPT</a>
+          <a href={committedQuery ? searchHref(committedQuery, "observed") : "/?source=observed"} aria-current={observed ? "page" : undefined}>Danh mục đã lưu · KBS</a>
         </nav>
         <form onSubmit={submit} className="search-form" noValidate>
           <label htmlFor="stock-query">Mã cổ phiếu hoặc tên doanh nghiệp</label>
@@ -154,18 +154,18 @@ function SearchPage() {
                 <span className="result-symbol">{company.asset.symbol}</span><span className="result-info"><span className="company-name">{company.companyName}</span><span className="small muted">{exchange} · Cổ phiếu{dataBadge}</span></span><span className="result-action">{selected ? "Đang xem" : "Xem thông tin"}<span aria-hidden="true">{selected ? " ✓" : " →"}</span></span>
               </button></li>;
             })}</ul>
-            <p className="scope-note">{observed ? "Danh mục đã lưu hiện chỉ FPT. Kết quả chỉ xác nhận tài sản, không xác nhận có giá hoặc lịch sử. Chi tiết tìm khoảng 30 ngày lịch kết thúc ở ngày có quan sát đã lưu lớn nhất; không xác nhận giá hiện tại hoặc độ mới." : "Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày."}</p>
+            <p className="scope-note">{observed ? "Danh mục tham chiếu gồm các cổ phiếu đã đăng ký trong registry; mỗi kết quả ghi rõ đã có dữ liệu lưu hay chưa thu thập dữ liệu. Chi tiết tìm khoảng 30 ngày lịch kết thúc ở ngày có quan sát đã lưu lớn nhất; không xác nhận giá hiện tại hoặc độ mới." : "Chỉ 10 mã trong danh mục demo. Chọn doanh nghiệp rồi mở chi tiết & biểu đồ ngày."}</p>
           </> : <div className={`state-panel ${state.status === "error" ? "error-panel" : ""}`}>
             <span className={`state-icon ${state.status === "loading" ? "loading-icon" : ""}`} aria-hidden="true"><SearchIcon /></span>
             <h3>{state.status === "initial" ? "Bắt đầu với một doanh nghiệp" : state.status === "loading" ? "Đang tìm doanh nghiệp…" : state.status === "empty" ? "Chưa tìm thấy kết quả" : "Chưa thể tìm kiếm"}</h3>
             <p>{statusText}</p>
-            {state.status === "empty" && <p className="small muted">{observed ? "Chưa có tài sản đã lưu khớp truy vấn trong phạm vi FPT. Không tìm sang dữ liệu minh họa." : "Thử mã cổ phiếu hoặc tên khác. Danh mục demo chỉ gồm 10 mã."}</p>}
+            {state.status === "empty" && <p className="small muted">{observed ? "Chưa có cổ phiếu khớp truy vấn trong danh mục tham chiếu observed. Không tìm sang dữ liệu minh họa." : "Thử mã cổ phiếu hoặc tên khác. Danh mục demo chỉ gồm 10 mã."}</p>}
             {state.status === "error" && state.retry && <button type="button" className="secondary-button" onClick={() => void search(state.query)}>Thử lại</button>}
           </div>}
         </section>
         {selected && state.status === "results" ? <CompanyReference company={selected} response={state.response} /> : <aside className="company-panel company-placeholder"><span className="placeholder-symbol" aria-hidden="true">↗</span><h2>Thông tin doanh nghiệp</h2><p className="muted">{state.status === "loading" ? "Thông tin sẽ xuất hiện khi tìm kiếm hoàn tất." : "Tìm và chọn một doanh nghiệp để xem mã, sàn và nguồn tham khảo tại đây."}</p></aside>}
       </div>
-      <div className="demo-notice"><span aria-hidden="true">ⓘ</span><div><strong>{observed ? "Danh mục đã lưu · KBS · Độ phủ chỉ FPT" : "Dữ liệu minh họa — không phải dữ liệu thị trường"}</strong><p>{observed ? "VND · Việt Nam (UTC+7). Thời điểm nguồn, thời điểm thu thập riêng của tài sản và độ mới chưa xác định. Tên/bí danh là tham chiếu tuyển chọn. Không có giá trên trang này." : "Thông tin dùng cho bản demo và nghiên cứu. Chưa có giá thị trường trên trang này."}</p></div></div>
+      <div className="demo-notice"><span aria-hidden="true">ⓘ</span><div><strong>{observed ? "Danh mục cổ phiếu observed · KBS · Trạng thái dữ liệu theo từng mã" : "Dữ liệu minh họa — không phải dữ liệu thị trường"}</strong><p>{observed ? "VND · Việt Nam (UTC+7). Danh mục tra cứu không đồng nghĩa độ phủ dữ liệu đã thu thập; thời điểm nguồn, thời điểm thu thập riêng của tài sản và độ mới chưa xác định. Tên/bí danh là tham chiếu tuyển chọn. Không có giá trên trang này." : "Thông tin dùng cho bản demo và nghiên cứu. Chưa có giá thị trường trên trang này."}</p></div></div>
     </main>
     <footer className="site-footer"><div><span className="footer-brand">MarketPulse VN</span><p>Thông tin chỉ phục vụ minh họa và nghiên cứu, không phải lời khuyên đầu tư.</p></div></footer>
   </>;

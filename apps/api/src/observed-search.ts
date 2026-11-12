@@ -57,15 +57,20 @@ export class ObservedSearchService implements ObservedSearchReader {
   /** Searches registered observed equities against curated company names and aliases, annotating each hit with stored data availability. */
   async search(query: string): Promise<ObservedSearchResponse> {
     const ids = this.entries.map(item => item.profile.assetId);
+    const byAssetId = new Map(this.entries.map(item => [item.profile.assetId, item.profile]));
     const documents = await withinTimeout(() => this.db.collection<Document & { _id: string }>("observed_assets")
-      .find({ _id: { $in: ids } }, { projection: observedAssetProjection, maxTimeMS: this.timeoutMs, singleBatch: true }).limit(ids.length).toArray(), this.timeoutMs);
-    const byId = new Map(documents.map(document => [(document.record as { assetId?: unknown } | undefined)?.assetId, document]));
+      .find({ _id: { $in: ids } }, { projection: { ...observedAssetProjection, _id: 1 }, maxTimeMS: this.timeoutMs, singleBatch: true }).limit(ids.length).toArray(), this.timeoutMs);
+    const byId = new Map<string, NonNullable<ReturnType<typeof validatedObservedAsset>>>();
+    for (const document of documents) {
+      const profile = typeof document._id === "string" ? byAssetId.get(document._id) : undefined;
+      if (!profile) throw new Error("Invalid observed asset");
+      byId.set(document._id, validatedObservedAsset(profile.symbol, document, this.registry));
+    }
     const normalized = normalizeSearchText(query);
     const data: ObservedSearchResponse["data"] = [];
     let dataset: Dataset | null = null;
     for (const { profile, entry } of this.entries) {
-      const document = byId.get(profile.assetId);
-      const stored = document ? validatedObservedAsset(profile.symbol, document, this.registry) : null;
+      const stored = byId.get(profile.assetId) ?? null;
       if (stored) dataset ??= stored.dataset;
       if ([entry.symbol, entry.companyName, ...entry.aliases].some(term => normalizeSearchText(term).includes(normalized))) {
         data.push({

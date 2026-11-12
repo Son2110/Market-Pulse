@@ -198,3 +198,39 @@ test("catalog initialization rejects missing, duplicate or overlarge equity univ
 test("database failures return sanitized JSON with no-store", async () => {
   await withApi(async (base) => { await error(await send(base), 500, "internal_error"); }, { failure: true });
 });
+
+test("PUT /:id/symbols/:symbol enforces the 10-symbol limit atomically and distinguishes 409 full from 404 not_found", async () => {
+  const filters: Record<string, unknown>[] = [];
+  let exists = true;
+  const collection = {
+    createIndex: async () => undefined,
+    findOne: async () => exists ? { _id: new ObjectId(id), userId: ownerId, name: "Full", symbols: ["BID", "FPT", "HPG", "MSN", "MWG", "SSI", "VCB", "VHM", "VIC", "VNM"], createdAt: new Date(), updatedAt: new Date() } : null,
+    insertOne: async () => undefined,
+    findOneAndUpdate: async (filter: Record<string, unknown>) => { filters.push(filter); return null; },
+    deleteOne: async () => ({ deletedCount: 0 }),
+  };
+  const provider = createFixtureMarketDataProvider();
+  const api = createWatchlistApi({
+    db: { collection: () => collection } as unknown as Db,
+    authenticate, provider, isReady: () => true,
+  });
+  await api.initialize();
+  const server = createServer(createApp({
+    checks: { mongo: async () => true, redis: async () => true }, watchlistRouter: api.router,
+    applicationReady: () => true,
+  }));
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("test server did not bind");
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    await error(await send(base, `/${id}/symbols/ACB`, "PUT"), 409, "watchlist_full");
+    assert.deepEqual(filters[0]?.$or, [{ symbols: "ACB" }, { "symbols.9": { $exists: false } }]);
+    exists = false;
+    await error(await send(base, `/${id}/symbols/ACB`, "PUT"), 404, "not_found");
+  } finally {
+    server.close();
+    await once(server, "close");
+  }
+});

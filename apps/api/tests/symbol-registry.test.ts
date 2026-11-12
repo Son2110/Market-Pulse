@@ -10,11 +10,11 @@ test("registry derives canonical equity and index profiles for VN30, representat
   assert.deepEqual(REGISTERED_SYMBOLS.filter(item => item.hotBasket === false).map(item => item.symbol), ["SHS", "PVS", "BSR"]);
   assert.deepEqual(symbolProfile("FPT"), { symbol: "FPT", assetType: "equity", exchange: "HOSE", assetId: "VN:HOSE:FPT", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: true });
   assert.deepEqual(symbolProfile("SHS"), { symbol: "SHS", assetType: "equity", exchange: "HNX", assetId: "VN:HNX:SHS", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: false });
-  assert.deepEqual(symbolProfile("BSR"), { symbol: "BSR", assetType: "equity", exchange: "UPCOM", assetId: "VN:UPCOM:BSR", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: false });
+  assert.deepEqual(symbolProfile("BSR"), { symbol: "BSR", assetType: "equity", exchange: "HOSE", assetId: "VN:HOSE:BSR", currency: "VND", unit: "VND", adjustmentBasis: "unknown", hotBasket: false });
   assert.deepEqual(symbolProfile("VNINDEX"), { symbol: "VNINDEX", assetType: "index", exchange: "INDEX", assetId: "VN:INDEX:VNINDEX", currency: null, unit: "index_point", adjustmentBasis: "not_applicable", hotBasket: true });
   assert.equal(symbolProfileByAssetId("VN:HOSE:FPT")?.symbol, "FPT");
   assert.equal(symbolProfileByAssetId("VN:HNX:SHS")?.symbol, "SHS");
-  assert.equal(symbolProfileByAssetId("VN:UPCOM:BSR")?.symbol, "BSR");
+  assert.equal(symbolProfileByAssetId("VN:HOSE:BSR")?.symbol, "BSR");
   assert.equal(symbolProfile("fpt"), null);
   assert.equal(symbolProfile("AAA"), null);
   assert.equal(symbolProfileByAssetId("VN:HOSE:AAA"), null);

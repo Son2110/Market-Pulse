@@ -98,7 +98,7 @@ const DEFAULT_DOCUMENT: SymbolRegistryDocument = {
     { symbol: "VRE", assetType: "equity", exchange: "HOSE", hotBasket: true },
     { symbol: "SHS", assetType: "equity", exchange: "HNX", hotBasket: false },
     { symbol: "PVS", assetType: "equity", exchange: "HNX", hotBasket: false },
-    { symbol: "BSR", assetType: "equity", exchange: "UPCOM", hotBasket: false },
+    { symbol: "BSR", assetType: "equity", exchange: "HOSE", hotBasket: false },
     { symbol: "VNINDEX", assetType: "index", exchange: "INDEX", hotBasket: true },
   ],
 };

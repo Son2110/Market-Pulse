@@ -25,7 +25,7 @@ test("observed catalog reads exact indexed equity identities with projection and
     assert.equal(name, "observed_assets");
     return { find: (filter: unknown, options: unknown) => {
       calls++; assert.deepEqual(filter, { _id: { $in: expectedIds } });
-      assert.deepEqual(options, { projection: observedAssetProjection, maxTimeMS: 123, singleBatch: true });
+      assert.deepEqual(options, { projection: { ...observedAssetProjection, _id: 1 }, maxTimeMS: 123, singleBatch: true });
       return { limit: (size: number) => { assert.equal(size, expectedIds.length); return { toArray: async () => [{ ...asset, _id: "VN:HOSE:FPT" }] }; } };
     } };
   } } as unknown as Db;
@@ -65,6 +65,8 @@ test("observed catalog distinguishes uncollected catalog assets (hasData: false)
     (row: ReturnType<typeof stored>) => { row.dataset.mode = "fixture" as never; },
     (row: ReturnType<typeof stored>) => { row.record!.currency = "USD"; row.rowDigest = digest(row.record!); },
     (row: ReturnType<typeof stored>) => { row.record!.symbol = "VCB"; row.rowDigest = digest(row.record!); },
+    (row: ReturnType<typeof stored>) => { row.record!.assetId = "VN:HOSE:VCB"; row.rowDigest = digest(row.record!); },
+    (row: ReturnType<typeof stored>) => { delete (row.record as Record<string, unknown>).assetId; },
   ]) {
     const row = stored(); mutate(row); document = row;
     await assert.rejects(service.search("FPT")); await assert.rejects(service.search("no match"));

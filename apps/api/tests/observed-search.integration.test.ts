@@ -45,7 +45,7 @@ test("real Mongo observed catalog verifies hasData true/false across catalog equ
   client.off("commandStarted", capture);
   assert.equal(commands.length, 1); const command = commands[0]!.command;
   assert.equal(command.find, "observed_assets"); assert.deepEqual(command.filter, { _id: { $in: expectedIds } });
-  assert.deepEqual(command.projection, observedAssetProjection); assert.equal(command.limit, expectedIds.length); assert.equal(command.singleBatch, true); assert.equal(command.maxTimeMS, 456);
+  assert.deepEqual(command.projection, { ...observedAssetProjection, _id: 1 }); assert.equal(command.limit, expectedIds.length); assert.equal(command.singleBatch, true); assert.equal(command.maxTimeMS, 456);
   const explanation = await db.collection("observed_assets").find({ _id: { $in: expectedIds } } as never).explain("executionStats");
   assert.equal(explanation.executionStats.totalDocsExamined, 1); assert(explanation.executionStats.totalKeysExamined <= 2);
   const vcbBody = await (await get("VCB")).json();

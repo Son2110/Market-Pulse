@@ -144,8 +144,21 @@ export function createWatchlistApi(options: WatchlistOptions): { router: Router;
       if (!filter) return;
       const symbol = request.params.symbol;
       if (typeof symbol !== "string" || !allowedSymbols?.has(symbol)) return jsonError(response, 400, "invalid_request");
-      const update = method === "put" ? { $addToSet: { symbols: symbol } } : { $pull: { symbols: symbol } };
-      const record = await collection.findOneAndUpdate(filter, { ...update, $set: { updatedAt: new Date(now()) } }, {
+      if (method === "put") {
+        const record = await collection.findOneAndUpdate(
+          { ...filter, $or: [{ symbols: symbol }, { "symbols.9": { $exists: false } }] },
+          { $addToSet: { symbols: symbol }, $set: { updatedAt: new Date(now()) } },
+          { returnDocument: "after", includeResultMetadata: false },
+        );
+        if (record) {
+          response.status(200).json({ data: publicWatchlist(record) });
+          return;
+        }
+        const existing = await collection.findOne(filter);
+        if (!existing) return jsonError(response, 404, "not_found");
+        return jsonError(response, 409, "watchlist_full");
+      }
+      const record = await collection.findOneAndUpdate(filter, { $pull: { symbols: symbol }, $set: { updatedAt: new Date(now()) } }, {
         returnDocument: "after", includeResultMetadata: false,
       });
       if (!record) return jsonError(response, 404, "not_found");
