@@ -13,6 +13,7 @@ export interface ObservedHistoryReader {
 
 export class ObservedHistoryService implements ObservedHistoryReader {
   constructor(private readonly db: Db, private readonly timeoutMs = 1000) {}
+  /** Discovers the latest 30-calendar-day stored trading window for a registered observed symbol. */
   async latestWindow(symbol = "FPT"): Promise<ObservedLatestWindowResponse | null> {
     const normalized = symbol.toUpperCase();
     const profile = symbolProfile(normalized);
@@ -60,6 +61,7 @@ export class ObservedHistoryService implements ObservedHistoryReader {
       .find({ _id: { $in: ids } }, { projection: observedDeliveryStatusProjection, maxTimeMS: this.timeoutMs }).limit(32).toArray() : [];
     return observedCollectionStatusResponse(selected.history, selected.candles, deliveries);
   }
+  /** Selects and validates stored observed asset and latest candle projections for a registered symbol and date range. */
   private async select(symbol: string, range: ObservedHistoryRange, withDelivery: boolean) {
     const profile = symbolProfile(symbol);
     if (!profile) return null;
@@ -74,6 +76,7 @@ export class ObservedHistoryService implements ObservedHistoryReader {
   }
 }
 
+/** Creates the Express router for observed latest-window, history, and collection-status read endpoints. */
 export function createObservedHistoryRouter(reader: ObservedHistoryReader, isReady: () => boolean = () => true) {
   const router = Router();
   router.get("/:symbol/latest-window", async (request, response) => {

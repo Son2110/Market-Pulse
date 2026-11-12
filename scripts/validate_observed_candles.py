@@ -18,6 +18,7 @@ SCHEMA_PATH = Path(__file__).resolve().parents[1] / "packages/schemas/observed-c
 
 
 def validate_observed_candles(document: object) -> list[str]:
+    """Validate an observed candle payload against schema v2, registered symbol profile, and digest invariants."""
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     errors = list(Draft202012Validator(schema, format_checker=strict_format_checker()).iter_errors(document))

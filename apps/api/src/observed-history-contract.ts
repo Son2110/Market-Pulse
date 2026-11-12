@@ -71,6 +71,7 @@ function pick(value: unknown, fields: string[]): Record<string, Json> {
   return Object.fromEntries(fields.map(field => [field, input[field]])) as Record<string, Json>;
 }
 
+/** Validates a stored observed asset document against the registered symbol profile and row digest. */
 export function validatedObservedAsset(symbol: string, assetDocument: unknown): { asset: ObservedAsset; dataset: Dataset } {
   const storedAsset = object(assetDocument);
   const asset = pick(storedAsset.record, assetFields) as ObservedAsset;
@@ -83,6 +84,7 @@ export function validatedObservedAsset(symbol: string, assetDocument: unknown): 
 }
 
 // Only the explicit public contract is projected; internal delivery/storage fields never escape.
+/** Validates stored observed asset and candle documents and constructs the public history response envelope. */
 export function observedHistoryResponse(symbol: string, range: ObservedHistoryRange, assetDocument: unknown, documents: unknown[]): ObservedHistoryResponse {
   const { asset, dataset } = validatedObservedAsset(symbol, assetDocument);
   const adjustmentBasis = symbolProfile(symbol)!.adjustmentBasis;

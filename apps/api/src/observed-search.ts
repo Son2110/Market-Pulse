@@ -22,6 +22,7 @@ const COVERAGE = catalogEntries.map(item => item.profile.symbol);
 
 export class ObservedSearchService implements ObservedSearchReader {
   constructor(private readonly db: Db, private readonly timeoutMs = 1000) {}
+  /** Searches stored observed equities in the symbol registry against curated company names and aliases. */
   async search(query: string): Promise<ObservedSearchResponse> {
     const ids = catalogEntries.map(item => item.profile.assetId);
     const documents = await withinTimeout(() => this.db.collection<Document & { _id: string }>("observed_assets")
@@ -48,6 +49,7 @@ export class ObservedSearchService implements ObservedSearchReader {
   }
 }
 
+/** Creates the Express router for the stored observed asset catalog search endpoint. */
 export function createObservedSearchRouter(reader: ObservedSearchReader, isReady: () => boolean = () => true) {
   const router = Router();
   router.get("/search", async (request, response) => {

@@ -121,6 +121,7 @@ export function collectedOrder(value: string): string {
 export function observedContent(row: ObservedCandle): { [key: string]: Json } {
   return Object.fromEntries(Object.entries(row).filter(([key]) => !["collectedAt", "barId", "contentDigest"].includes(key)));
 }
+/** Validates a v2 observed candle payload against schema, registered symbol profile, and bar/content digests. */
 export function validateObservedPayload(input: Json): ObservedPayload {
   if (!validateObservedSchema(input)) fail();
   const payload = input as unknown as ObservedPayload;

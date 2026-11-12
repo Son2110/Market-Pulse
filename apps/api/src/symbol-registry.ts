@@ -9,6 +9,7 @@ export interface SymbolProfile {
 const SYMBOL = /^[A-Z0-9]{1,12}$/u;
 const EXCHANGES = new Set(["HOSE", "HNX", "UPCOM", "INDEX"]);
 
+/** Validates a raw symbol registry entry and derives its canonical asset profile. */
 function profile(entry: { symbol: string; assetType: string; exchange: string }): SymbolProfile {
   const index = entry.assetType === "index";
   if (!SYMBOL.test(entry.symbol) || !EXCHANGES.has(entry.exchange) || (entry.assetType !== "equity" && !index) || (index !== (entry.exchange === "INDEX"))) {

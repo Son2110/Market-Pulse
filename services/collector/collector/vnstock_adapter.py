@@ -29,6 +29,7 @@ class AdapterError(ValueError):
 
 
 def validate_request(symbol: str, start: str, end: str, interval: str = "1d") -> None:
+    """Validate that the requested symbol is registered and the 1d date window is within 32 calendar days."""
     if symbol not in SYMBOLS or interval != "1d":
         raise AdapterError("unsupported_request")
     try:
@@ -66,6 +67,7 @@ def provider_date(value: object) -> str:
 
 
 def normalize_rows(rows: object, symbol: str, start: str, end: str, collected_at: str) -> dict:
+    """Normalize raw provider rows into a contract-valid v2 observed candle document for a registered symbol."""
     validate_request(symbol, start, end)
     if not isinstance(rows, list) or len(rows) > 32:
         raise AdapterError("malformed_provider_response")

@@ -13,6 +13,7 @@ _EXCHANGES = {"HOSE", "HNX", "UPCOM", "INDEX"}
 
 
 def _profile(entry: dict) -> dict:
+    """Validate a raw symbol registry entry and derive its canonical asset profile."""
     index = entry["assetType"] == "index"
     if (not isinstance(entry["symbol"], str) or not _SYMBOL.fullmatch(entry["symbol"]) or entry["exchange"] not in _EXCHANGES
             or entry["assetType"] not in {"equity", "index"} or index != (entry["exchange"] == "INDEX")):
@@ -40,4 +41,5 @@ REGISTERED_SYMBOLS = tuple(PROFILES)
 
 
 def symbol_profile(symbol: str) -> dict | None:
+    """Return the canonical profile for a registered symbol, or None if unregistered."""
     return PROFILES.get(symbol)
