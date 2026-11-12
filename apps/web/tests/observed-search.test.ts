@@ -12,9 +12,14 @@ function response(): SearchResponse {
   };
 }
 
-test("observed response requires catalog-only provenance, canonical FPT and separate curated attribution", () => {
+test("observed response requires catalog-only provenance, covered symbols and separate curated attribution", () => {
   const body = response(); assert(isObservedSearchResponse(body)); assert(!isSearchResponse(response()));
   assert(isObservedSearchResponse({ ...body, data: [], meta: { ...body.meta, dataset: null } }));
+  assert(isObservedSearchResponse({
+    data: [...body.data, { asset: { assetId: "VN:HOSE:VCB", symbol: "VCB", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, companyName: "Vietcombank", aliases: ["VCB"],
+      reference: { origin: "curated_reference", officialSources: ["https://vietcombank.com.vn"], reviewedOn: "2026-09-29" } }],
+    meta: { ...body.meta, label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT, VCB", coverage: ["FPT", "VCB"] },
+  }));
   for (const mutate of [
     (value: SearchResponse) => { value.data[0].asset.symbol = "VCB"; },
     (value: SearchResponse) => { value.data[0].asset.exchange = "HOSE"; },

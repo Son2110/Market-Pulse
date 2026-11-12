@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "symbols": [
+    {"symbol": "FPT", "assetType": "equity", "exchange": "HOSE"},
+    {"symbol": "VNINDEX", "assetType": "index", "exchange": "INDEX"}
+  ]
+}

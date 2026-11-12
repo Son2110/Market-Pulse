@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from jsonschema import Draft202012Validator
+from scripts.symbol_registry import symbol_profile
 from scripts.validate_market_data import strict_format_checker
 
 
@@ -17,6 +18,7 @@ SCHEMA_PATH = Path(__file__).resolve().parents[1] / "packages/schemas/observed-c
 
 
 def validate_observed_candles(document: object) -> list[str]:
+    """Validate an observed candle payload against schema v2, registered symbol profile, and digest invariants."""
     schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
     errors = list(Draft202012Validator(schema, format_checker=strict_format_checker()).iter_errors(document))
@@ -27,10 +29,11 @@ def validate_observed_candles(document: object) -> list[str]:
     result = []
     if not 0 <= (last - first).days <= 31:
         result.append("invalid date range")
-    equity = request["symbol"] == "FPT"
-    expected = {"assetId": f"VN:{'HOSE' if equity else 'INDEX'}:{request['symbol']}", "symbol": request["symbol"],
-                "assetType": "equity" if equity else "index", "currency": "VND" if equity else None,
-                "unit": "VND" if equity else "index_point", "timezone": "Asia/Ho_Chi_Minh"}
+    profile = symbol_profile(request["symbol"])
+    if profile is None:
+        return result + ["unregistered symbol"]
+    expected = {"assetId": profile["assetId"], "symbol": profile["symbol"], "assetType": profile["assetType"],
+                "currency": profile["currency"], "unit": profile["unit"], "timezone": "Asia/Ho_Chi_Minh"}
     if document["assets"][0] != expected:
         result.append("asset does not match request")
     previous = None
@@ -51,7 +54,7 @@ def validate_observed_candles(document: object) -> list[str]:
             result.append("invalid provider calendar label")
         if any(row[key] != expected[key] for key in ("assetId", "currency", "unit", "timezone")):
             result.append("candle asset/unit mismatch")
-        if row["adjustmentBasis"] != ("unknown" if equity else "not_applicable"):
+        if row["adjustmentBasis"] != profile["adjustmentBasis"]:
             result.append("unsupported adjustment basis")
         if any(not re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?", row[key]) for key in ("open", "high", "low", "close")):
             result.append("noncanonical OHLC decimal")

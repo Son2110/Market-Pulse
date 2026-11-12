@@ -3,6 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { Decimal } from "decimal.js";
 import { collectedOrder, observedContent, type Dataset, type ObservedAsset, type ObservedCandle } from "./ingestion-contract.js";
 import { canonicalJson, digest, type Json } from "./platform/contracts/json.js";
+import { symbolProfile } from "./symbol-registry.js";
 
 export interface ObservedHistoryRange { from: string; to: string }
 export interface ObservedLatestWindowResponse {
@@ -70,21 +71,23 @@ function pick(value: unknown, fields: string[]): Record<string, Json> {
   return Object.fromEntries(fields.map(field => [field, input[field]])) as Record<string, Json>;
 }
 
+/** Validates a stored observed asset document against the registered symbol profile and row digest. */
 export function validatedObservedAsset(symbol: string, assetDocument: unknown): { asset: ObservedAsset; dataset: Dataset } {
   const storedAsset = object(assetDocument);
   const asset = pick(storedAsset.record, assetFields) as ObservedAsset;
   const dataset = pick(storedAsset.dataset, datasetFields) as Dataset;
-  const equity = symbol === "FPT";
-  const expected = { assetId: `VN:${equity ? "HOSE" : "INDEX"}:${symbol}`, symbol, assetType: equity ? "equity" : "index", currency: equity ? "VND" : null, unit: equity ? "VND" : "index_point", timezone: "Asia/Ho_Chi_Minh" };
+  const profile = symbolProfile(symbol); if (!profile) return invalid();
+  const expected = { assetId: profile.assetId, symbol, assetType: profile.assetType, currency: profile.currency, unit: profile.unit, timezone: "Asia/Ho_Chi_Minh" };
   if (storedAsset.schemaVersion !== "2.0.0" || !assetShape(asset) || !datasetShape(dataset)
     || canonicalJson(asset) !== canonicalJson(expected) || storedAsset.rowDigest !== digest(asset)) invalid();
   return { asset, dataset };
 }
 
 // Only the explicit public contract is projected; internal delivery/storage fields never escape.
+/** Validates stored observed asset and candle documents and constructs the public history response envelope. */
 export function observedHistoryResponse(symbol: string, range: ObservedHistoryRange, assetDocument: unknown, documents: unknown[]): ObservedHistoryResponse {
   const { asset, dataset } = validatedObservedAsset(symbol, assetDocument);
-  const equity = symbol === "FPT";
+  const adjustmentBasis = symbolProfile(symbol)!.adjustmentBasis;
   if (documents.length > 32) invalid();
   let previous = "";
   const candles = documents.map(document => {
@@ -93,7 +96,7 @@ export function observedHistoryResponse(symbol: string, range: ObservedHistoryRa
     row.source = pick(row.source, sourceFields) as ObservedCandle["source"];
     if (stored.schemaVersion !== "2.0.0" || !datasetShape(stored.dataset) || canonicalJson(stored.dataset as Json) !== canonicalJson(dataset) || !candleShape(row)) invalid();
     if (["assetId", "currency", "unit", "timezone"].some(key => row[key] !== asset[key])
-      || row.adjustmentBasis !== (equity ? "unknown" : "not_applicable") || row.tradingDate < range.from || row.tradingDate > range.to || row.tradingDate <= previous) invalid();
+      || row.adjustmentBasis !== adjustmentBasis || row.tradingDate < range.from || row.tradingDate > range.to || row.tradingDate <= previous) invalid();
     previous = row.tradingDate;
     const label = row.providerTimeLabel as string;
     try { collectedOrder(`${label.replace(" ", "T")}${label.length === 16 ? ":00" : ""}Z`); } catch { invalid(); }

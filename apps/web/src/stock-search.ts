@@ -28,9 +28,9 @@ interface FixtureSearchMeta {
 
 export type SearchSource = "fixture" | "observed";
 export interface ObservedSearchMeta {
-  scope: "stored observed equities"; label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT"; provider: "KBS";
+  scope: "stored observed equities"; label: string; provider: "KBS";
   dataset: { mode: "observed"; label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN"; freshness: "unknown"; sessionCalendar: "unverified" } | null;
-  sourceAsOf: null; collectedAt: null; freshness: "unknown"; coverage: ["FPT"]; availability: "catalog_only"; assetOrigin: "stored_observed_asset";
+  sourceAsOf: null; collectedAt: null; freshness: "unknown"; coverage: string[]; availability: "catalog_only"; assetOrigin: "stored_observed_asset";
 }
 export function searchSource(search: string): SearchSource | null {
   const parameters = new URLSearchParams(search);
@@ -97,22 +97,29 @@ export function isSearchResponse(value: unknown): value is SearchResponse {
   });
 }
 
+/** Validates a stored observed catalog search response against coverage, provenance, and asset invariants. */
 export function isObservedSearchResponse(value: unknown): value is SearchResponse {
-  if (!record(value) || !record(value.meta) || !Array.isArray(value.data) || value.data.length > 1) return false;
+  if (!record(value) || !record(value.meta) || !Array.isArray(value.data)) return false;
   const meta = value.meta;
-  if (meta.scope !== "stored observed equities" || meta.label !== "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT"
+  if (!Array.isArray(meta.coverage) || meta.coverage.length === 0 || meta.coverage.length > 32
+    || !meta.coverage.every((symbol): symbol is string => typeof symbol === "string" && /^[A-Z0-9]{1,12}$/.test(symbol) && symbol !== "VNINDEX")
+    || new Set(meta.coverage).size !== meta.coverage.length) return false;
+  const coverage = new Set(meta.coverage);
+  if (meta.scope !== "stored observed equities" || meta.label !== `STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO ${meta.coverage.join(", ")}`
     || meta.provider !== "KBS" || meta.sourceAsOf !== null || meta.collectedAt !== null || meta.freshness !== "unknown"
-    || meta.availability !== "catalog_only" || meta.assetOrigin !== "stored_observed_asset"
-    || !Array.isArray(meta.coverage) || meta.coverage.length !== 1 || meta.coverage[0] !== "FPT") return false;
+    || meta.availability !== "catalog_only" || meta.assetOrigin !== "stored_observed_asset" || value.data.length > meta.coverage.length) return false;
   const dataset = meta.dataset;
   if (dataset === null ? value.data.length !== 0 : !record(dataset) || dataset.mode !== "observed"
     || dataset.label !== "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN" || dataset.freshness !== "unknown" || dataset.sessionCalendar !== "unverified") return false;
+  const symbols = new Set<string>();
   return value.data.every((item: unknown) => {
     if (!record(item) || !record(item.asset) || !record(item.reference) || item.reference.origin !== "curated_reference") return false;
     const asset = item.asset;
+    const match = typeof asset.assetId === "string" ? /^VN:(HOSE|HNX|UPCOM):([A-Z0-9]{1,12})$/.exec(asset.assetId) : null;
     if (Object.keys(asset).sort().join(",") !== "assetId,assetType,currency,symbol,timezone,unit"
-      || asset.assetId !== "VN:HOSE:FPT" || asset.symbol !== "FPT") return false;
-    return isSearchResponse({ data: [{ ...item, asset: { ...asset, exchange: "HOSE" } }],
+      || !match || asset.symbol !== match[2] || !coverage.has(match[2]) || symbols.has(match[2])) return false;
+    symbols.add(match[2]);
+    return isSearchResponse({ data: [{ ...item, asset: { ...asset, exchange: match[1] } }],
       meta: { scope: "fixture equities", dataset: "fixture / unknown", label: "SYNTHETIC FIXTURE — NOT MARKET DATA", provider: "marketpulse-fixture", asOf: null } });
   });
 }

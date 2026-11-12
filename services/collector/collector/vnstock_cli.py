@@ -3,14 +3,14 @@
 import argparse
 import json
 
-from collector.vnstock_adapter import AdapterError, collect, summarize, validate_request
+from collector.vnstock_adapter import SYMBOLS, AdapterError, collect, summarize, validate_request
 from collector.transport import submit, validate_submission_options
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Manually collect bounded KBS candles in memory; print metadata only.")
     parser.add_argument("--enable-vnstock", action="store_true", help="explicitly authorize a provider call")
-    parser.add_argument("--symbol", required=True, choices=["FPT", "VNINDEX"])
+    parser.add_argument("--symbol", required=True, choices=sorted(SYMBOLS))
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)
     parser.add_argument("--timeout-seconds", type=int, default=45)

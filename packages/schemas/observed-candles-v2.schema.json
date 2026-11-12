@@ -14,7 +14,7 @@
     "request": {
       "type": "object", "additionalProperties": false,
       "required": ["symbol", "start", "end", "interval"],
-      "properties": {"symbol": {"enum": ["FPT", "VNINDEX"]}, "start": {"type": "string", "format": "date"}, "end": {"type": "string", "format": "date"}, "interval": {"const": "1d"}}
+      "properties": {"symbol": {"type": "string", "pattern": "^[A-Z0-9]{1,12}$"}, "start": {"type": "string", "format": "date"}, "end": {"type": "string", "format": "date"}, "interval": {"const": "1d"}}
     },
     "assets": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/asset"}},
     "candles": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/candle"}}
@@ -24,13 +24,13 @@
     "asset": {
       "type": "object", "additionalProperties": false,
       "required": ["assetId", "symbol", "assetType", "currency", "unit", "timezone"],
-      "properties": {"assetId": {"enum": ["VN:HOSE:FPT", "VN:INDEX:VNINDEX"]}, "symbol": {"enum": ["FPT", "VNINDEX"]}, "assetType": {"enum": ["equity", "index"]}, "currency": {"enum": ["VND", null]}, "unit": {"enum": ["VND", "index_point"]}, "timezone": {"const": "Asia/Ho_Chi_Minh"}}
+      "properties": {"assetId": {"type": "string", "pattern": "^VN:(?:HOSE|HNX|UPCOM|INDEX):[A-Z0-9]{1,12}$"}, "symbol": {"type": "string", "pattern": "^[A-Z0-9]{1,12}$"}, "assetType": {"enum": ["equity", "index"]}, "currency": {"enum": ["VND", null]}, "unit": {"enum": ["VND", "index_point"]}, "timezone": {"const": "Asia/Ho_Chi_Minh"}}
     },
     "candle": {
       "type": "object", "additionalProperties": false,
       "required": ["assetId", "tradingDate", "interval", "currency", "unit", "timezone", "adjustmentBasis", "open", "high", "low", "close", "volume", "volumeUnit", "providerTimeLabel", "timeProvenance", "sourceAsOf", "collectedAt", "source", "barId", "contentDigest"],
       "properties": {
-        "assetId": {"enum": ["VN:HOSE:FPT", "VN:INDEX:VNINDEX"]}, "tradingDate": {"type": "string", "format": "date"}, "interval": {"const": "1d"},
+        "assetId": {"type": "string", "pattern": "^VN:(?:HOSE|HNX|UPCOM|INDEX):[A-Z0-9]{1,12}$"}, "tradingDate": {"type": "string", "format": "date"}, "interval": {"const": "1d"},
         "currency": {"enum": ["VND", null]}, "unit": {"enum": ["VND", "index_point"]}, "timezone": {"const": "Asia/Ho_Chi_Minh"}, "adjustmentBasis": {"enum": ["unknown", "not_applicable"]},
         "open": {"$ref": "#/$defs/decimal"}, "high": {"$ref": "#/$defs/decimal"}, "low": {"$ref": "#/$defs/decimal"}, "close": {"$ref": "#/$defs/decimal"},
         "volume": {"type": "null"}, "volumeUnit": {"const": "not_available"},
