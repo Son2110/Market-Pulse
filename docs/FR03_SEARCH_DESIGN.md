@@ -1,6 +1,22 @@
 # FR-03 — stored observed catalog search · 04/11/2026
 
-## Current slice and design references
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d8ff854aa936a8a0c2a8d4731a05fd2935686fa02882cd47f319f6bb101699a0 -->
+
+## Current observed search scope · 12/11/2026
+
+Observed search preserves the existing intersection of registry equity profiles and [`STOCK_REFERENCE_CATALOG`](../apps/api/src/stock-reference-catalog.ts). Only eligible assets present in observed storage and passing the shared schema/canonical-field/digest validator can appear. The default registry remains `["FPT", "VNINDEX"]`, so default equity search coverage is `["FPT"]`; VNINDEX is an index. A custom registry can add an equity such as VCB with an existing curated reference. A registered equity without a reference, such as SHS, is excluded from search even when ingestion and other observed read routes support it. No company-name fallback or reference entry is synthesized from the symbol or stored metadata: `companyName`, `aliases`, official URLs and review date always come from the curated reference.
+
+The service performs one bounded `observed_assets.find` with `_id: { $in: eligibleAssetIds }`, public projection, `singleBatch`, a result limit equal to the eligible count and configured `maxTimeMS`. It validates stored eligible assets before matching normalized symbols, company names and aliases; it reads no candles, receipts or provider. Meta coverage lists the eligible registry/reference intersection, not stored-asset or candle availability. Dataset is taken from validated eligible storage when present, otherwise null; source-as-of/collection time remain null and freshness unknown.
+
+With a valid query and healthy, valid eligible storage, an empty catalog, absent stored asset, nonmatching query or query for an unregistered symbol returns 200 with `data: []`. Corrupt eligible stored assets or unavailable readiness/storage return sanitized 503 `observed_asset_search_unavailable`, including for a nonmatching query. Missing/blank/invalid queries retain 400 `invalid_query`. The disabled search route returns 404. `404 asset_not_found` belongs to individual observed asset read routes for unsupported symbols or missing stored assets; it is not the search no-match response. Enabled search responses remain no-store; there is no fixture fallback. This documents current behavior without widening search.
+
+The sections below record the initial 04/11/2026 slice, its driver comparison and dated acceptance evidence. Their FPT-only scope and `findOne` description are historical; the current scope and storage boundary above supersede those details.
+
+## Initial slice and design references · 04/11/2026
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 This slice adds a separate, opt-in **stored asset catalog** to the existing root search. It uses the current [App.tsx](../apps/web/src/App.tsx), [SiteHeader.tsx](../apps/web/src/SiteHeader.tsx), [styles.css](../apps/web/src/styles.css), observed source tabs from [observed-detail.css](../apps/web/src/observed-detail.css) and existing [FR-04 handoff](FR04_DETAIL_DESIGN.md). The historical MP-06 Stitch handoff below remains evidence of the original design; no new Stitch design is created. Existing two-column/850px/520px responsive behavior, labelled form, keyboard buttons, visible focus and live status remain in use.
 

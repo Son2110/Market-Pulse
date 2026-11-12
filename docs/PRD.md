@@ -1,6 +1,14 @@
 # Yêu cầu sản phẩm — scope hiện hành và baseline lịch sử
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:1abc7fd030e9e518eacb83ae9328f5550092244825f3b49e33332c6c9053f31e -->
+
+**FR-03 catalog đã lưu — phạm vi hiện hành · 12/11/2026:** search observed chỉ gồm profile `equity` trong symbol registry đồng thời có mục trong `STOCK_REFERENCE_CATALOG`, và chỉ trả canonical asset đã lưu vượt qua validation. Registry mặc định vẫn là `["FPT", "VNINDEX"]`, nên search mặc định chỉ có FPT; VNINDEX không là equity. Mã đăng ký nhưng thiếu reference như SHS vẫn bị loại khỏi search dù các route đọc observed khác hỗ trợ. `companyName`, aliases và attribution luôn từ reference tuyển chọn, không lấy tên từ storage hoặc tạo từ symbol. Với query hợp lệ và storage hợp lệ/sẵn sàng, catalog rỗng, asset chưa lưu, query không khớp hoặc mã ngoài registry trả 200 `data: []`; storage hỏng trong tập đủ điều kiện hoặc unavailable trả 503 `observed_asset_search_unavailable`; route bị tắt trả 404. `404 asset_not_found` thuộc route đọc từng asset khi mã không được hỗ trợ hoặc asset chưa lưu. Giữ nguyên hành vi hiện có; ghi nhận FPT-only ngày 04/11 bên dưới là snapshot lịch sử. Xem [hợp đồng search hiện hành](FR03_SEARCH_DESIGN.md).
+
 **FR-03 catalog đã lưu · 04/11/2026:** search root có source observed tường minh chỉ FPT, đọc canonical asset đã lưu và dùng tên/bí danh tham chiếu tuyển chọn có attribution riêng. Query/source giữ qua reload và detail/back; không provider hoặc fixture fallback. Catalog không xác nhận có giá/candle, freshness hoặc lịch sử; chưa hoàn tất FR-03/toàn core. [Handoff hiện hành](FR03_SEARCH_DESIGN.md) phân biệt checks synthetic/stub với nghiệm thu dữ liệu thật và review riêng.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 
 ## Phạm vi hiện hành · 26/10/2026 — chiều sâu sản phẩm và dữ liệu thật
