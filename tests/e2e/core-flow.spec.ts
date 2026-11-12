@@ -43,7 +43,7 @@ test("search source tabs preserve only the committed URL query across drafts and
   const query = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
   const tabs = page.getByRole("navigation", { name: "Nguồn tìm kiếm", exact: true });
   const fixture = tabs.getByRole("link", { name: "Dữ liệu minh họa", exact: true });
-  const observed = tabs.getByRole("link", { name: "Danh mục đã lưu · KBS · FPT", exact: true });
+  const observed = tabs.getByRole("link", { name: "Danh mục đã lưu · KBS", exact: true });
   await page.goto("/?source=observed&q=FPT");
   await expect(page.getByRole("heading", { name: "Chưa tìm thấy kết quả", exact: true })).toBeVisible();
   for (const draft of ["VCB", "", " ", "x".repeat(101)]) {
@@ -283,7 +283,7 @@ test("latest stored VN-Index window handles discovery, retries, manual range nav
   await noOverflow(page);
 });
 
-test("observed watchlist handles source tabs, stored catalog search, exact FPT close, unsupported symbols and retry with explicit stubs", async ({ page }, testInfo) => {
+test("observed watchlist handles source tabs, stored catalog search, exact FPT close, uncollected symbols and retry with explicit stubs", async ({ page }, testInfo) => {
   const data = { asset: { assetId: "VN:HOSE:FPT", symbol: "FPT", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" },
     dataset: { mode: "observed", label: "OBSERVED KBS DAILY CANDLES — FRESHNESS UNKNOWN", freshness: "unknown", sessionCalendar: "unverified" } };
   const range = { from: "2026-10-04", to: "2026-11-02" };
@@ -294,7 +294,7 @@ test("observed watchlist handles source tabs, stored catalog search, exact FPT c
     providerTimeLabel: "2026-11-02 00:00:00", timeProvenance: "provider_naive_calendar_label", sourceAsOf: null, collectedAt: "2026-11-03T07:00:00.123456+07:00",
     source: { provider: "KBS", connector: "vnstock", connectorVersion: "4.0.8", dependencyVersion: "2.6.2", mode: "observed" }, barId: "a".repeat(64), contentDigest: "b".repeat(64) };
   const searchBody = {
-    data: [{ asset: data.asset, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"],
+    data: [{ asset: data.asset, companyName: "Công ty Cổ phần FPT", aliases: ["FPT"], hasData: true,
       reference: { origin: "curated_reference", officialSources: ["https://fpt.com/vi/nha-dau-tu/thong-tin-co-phieu"], reviewedOn: "2026-09-29" } }],
     meta: { scope: "stored observed equities", label: "STORED OBSERVED ASSET CATALOG — COVERAGE LIMITED TO FPT", provider: "KBS", dataset: data.dataset,
       sourceAsOf: null, collectedAt: null, freshness: "unknown", coverage: ["FPT"], availability: "catalog_only", assetOrigin: "stored_observed_asset" },
@@ -303,6 +303,9 @@ test("observed watchlist handles source tabs, stored catalog search, exact FPT c
   await page.route("**/api/observed/assets/search?*", async route => {
     const q = new URL(route.request().url()).searchParams.get("q");
     await route.fulfill({ json: q === "FPT" ? searchBody : { ...searchBody, data: [], meta: { ...searchBody.meta, dataset: null } } });
+  });
+  await page.route("**/api/observed/assets/HPG/latest-window", async route => {
+    await route.fulfill({ json: { data: { asset: { assetId: "VN:HOSE:HPG", symbol: "HPG", assetType: "equity", currency: "VND", unit: "VND", timezone: "Asia/Ho_Chi_Minh" }, dataset: data.dataset }, meta: { ...meta, status: "no_data", latestTradingDate: null, range: null } } });
   });
   await page.route("**/api/observed/assets/FPT/latest-window", async route => {
     if (windowFails) { await route.fulfill({ status: 503, json: { error: "observed_latest_window_unavailable" } }); return; }
@@ -333,7 +336,8 @@ test("observed watchlist handles source tabs, stored catalog search, exact FPT c
   await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tra cứu cổ phiếu", exact: true })).toHaveAttribute("href", "/?source=observed");
   const table = page.getByRole("table", { name: "Cổ phiếu theo dõi và giá đóng cửa từ dữ liệu đã lưu", exact: true });
   const hpgRow = table.getByRole("row", { name: /^HPG/ });
-  await expect(hpgRow).toContainText("Mã ngoài phạm vi dữ liệu đã lưu (hiện chỉ hỗ trợ FPT). Không chuyển sang dữ liệu minh họa.");
+  await expect(hpgRow).toContainText("Chưa có quan sát HPG đã lưu. Không có giá đóng cửa để hiển thị.");
+  await expect(hpgRow).toContainText("HOSE · Chưa thu thập dữ liệu");
   await page.getByLabel("Mã hoặc tên doanh nghiệp", { exact: true }).fill("VCB");
   await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
   await expect(page.getByText("Chưa tìm thấy tài sản đã lưu khớp truy vấn trong phạm vi FPT.", { exact: true })).toBeVisible();
@@ -343,9 +347,11 @@ test("observed watchlist handles source tabs, stored catalog search, exact FPT c
   await page.getByRole("button", { name: "Thêm FPT", exact: true }).click();
   const fptRow = table.getByRole("row", { name: /^FPT/ });
   await expect(fptRow.getByRole("button", { name: "Tải lại giá FPT", exact: true })).toBeVisible();
+  await expect(fptRow).toContainText("HOSE · Cổ phiếu đã đăng ký");
   windowFails = false;
   await fptRow.getByRole("button", { name: "Tải lại giá FPT", exact: true }).click();
   await expect(fptRow).toContainText(`${candle.close} VND`);
+  await expect(fptRow).toContainText("HOSE · Dữ liệu đã lưu");
   await expect(fptRow).toContainText("Không tính thay đổi / lợi nhuận");
   await expect(fptRow).toContainText(candle.providerTimeLabel);
   await expect(fptRow).toContainText(candle.collectedAt);
@@ -528,18 +534,28 @@ test("real stored observed search → detail/chart/collection-status/revision �
     await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Tổng quan", exact: true })).toHaveAttribute("href", "/market?source=observed&window=latest");
     await expect(page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Theo dõi", exact: true })).toHaveAttribute("href", "/watchlists?source=observed");
     const searchInput = page.getByLabel("Mã cổ phiếu hoặc tên doanh nghiệp", { exact: true });
-    await searchInput.fill("VCB");
+    await searchInput.fill("AAA");
     await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Chưa tìm thấy kết quả", exact: true })).toBeVisible();
-    await expect(page.getByText("Chưa có tài sản đã lưu khớp truy vấn trong phạm vi FPT. Không tìm sang dữ liệu minh họa.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Chưa có cổ phiếu khớp truy vấn trong danh mục tham chiếu observed. Không tìm sang dữ liệu minh họa.", { exact: true })).toBeVisible();
+
+    await searchInput.fill("VCB");
+    await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
+    await expect(page.getByRole("button", { name: /^Xem thông tin VCB/ })).toContainText("Chưa thu thập dữ liệu");
+    const vcbPanel = page.getByRole("complementary", { name: "Ngân hàng TMCP Ngoại thương Việt Nam", exact: true });
+    await expect(vcbPanel).toContainText("Chưa thu thập dữ liệu");
+    await expect(vcbPanel).toContainText("canonicalObservedEquityAsset(profile)");
 
     await searchInput.fill("FPT");
     const observedSearchResponse = page.waitForResponse(res => new URL(res.url()).pathname === "/api/observed/assets/search" && res.status() === 200);
     await page.getByRole("button", { name: "Tìm kiếm", exact: true }).click();
     expect(new URL((await observedSearchResponse).url()).origin).toBe(new URL(page.url()).origin);
     await expect(page.getByRole("button", { name: /^Xem thông tin FPT/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /^Xem thông tin FPT/ })).toContainText("Đã có dữ liệu lưu");
     const referencePanel = page.getByRole("complementary", { name: "Công ty Cổ phần FPT", exact: true });
-    await expect(referencePanel).toContainText("Danh mục tài sản đã lưu · KBS · Chỉ FPT");
+    await expect(referencePanel).toContainText("Danh mục cổ phiếu observed · KBS");
+    await expect(referencePanel).toContainText("Đã có dữ liệu lưu");
+    await expect(referencePanel).toContainText("Mã và đơn vị đọc từ tài sản đã lưu.");
     await expect(referencePanel).toContainText("Độ mới chưa xác định; chưa có thời điểm quan sát thị trường.");
     await expect(referencePanel).toContainText("tham chiếu do dự án tuyển chọn");
     await noOverflow(page);

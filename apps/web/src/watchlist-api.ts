@@ -1,4 +1,5 @@
 import { validDate } from "./auth.js";
+import { equityProfile } from "./symbol-registry.js";
 
 export const WATCHLIST_SYMBOLS = ["BID", "FPT", "HPG", "MSN", "MWG", "SSI", "VCB", "VHM", "VIC", "VNM"] as const;
 export interface Watchlist { id: string; name: string; symbols: string[]; createdAt: string; updatedAt: string }
@@ -13,8 +14,14 @@ export function watchlistName(value: string): string | undefined {
   const name = value.trim(), length = Array.from(name).length;
   return length >= 1 && length <= 100 ? name : undefined;
 }
+/**
+ * Checks whether a value is a canonical equity symbol allowed in watchlists.
+ *
+ * @param value - Candidate symbol value.
+ * @returns True when the symbol is in the fixture catalog or the canonical symbol registry.
+ */
 export function isWatchlistSymbol(value: unknown): value is string {
-  return typeof value === "string" && (WATCHLIST_SYMBOLS as readonly string[]).includes(value);
+  return typeof value === "string" && ((WATCHLIST_SYMBOLS as readonly string[]).includes(value) || equityProfile(value) !== null);
 }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value); }
 export function isWatchlist(value: unknown): value is Watchlist {

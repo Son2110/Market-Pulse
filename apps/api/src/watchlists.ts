@@ -1,6 +1,7 @@
 import express, { type NextFunction, type Request, type RequestHandler, type Response, Router } from "express";
 import { ObjectId, type Collection, type Db, type WithId } from "mongodb";
 import type { AssetCatalogProvider } from "./market-data.js";
+import { DEFAULT_SYMBOL_REGISTRY, type SymbolRegistry } from "./symbol-registry.js";
 
 interface WatchlistRecord {
   userId: ObjectId;
@@ -16,6 +17,7 @@ export interface WatchlistOptions {
   provider: AssetCatalogProvider;
   isReady: () => boolean;
   now?: () => number;
+  registry?: SymbolRegistry;
 }
 
 function jsonError(response: Response, status: number, error: string): void {
@@ -142,8 +144,21 @@ export function createWatchlistApi(options: WatchlistOptions): { router: Router;
       if (!filter) return;
       const symbol = request.params.symbol;
       if (typeof symbol !== "string" || !allowedSymbols?.has(symbol)) return jsonError(response, 400, "invalid_request");
-      const update = method === "put" ? { $addToSet: { symbols: symbol } } : { $pull: { symbols: symbol } };
-      const record = await collection.findOneAndUpdate(filter, { ...update, $set: { updatedAt: new Date(now()) } }, {
+      if (method === "put") {
+        const record = await collection.findOneAndUpdate(
+          { ...filter, $or: [{ symbols: symbol }, { "symbols.9": { $exists: false } }] },
+          { $addToSet: { symbols: symbol }, $set: { updatedAt: new Date(now()) } },
+          { returnDocument: "after", includeResultMetadata: false },
+        );
+        if (record) {
+          response.status(200).json({ data: publicWatchlist(record) });
+          return;
+        }
+        const existing = await collection.findOne(filter);
+        if (!existing) return jsonError(response, 404, "not_found");
+        return jsonError(response, 409, "watchlist_full");
+      }
+      const record = await collection.findOneAndUpdate(filter, { $pull: { symbols: symbol }, $set: { updatedAt: new Date(now()) } }, {
         returnDocument: "after", includeResultMetadata: false,
       });
       if (!record) return jsonError(response, 404, "not_found");
@@ -164,6 +179,10 @@ export function createWatchlistApi(options: WatchlistOptions): { router: Router;
         throw new Error("Watchlist catalog unavailable");
       }
       await collection.createIndex({ userId: 1 }, { unique: true, name: "watchlist_user_unique" });
+      const registry = options.registry ?? DEFAULT_SYMBOL_REGISTRY;
+      for (const profile of registry.symbols) {
+        if (profile.assetType === "equity") symbols.add(profile.symbol);
+      }
       allowedSymbols = symbols;
     },
   };

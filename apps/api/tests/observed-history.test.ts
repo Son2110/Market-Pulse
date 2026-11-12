@@ -153,7 +153,7 @@ test("observed HTTP validates inputs before reads and sanitizes failures with no
   t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === "object");
   const base = `http://127.0.0.1:${address.port}/api/observed/assets`;
-  for (const [path, status, error] of [["FPT/history", 400, "invalid_query"], ["%24FPT/history?from=2026-10-01&to=2026-10-06", 400, "invalid_symbol"], ["%ZZ/history?from=2026-10-01&to=2026-10-06", 400, "invalid_symbol"], ["VCB/history?from=2026-10-01&to=2026-10-06", 404, "asset_not_found"], ["fpt/history?from=2026-10-01&to=2026-10-06", 503, "observed_history_unavailable"]] as const) {
+  for (const [path, status, error] of [["FPT/history", 400, "invalid_query"], ["%24FPT/history?from=2026-10-01&to=2026-10-06", 400, "invalid_symbol"], ["%ZZ/history?from=2026-10-01&to=2026-10-06", 400, "invalid_symbol"], ["AAA/history?from=2026-10-01&to=2026-10-06", 404, "asset_not_found"], ["fpt/history?from=2026-10-01&to=2026-10-06", 503, "observed_history_unavailable"]] as const) {
     const response = await fetch(`${base}/${path}`); assert.equal(response.status, status);
     assert.deepEqual(await response.json(), { error }); assert.equal(response.headers.get("cache-control"), "no-store");
   }
@@ -166,7 +166,7 @@ test("latest window HTTP rejects arbitrary ranges/parameters and unsupported sym
   const server = createServer(createApp({ checks: { mongo: async () => true, redis: async () => true }, observedHistoryRouter: createObservedHistoryRouter(reader) }));
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise<void>(resolve => server.close(() => resolve())));
   const address = server.address(); assert(address && typeof address === "object"); const base = `http://127.0.0.1:${address.port}/api/observed/assets/`;
-  for (const [path, status, error] of [["FPT/latest-window?from=2026-10-01", 400, "invalid_query"], ["VNINDEX/latest-window?window=latest", 400, "invalid_query"], ["FPT/latest-window?interval=1d&interval=1d", 400, "invalid_query"], ["%24FPT/latest-window", 400, "invalid_symbol"], ["%ZZ/latest-window", 400, "invalid_symbol"], ["VCB/latest-window", 404, "asset_not_found"], ["fpt/latest-window", 503, "observed_latest_window_unavailable"], ["vnindex/latest-window", 503, "observed_latest_window_unavailable"]] as const) {
+  for (const [path, status, error] of [["FPT/latest-window?from=2026-10-01", 400, "invalid_query"], ["VNINDEX/latest-window?window=latest", 400, "invalid_query"], ["FPT/latest-window?interval=1d&interval=1d", 400, "invalid_query"], ["%24FPT/latest-window", 400, "invalid_symbol"], ["%ZZ/latest-window", 400, "invalid_symbol"], ["AAA/latest-window", 404, "asset_not_found"], ["fpt/latest-window", 503, "observed_latest_window_unavailable"], ["vnindex/latest-window", 503, "observed_latest_window_unavailable"]] as const) {
     const response = await fetch(`${base}${path}`); assert.equal(response.status, status); assert.deepEqual(await response.json(), { error }); assert.equal(response.headers.get("cache-control"), "no-store");
   }
   assert.deepEqual(called, ["FPT", "VNINDEX"]);

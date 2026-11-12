@@ -14,13 +14,17 @@ CORPUS = json.loads((Path(__file__).resolve().parents[1] / "apps/api/tests/obser
 
 class SymbolRegistryTests(unittest.TestCase):
     def test_profiles_match_node_registry(self):
-        self.assertEqual(REGISTERED_SYMBOLS, ("FPT", "VNINDEX"))
+        self.assertEqual(len(REGISTERED_SYMBOLS), 34)
         self.assertEqual(PROFILES["FPT"], {"symbol": "FPT", "assetType": "equity", "exchange": "HOSE", "assetId": "VN:HOSE:FPT",
-                                           "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown"})
+                                           "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown", "hotBasket": True})
+        self.assertEqual(PROFILES["SHS"], {"symbol": "SHS", "assetType": "equity", "exchange": "HNX", "assetId": "VN:HNX:SHS",
+                                           "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown", "hotBasket": False})
+        self.assertEqual(PROFILES["BSR"], {"symbol": "BSR", "assetType": "equity", "exchange": "HOSE", "assetId": "VN:HOSE:BSR",
+                                           "currency": "VND", "unit": "VND", "adjustmentBasis": "unknown", "hotBasket": False})
         self.assertEqual(PROFILES["VNINDEX"], {"symbol": "VNINDEX", "assetType": "index", "exchange": "INDEX", "assetId": "VN:INDEX:VNINDEX",
-                                               "currency": None, "unit": "index_point", "adjustmentBasis": "not_applicable"})
+                                               "currency": None, "unit": "index_point", "adjustmentBasis": "not_applicable", "hotBasket": True})
         self.assertIsNone(symbol_profile("fpt"))
-        self.assertIsNone(symbol_profile("VCB"))
+        self.assertIsNone(symbol_profile("AAA"))
 
     def test_factory_supports_other_exchanges_and_rejects_bad_documents(self):
         entry = {"symbol": "VCB", "assetType": "equity", "exchange": "HOSE"}
@@ -40,10 +44,10 @@ class SymbolRegistryTests(unittest.TestCase):
         self.assertEqual(validate_observed_candles(CORPUS["baseline"]), [])
         self.assertEqual(validate_observed_candles(CORPUS["index"]), [])
         payload = copy.deepcopy(CORPUS["baseline"])
-        payload["request"]["symbol"] = "VCB"
-        payload["assets"][0].update(symbol="VCB", assetId="VN:HOSE:VCB")
+        payload["request"]["symbol"] = "AAA"
+        payload["assets"][0].update(symbol="AAA", assetId="VN:HOSE:AAA")
         for row in payload["candles"]:
-            row["assetId"] = "VN:HOSE:VCB"
+            row["assetId"] = "VN:HOSE:AAA"
         self.assertTrue(validate_observed_candles(payload))
 
 

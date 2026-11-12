@@ -174,6 +174,14 @@ test("real Mongo watchlists enforce owner isolation, atomic membership, uniquene
         const response = await send("PUT", `/${list.id}/symbols/${symbol}`, userA.token);
         assert.equal(response.status, 400); assert.deepEqual(await response.json(), { error: "invalid_request" });
       }
+      const overflowAdds = await Promise.all(["ACB", "SHS"].map((symbol) => send("PUT", `/${list.id}/symbols/${symbol}`, userA.token)));
+      for (const response of overflowAdds) {
+        assert.equal(response.status, 409);
+        assert.deepEqual(await response.json(), { error: "watchlist_full" });
+      }
+      const existingAtCap = await send("PUT", `/${list.id}/symbols/FPT`, userA.token);
+      assert.equal(existingAtCap.status, 200);
+      await existingAtCap.json();
       assert.deepEqual((await read(userA.token))[0]!.symbols, equities.sort());
       const stored = await collection.findOne({ _id: new ObjectId(list.id) });
       assert.equal(stored?.symbols.length, 10);
